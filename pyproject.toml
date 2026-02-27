@@ -1,50 +1,106 @@
 [project]
-name = "aieng-template-uv"
+name = "unbias-plus"
 version = "0.1.0"
-description = "Add your description here"
+description = "Bias detection and debiasing using a single LLM"
 readme = "README.md"
-authors = [ {name = "Vector AI Engineering", email = "ai_engineering@vectorinstitute.ai"}]
+authors = [
+    {name = "Ahmed Y. Radwan", email = "ahmed.radwan@vectorinstitute.ai"}
+]
 license = "Apache-2.0"
-repository = "https://github.com/VectorInstitute/aieng-template-uv"
-requires-python = ">=3.12"
+repository = "https://github.com/VectorInstitute/unbias-plus"
+requires-python = ">=3.10,<3.12"
+
 dependencies = [
-    "filelock==3.24.3",
-    "urllib3==2.6.3",
+    # Core ML/DL
+    "torch==2.6.0+cu124",
+    "torchaudio==2.6.0+cu124",
+    "torchvision==0.21.0+cu124",
+    "transformers>=4.35.0",
+    "accelerate==1.10.1",
+
+    # Fine-tuning
+    "peft>=0.17.1",
+    "bitsandbytes==0.48.1",
+    "trl==0.22.2",
+    "unsloth[colab-new]",
+    "unsloth-zoo>=2025.10.10",
+    "flash-attn==2.7.3",
+
+    # Build tools (required for flash-attn)
+    "cmake==4.1.0",
+    "ninja>=1.13.0",
+    "setuptools>=80.9.0",
+    "wheel>=0.45.1",
+    "build>=1.3.0",
+
+    # Data handling
+    "numpy>=1.24.0",
+    "pandas>=2.0.0",
+    "pyarrow==15.0.2",
+    "datasets>=2.18.0",
+    "safetensors>=0.4.0",
+    "jsonlines>=4.0.0",
+
+    # Validation
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.11.0",
+
+    # Utilities
+    "tqdm>=4.67.3",
+    "python-dotenv==1.1",
+    "einops>=0.8.1",
+    "tiktoken==0.7.0",
+]
+
+[project.scripts]
+unbias-plus = "unbias_plus.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.0.0",
+    "pytest-asyncio>=0.25.2",
+    "ruff>=0.3.0",
+    "mypy>=1.8.0",
+    "types-PyYAML>=6.0.0",
+    "pre-commit>=3.0.0",
+    "pip>=26.0",  # Pinning to address CVE-2026-1703
+    "pip-audit>=2.7.3",
+    "codecov>=2.1.13",
+]
+
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.0.0",
+    "mkdocstrings[python]>=0.24.0",
+    "jinja2>=3.1.6",  # Pinning to address GHSA-cpwx-vrp4-4pq7
+    "ipykernel>=6.29.5",
+    "ipython>=8.31.0",
+]
+
+all = [
+    "unbias-plus[dev,docs]",
 ]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[dependency-groups]
-dev = [
-    "codecov>=2.1.13",
-    "mypy>=1.14.1",
-    "nbqa>=1.9.1",
-    "pip>=26.0", # Pinning version to address vulnerability CVE-2026-1703
-    "pip-audit>=2.7.3",
-    "pre-commit>=4.1.0",
-    "pytest>=8.3.4",
-    "pytest-asyncio>=0.25.2",
-    "pytest-cov>=6.0.0",
-    "pytest-mock>=3.14.0",
-    "ruff>=0.13.3",
-]
-docs = [
-    "jinja2>=3.1.6", # Pinning version to address vulnerability GHSA-cpwx-vrp4-4pq7
-    "mkdocs>=1.6.0",
-    "mkdocs-material>=9.5.15",
-    "mkdocstrings>=0.24.1",
-    "mkdocstrings-python>=1.10.0",
-    "ipykernel>=6.29.5",
-    "ipython>=8.31.0",
-]
+[tool.hatch.build.targets.wheel]
+packages = ["src/unbias_plus"]
 
-# Default dependency groups to be installed
 [tool.uv]
 default-groups = ["dev", "docs"]
+index-url = "https://pypi.org/simple"
+extra-index-url = ["https://download.pytorch.org/whl/cu124"]
+index-strategy = "unsafe-best-match"
+
+[tool.uv.sources]
+unsloth = { git = "https://github.com/unslothai/unsloth.git" }
 
 [tool.mypy]
+python_version = "3.10"
 follow_imports = "normal"
 ignore_missing_imports = false
 install_types = true
@@ -55,22 +111,17 @@ no_implicit_optional = true
 check_untyped_defs = true
 namespace_packages = true
 explicit_package_bases = true
+warn_return_any = true
 warn_unused_configs = true
-allow_subclassing_any = false
-allow_untyped_calls = false
-allow_incomplete_defs = false
-allow_untyped_decorators = false
 warn_redundant_casts = true
 warn_unused_ignores = true
-implicit_reexport = false
 strict_equality = true
-extra_checks = true
 mypy_path = "src"
 
 [tool.ruff]
+line-length = 88
 include = ["*.py", "pyproject.toml", "*.ipynb"]
 exclude = []
-line-length = 120
 
 [tool.ruff.format]
 quote-style = "double"
@@ -79,45 +130,45 @@ docstring-code-format = true
 
 [tool.ruff.lint]
 select = [
-    "A", # flake8-builtins
-    "B", # flake8-bugbear
+    "A",   # flake8-builtins
+    "B",   # flake8-bugbear
     "COM", # flake8-commas
-    "C4", # flake8-comprehensions
+    "C4",  # flake8-comprehensions
     "RET", # flake8-return
     "SIM", # flake8-simplify
     "ICN", # flake8-import-conventions
-    "Q", # flake8-quotes
+    "Q",   # flake8-quotes
     "RSE", # flake8-raise
-    "D", # pydocstyle
-    "E", # pycodestyle
-    "F", # pyflakes
-    "I", # isort
-    "W", # pycodestyle
-    "N", # pep8-naming
+    "D",   # pydocstyle
+    "E",   # pycodestyle
+    "F",   # pyflakes
+    "I",   # isort
+    "W",   # pycodestyle
+    "N",   # pep8-naming
     "ERA", # eradicate
-    "PL", # pylint
+    "PL",  # pylint
 ]
-fixable = ["A", "B", "COM", "C4", "RET", "SIM", "ICN", "Q", "RSE", "D", "E", "F", "I", "W", "N", "ERA", "PL"]
+fixable = [
+    "A", "B", "COM", "C4", "RET", "SIM", "ICN",
+    "Q", "RSE", "D", "E", "F", "I", "W", "N", "ERA", "PL",
+]
 ignore = [
-    "B905", # `zip()` without an explicit `strict=` parameter
-    "E501", # line too long
-    "D203", # 1 blank line required before class docstring
-    "D213", # Multi-line docstring summary should start at the second line
+    "B905",    # zip() without explicit strict= parameter
+    "E501",    # line too long
+    "D203",    # 1 blank line required before class docstring
+    "D213",    # Multi-line docstring summary should start at second line
     "PLR2004", # Replace magic number with named constant
     "PLR0913", # Too many arguments
-    "COM812", # Missing trailing comma
-    "ERA001", # Found commented-out code (too many false positives with math comments)
-    "A001", # Ignore variable `input` is shadowing a Python builtin (common for torch)
-    "A002", # Ignore variable `input` is shadowing a Python builtin in function (common for torch)
-    "D301", # r-strings for docstrings with backslashes
+    "COM812",  # Missing trailing comma
+    "ERA001",  # Found commented-out code
+    "A001",    # Shadowing builtin (common for torch)
+    "A002",    # Shadowing builtin in function (common for torch)
+    "D301",    # r-strings for docstrings with backslashes
 ]
 
-# Ignore import violations in all `__init__.py` files.
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["E402", "F401", "F403", "F811"]
-# Ignoring undocumented public functions, public init, magic method, and magic numbers in tests folder
 "tests/*" = ["D103", "D105", "D107"]
-
 
 [tool.ruff.lint.pep8-naming]
 ignore-names = ["X*", "setUp"]
@@ -132,11 +183,16 @@ convention = "numpy"
 max-doc-length = 88
 
 [tool.pytest.ini_options]
+testpaths = ["tests/unit", "tests/integration"]
+python_files = ["test_*.py"]
 markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration_test: marks tests as integration tests",
 ]
+filterwarnings = [
+    "ignore:builtin type .* has no __module__ attribute:DeprecationWarning",
+]
 
-[tool.coverage]
-    [tool.coverage.run]
-    source=["src/aieng_template_uv"]
-    omit=["tests/*", "*__init__.py"]
+[tool.coverage.run]
+source = ["src/unbias_plus"]
+omit = ["tests/*", "*__init__.py"]

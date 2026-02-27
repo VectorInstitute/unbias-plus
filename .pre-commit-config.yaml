@@ -59,7 +59,7 @@ repos:
     - id: doctest
       name: doctest
       entry: python3 -m doctest -o NORMALIZE_WHITESPACE
-      files: "^src/aieng_template_uv/"
+      files: "^src/unbias_plus/"
       language: system
 
   - repo: local
