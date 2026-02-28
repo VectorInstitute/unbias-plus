@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UnBias</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+  <div class="noise"></div>
+
+  <header>
+    <div class="logo">
+      <span class="logo-un">Un</span><span class="logo-bias">Bias</span>
+    </div>
+    <img
+      src="/static/Vector-Logo-FullColour_Horizontal.png"
+      alt="Vector Institute"
+      class="vector-logo"
+    />
+  </header>
+  <main>
+
+    <!-- INPUT SECTION -->
+    <section class="input-section">
+      <div class="section-label">
+        <span class="label-num">01</span>
+        <span class="label-text">Paste your text</span>
+      </div>
+      <textarea
+        id="input-text"
+        placeholder="Paste any text here — news article, social media post, report, essay..."
+        spellcheck="false"
+      ></textarea>
+      <div class="input-footer">
+        <span id="char-count" class="char-count">0 / 5000</span>
+        <button id="analyze-btn" class="analyze-btn">
+          <span class="btn-text">Analyze for Bias</span>
+          <span class="btn-arrow">→</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- LOADING STATE -->
+    <div id="loading" class="loading hidden">
+      <div class="loading-bar">
+        <div class="loading-fill"></div>
+      </div>
+      <p class="loading-label">Analyzing bias patterns...</p>
+    </div>
+
+    <!-- RESULTS -->
+    <div id="results" class="results hidden">
+
+      <!-- BIAS SUMMARY BAR -->
+      <div class="summary-bar">
+        <div class="summary-left">
+          <span class="summary-label">Bias detected</span>
+          <span id="segment-count" class="segment-count">0 segments</span>
+        </div>
+        <div class="severity-pills" id="severity-pills"></div>
+      </div>
+
+      <!-- TWO PANEL VIEW -->
+      <div class="panels">
+
+        <!-- LEFT: ORIGINAL WITH HIGHLIGHTS -->
+        <div class="panel panel-original">
+          <div class="panel-header">
+            <span class="panel-title">Original</span>
+            <span class="panel-subtitle">Biased segments highlighted</span>
+          </div>
+          <div id="highlighted-text" class="panel-body"></div>
+        </div>
+
+        <!-- RIGHT: UNBIASED REWRITE -->
+        <div class="panel panel-unbiased">
+          <div class="panel-header">
+            <span class="panel-title">UnBiased</span>
+            <span class="panel-subtitle">Neutral rewrite</span>
+          </div>
+          <div id="unbiased-text" class="panel-body"></div>
+          <button class="copy-btn" id="copy-btn" title="Copy unbiased text">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            Copy
+          </button>
+        </div>
+
+      </div>
+
+      <!-- SEGMENT BREAKDOWN -->
+      <div class="breakdown-section">
+        <div class="section-label">
+          <span class="label-num">02</span>
+          <span class="label-text">Segment breakdown</span>
+        </div>
+        <div id="segment-list" class="segment-list"></div>
+      </div>
+
+      <!-- NO BIAS STATE -->
+      <div id="no-bias" class="no-bias hidden">
+        <div class="no-bias-icon">✓</div>
+        <p class="no-bias-title">No bias detected</p>
+        <p class="no-bias-sub">This text appears to use neutral, balanced language.</p>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- TOOLTIP -->
+  <div id="tooltip" class="tooltip hidden">
+    <div class="tooltip-severity" id="tooltip-severity"></div>
+    <div class="tooltip-type" id="tooltip-type"></div>
+    <div class="tooltip-reasoning" id="tooltip-reasoning"></div>
+    <div class="tooltip-replacement">
+      <span class="tooltip-rep-label">Replace with →</span>
+      <span id="tooltip-replacement"></span>
+    </div>
+  </div>
+
+  <script src="/static/script.js"></script>
+</body>
+</html>

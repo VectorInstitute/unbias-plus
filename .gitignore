@@ -8,11 +8,16 @@ wheels/
 
 # Virtual environments
 .venv
+.env
+.envrc
 
 # Lint & Test
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
+
+# Pre-commit & virtualenv caches
+.cache/
 
 # Vscode
 .vscode
