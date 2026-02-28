@@ -4,7 +4,7 @@
 [![integration tests](https://github.com/VectorInstitute/unbias-plus/actions/workflows/integration_tests.yml/badge.svg)](https://github.com/VectorInstitute/unbias-plus/actions/workflows/integration_tests.yml)
 [![docs](https://github.com/VectorInstitute/unbias-plus/actions/workflows/docs.yml/badge.svg)](https://github.com/VectorInstitute/unbias-plus/actions/workflows/docs.yml)
 [![codecov](https://codecov.io/github/VectorInstitute/unbias-plus/graph/badge.svg?token=83MYFZ3UPA)](https://codecov.io/github/VectorInstitute/unbias-plus)
-[![License](https://img.shields.io/github/license/VectorInstitute/unbias-plus)](https://github.com/VectorInstitute/unbias-plus/blob/main/LICENSE)
+[![License](https://img.shields.io/github/license/VectorInstitute/unbias-plus)](https://github.com/VectorInstitute/unbias-plus/blob/main/LICENSE.md)
 
 Bias detection and debiasing using a single LLM. Analyze text for biased language, get structured results (binary label, severity, biased segments with replacements and reasoning), and a neutral rewrite—all via one fine-tuned causal language model.
 

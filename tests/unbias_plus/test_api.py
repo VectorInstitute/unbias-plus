@@ -1,6 +1,6 @@
 """Tests for API module."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -55,8 +55,13 @@ def client(sample_bias_result: BiasResult) -> TestClient:
     mock_pipe.analyze.return_value = sample_bias_result
     mock_pipe._model.model_name_or_path = "mock-model"
 
-    with patch("unbias_plus.api.UnBiasPlus", return_value=mock_pipe):
-        yield TestClient(app)
+    old_pipe = getattr(app.state, "pipe", None)
+    app.state.pipe = mock_pipe
+    test_client = TestClient(app)
+    try:
+        yield test_client
+    finally:
+        app.state.pipe = old_pipe
 
 
 def test_health_endpoint(client: TestClient) -> None:
@@ -97,11 +102,11 @@ def test_analyze_endpoint_missing_text(client: TestClient) -> None:
 
 def test_analyze_endpoint_model_not_loaded() -> None:
     """Test /analyze returns 500 when model is not loaded."""
-    with patch("unbias_plus.api.UnBiasPlus", return_value=MagicMock()):
-        test_client = TestClient(app)
-        app.state.pipe = None
-        response = test_client.post(
-            "/analyze",
-            json={"text": "test"},
-        )
+    old_pipe = getattr(app.state, "pipe", None)
+    app.state.pipe = None
+    test_client = TestClient(app)
+    try:
+        response = test_client.post("/analyze", json={"text": "test"})
+    finally:
+        app.state.pipe = old_pipe
     assert response.status_code == 500
