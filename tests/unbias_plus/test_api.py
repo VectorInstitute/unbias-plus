@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from unbias_plus.api import app
-from unbias_plus.schema import BiasResult, BiasedSegment
+from unbias_plus.schema import BiasedSegment, BiasResult
 
 
 @pytest.fixture
@@ -55,7 +55,7 @@ def client(sample_bias_result: BiasResult) -> TestClient:
     mock_pipe.analyze.return_value = sample_bias_result
     mock_pipe._model.model_name_or_path = "mock-model"
 
-    with patch("unbias_plus.api._pipe", mock_pipe):
+    with patch("unbias_plus.api.UnBiasPlus", return_value=mock_pipe):
         yield TestClient(app)
 
 
@@ -97,9 +97,10 @@ def test_analyze_endpoint_missing_text(client: TestClient) -> None:
 
 def test_analyze_endpoint_model_not_loaded() -> None:
     """Test /analyze returns 500 when model is not loaded."""
-    with patch("unbias_plus.api._pipe", None):
-        client = TestClient(app)
-        response = client.post(
+    with patch("unbias_plus.api.UnBiasPlus", return_value=MagicMock()):
+        test_client = TestClient(app)
+        app.state.pipe = None
+        response = test_client.post(
             "/analyze",
             json={"text": "test"},
         )

@@ -24,9 +24,8 @@ dependencies = [
     "trl==0.22.2",
     "unsloth[colab-new]",
     "unsloth-zoo>=2025.10.10",
-    "flash-attn==2.7.3",
 
-    # Build tools (required for flash-attn)
+    # Build tools (for optional flash-attn / CUDA builds)
     "cmake==4.1.0",
     "ninja>=1.13.0",
     "setuptools>=80.9.0",
@@ -54,6 +53,12 @@ dependencies = [
     # API server
     "fastapi>=0.110.0",
     "uvicorn>=0.29.0",
+]
+
+[project.optional-dependencies]
+# Install with: uv sync --extra train (requires CUDA/nvcc to build)
+train = [
+    "flash-attn==2.7.3",
 ]
 
 [project.scripts]

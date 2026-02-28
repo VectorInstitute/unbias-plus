@@ -28,8 +28,7 @@ def mock_pipeline(sample_json: str) -> UnBiasPlus:
         mock_model.generate.return_value = sample_json
         mock_model.model_name_or_path = "mock-model"
         mock_model_cls.return_value = mock_model
-        pipe = UnBiasPlus("mock-model")
-    return pipe
+        return UnBiasPlus("mock-model")
 
 
 def test_analyze_returns_bias_result(
@@ -38,7 +37,9 @@ def test_analyze_returns_bias_result(
 ) -> None:
     """Test analyze returns a BiasResult object."""
     with patch.object(
-        mock_pipeline._model, "generate", return_value=mock_pipeline._model.generate.return_value
+        mock_pipeline._model,
+        "generate",
+        return_value=mock_pipeline._model.generate.return_value,
     ):
         result = mock_pipeline.analyze(sample_text)
     assert isinstance(result, BiasResult)
@@ -84,8 +85,8 @@ def test_analyze_raises_on_bad_output(
     sample_text: str,
 ) -> None:
     """Test analyze raises ValueError when LLM returns invalid output."""
-    with patch.object(
-        mock_pipeline._model, "generate", return_value="not valid json"
+    with (
+        patch.object(mock_pipeline._model, "generate", return_value="not valid json"),
+        pytest.raises(ValueError),
     ):
-        with pytest.raises(ValueError):
-            mock_pipeline.analyze(sample_text)
+        mock_pipeline.analyze(sample_text)

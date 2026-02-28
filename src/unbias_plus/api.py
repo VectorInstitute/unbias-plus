@@ -2,10 +2,10 @@
 
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import AsyncGenerator
+from typing import AsyncGenerator, cast
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -15,7 +15,6 @@ from unbias_plus.pipeline import UnBiasPlus
 from unbias_plus.schema import BiasResult
 
 
-_pipe: UnBiasPlus | None = None
 DEMO_DIR = Path(__file__).parent / "demo"
 
 
@@ -60,15 +59,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     None
 
     """
-    global _pipe
     model_path = getattr(app.state, "model_name_or_path", DEFAULT_MODEL)
     load_in_4bit = getattr(app.state, "load_in_4bit", False)
-    _pipe = UnBiasPlus(
+    app.state.pipe = UnBiasPlus(
         model_name_or_path=model_path,
         load_in_4bit=load_in_4bit,
     )
     yield
-    _pipe = None
+    app.state.pipe = None
 
 
 app = FastAPI(
@@ -105,7 +103,7 @@ def index() -> str:
 
 
 @app.get("/health", response_model=HealthResponse)
-def health() -> HealthResponse:
+def health(request: Request) -> HealthResponse:
     """Check if the server and model are ready.
 
     Returns
@@ -114,19 +112,22 @@ def health() -> HealthResponse:
         Server status and loaded model name.
 
     """
+    pipe = getattr(request.app.state, "pipe", None)
     return HealthResponse(
         status="ok",
-        model=str(_pipe._model.model_name_or_path) if _pipe else "not loaded",
+        model=str(pipe._model.model_name_or_path) if pipe else "not loaded",
     )
 
 
 @app.post("/analyze", response_model=BiasResult)
-def analyze(request: AnalyzeRequest) -> BiasResult:
+def analyze(request: Request, body: AnalyzeRequest) -> BiasResult:
     """Analyze input text for bias.
 
     Parameters
     ----------
-    request : AnalyzeRequest
+    request : Request
+        FastAPI request (for app state).
+    body : AnalyzeRequest
         Request body containing the text to analyze.
 
     Returns
@@ -142,10 +143,11 @@ def analyze(request: AnalyzeRequest) -> BiasResult:
         422 if the model output cannot be parsed.
 
     """
-    if _pipe is None:
+    pipe = getattr(request.app.state, "pipe", None)
+    if pipe is None:
         raise HTTPException(status_code=500, detail="Model not loaded.")
     try:
-        return _pipe.analyze(request.text)
+        return cast(BiasResult, pipe.analyze(body.text))
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 

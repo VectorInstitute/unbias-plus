@@ -64,11 +64,13 @@ uv sync --dev
 source .venv/bin/activate
 ```
 
-> **Note (HPC / CUDA clusters):** Load the CUDA module before running `uv sync` so that `flash-attn` can compile its CUDA extensions:
-> ```bash
-> module load cuda/12.4.0
-> uv sync
-> ```
+**Optional: flash-attn (GPU only)**  
+For training or faster inference with flash attention, install the `train` extra (requires CUDA/nvcc to build):
+```bash
+uv sync --extra train
+# On HPC: load CUDA first, e.g. module load cuda/12.4.0
+```
+Default `uv sync` does **not** install flash-attn, so CI and CPU-only setups work without it.
 
 ## Usage
 
@@ -88,6 +90,32 @@ unbias-plus --serve --load-in-4bit   # reduce VRAM
 ```
 
 Options: `--model`, `--load-in-4bit`, `--max-new-tokens`, `--host`, `--port`, `--json`.
+
+### Test the model (CLI)
+
+After `uv sync` (and optionally `uv sync --extra train` on a GPU machine), verify the pipeline with:
+
+```bash
+# Default install (no flash-attn); use a small model or --load-in-4bit on GPU
+uv run unbias-plus --text "Women are too emotional to lead."
+
+# With your own model path
+uv run unbias-plus --text "Some biased sentence." --model path/to/your/model
+
+# JSON output
+uv run unbias-plus --text "Test." --json
+```
+
+Or in Python (same env):
+
+```bash
+uv run python -c "
+from unbias_plus import UnBiasPlus
+pipe = UnBiasPlus()  # or UnBiasPlus('your-model-id', load_in_4bit=True)
+text = 'Women are too emotional to lead.'
+print(pipe.analyze_to_cli(text))
+" 
+```
 
 ### REST API + Demo UI
 

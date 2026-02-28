@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from unbias_plus.schema import BiasResult, BiasedSegment
+from unbias_plus.schema import BiasedSegment, BiasResult
 
 
 def test_biased_segment_valid() -> None:

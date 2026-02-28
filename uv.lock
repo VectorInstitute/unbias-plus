@@ -3000,7 +3000,6 @@ dependencies = [
     { name = "datasets" },
     { name = "einops" },
     { name = "fastapi" },
-    { name = "flash-attn" },
     { name = "jsonlines" },
     { name = "ninja" },
     { name = "numpy" },
@@ -3024,6 +3023,11 @@ dependencies = [
     { name = "unsloth-zoo" },
     { name = "uvicorn" },
     { name = "wheel" },
+]
+
+[package.optional-dependencies]
+train = [
+    { name = "flash-attn" },
 ]
 
 [package.dev-dependencies]
@@ -3060,7 +3064,7 @@ requires-dist = [
     { name = "datasets", specifier = ">=2.18.0" },
     { name = "einops", specifier = ">=0.8.1" },
     { name = "fastapi", specifier = ">=0.110.0" },
-    { name = "flash-attn", specifier = "==2.7.3" },
+    { name = "flash-attn", marker = "extra == 'train'", specifier = "==2.7.3" },
     { name = "jsonlines", specifier = ">=4.0.0" },
     { name = "ninja", specifier = ">=1.13.0" },
     { name = "numpy", specifier = ">=1.24.0" },
@@ -3084,6 +3088,7 @@ requires-dist = [
     { name = "uvicorn", specifier = ">=0.29.0" },
     { name = "wheel", specifier = ">=0.45.1" },
 ]
+provides-extras = ["train"]
 
 [package.metadata.requires-dev]
 dev = [

@@ -54,17 +54,17 @@ jobs:
           python-version-file: ".python-version"
 
       - name: Install the project
-        run: uv sync --all-extras --dev
+        run: uv sync --group dev
 
-      - name: Install dependencies and check code
+      - name: Run tests
         run: |
-          uv run pytest -m "not integration_test" --cov src/aieng_template_uv --cov-report=xml tests
+          uv run pytest tests/ -m "not integration_test" --cov=src/unbias_plus --cov-report=xml
 
       # Uncomment this once this repo is configured on Codecov
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          slug: VectorInstitute/aieng-template-uv
+          slug: VectorInstitute/unbias-plus
           fail_ci_if_error: false
           verbose: true
