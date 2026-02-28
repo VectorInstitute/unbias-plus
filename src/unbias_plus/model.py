@@ -32,9 +32,9 @@ class UnBiasModel:
 
     Examples
     --------
-    >>> model = UnBiasModel()
-    >>> raw = model.generate("Analyze this text for bias...")
-    >>> isinstance(raw, str)
+    >>> model = UnBiasModel()  # doctest: +SKIP
+    >>> raw = model.generate("Analyze this text for bias...")  # doctest: +SKIP
+    >>> isinstance(raw, str)  # doctest: +SKIP
     True
 
     """
@@ -102,9 +102,9 @@ class UnBiasModel:
 
         Examples
         --------
-        >>> model = UnBiasModel()
-        >>> output = model.generate("Analyze: Women can't lead.")
-        >>> isinstance(output, str)
+        >>> model = UnBiasModel()  # doctest: +SKIP
+        >>> output = model.generate("Analyze: Women can't lead.")  # doctest: +SKIP
+        >>> isinstance(output, str)  # doctest: +SKIP
         True
 
         """

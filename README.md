@@ -64,7 +64,7 @@ uv sync --dev
 source .venv/bin/activate
 ```
 
-**Optional: flash-attn (GPU only)**  
+**Optional: flash-attn (GPU only)**
 For training or faster inference with flash attention, install the `train` extra (requires CUDA/nvcc to build):
 ```bash
 uv sync --extra train
@@ -114,7 +114,7 @@ from unbias_plus import UnBiasPlus
 pipe = UnBiasPlus()  # or UnBiasPlus('your-model-id', load_in_4bit=True)
 text = 'Women are too emotional to lead.'
 print(pipe.analyze_to_cli(text))
-" 
+"
 ```
 
 ### REST API + Demo UI

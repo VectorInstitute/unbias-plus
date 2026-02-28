@@ -60,6 +60,7 @@ repos:
       name: doctest
       entry: python3 -m doctest -o NORMALIZE_WHITESPACE
       files: "^src/unbias_plus/"
+      types: [python]
       language: system
 
   - repo: local
