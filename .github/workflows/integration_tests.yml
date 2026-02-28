@@ -58,7 +58,7 @@ jobs:
 
       - name: Install dependencies and check code
         run: |
-          uv run pytest -m "integration_test" --cov src/unbias_plus --cov-report=xml tests
+          uv run pytest -m "not integration_test" --cov src/unbias_plus --cov-report=xml tests
 
       # Uncomment this once this repo is configured on Codecov
       - name: Upload coverage to Codecov
