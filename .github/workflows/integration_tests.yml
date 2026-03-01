@@ -61,10 +61,10 @@ jobs:
           uv run pytest -m "not integration_test" --cov src/unbias_plus --cov-report=xml tests
 
       # Uncomment this once this repo is configured on Codecov
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          slug: VectorInstitute/unbias-plus
-          fail_ci_if_error: false
-          verbose: true
+      #- name: Upload coverage to Codecov
+      #  uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de
+      #  with:
+      #    token: ${{ secrets.CODECOV_TOKEN }}
+      #    slug: VectorInstitute/unbias-plus
+      #    fail_ci_if_error: false
+      #    verbose: true

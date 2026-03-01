@@ -181,7 +181,8 @@ def serve(
     Examples
     --------
     >>> from unbias_plus.api import serve
-    >>> serve("VectorInstitute/unbias-plus-llama3", port=8000)
+    >>> serve("Qwen/Qwen3-4B", port=8000)  # doctest: +SKIP
+
 
     """
     app.state.model_name_or_path = str(model_name_or_path)
