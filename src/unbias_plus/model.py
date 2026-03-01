@@ -6,7 +6,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 
-DEFAULT_MODEL = "meta-llama/Llama-3.2-3B"
+DEFAULT_MODEL = "Qwen/Qwen3-4B"
 
 
 class UnBiasModel:
@@ -20,7 +20,7 @@ class UnBiasModel:
     ----------
     model_name_or_path : str | Path
         HuggingFace model ID or local path to the model.
-        Defaults to 'meta-llama/Llama-3.2-3B'.
+        Defaults to 'Qwen/Qwen3-4B'.
     device : str | None, optional
         Device to run on ('cuda' or 'cpu').
         Auto-detects if not provided.
