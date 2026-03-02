@@ -6,7 +6,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 
-DEFAULT_MODEL = "Qwen/Qwen3-4B"
+DEFAULT_MODEL = "vector-institute/Unbias-plus-Qwen2.5"
 
 
 class UnBiasModel:
@@ -44,7 +44,7 @@ class UnBiasModel:
         model_name_or_path: str | Path = DEFAULT_MODEL,
         device: str | None = None,
         load_in_4bit: bool = False,
-        max_new_tokens: int = 1024,
+        max_new_tokens: int = 2048,
     ) -> None:
         """Initialize the model and tokenizer.
 
@@ -67,8 +67,17 @@ class UnBiasModel:
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
+        # If the caller did not explicitly choose a different model, they are
+        # using the default LoRA-4bit checkpoint. For that model we need to
+        # enable 4-bit loading automatically, even if load_in_4bit=False was
+        # passed through higher-level defaults (CLI / API). For any other
+        # model, 4-bit remains opt-in.
+        effective_load_in_4bit = load_in_4bit or (
+            self.model_name_or_path == DEFAULT_MODEL
+        )
+
         quantization_config = None
-        if load_in_4bit:
+        if effective_load_in_4bit:
             quantization_config = BitsAndBytesConfig(
                 load_in_4bit=True,
                 bnb_4bit_compute_dtype=torch.bfloat16,
@@ -77,11 +86,11 @@ class UnBiasModel:
         self.model = AutoModelForCausalLM.from_pretrained(
             self.model_name_or_path,
             torch_dtype=torch.bfloat16,
-            device_map="auto" if load_in_4bit else None,
+            device_map="auto" if effective_load_in_4bit else None,
             quantization_config=quantization_config,
         )
 
-        if not load_in_4bit:
+        if not effective_load_in_4bit:
             self.model = self.model.to(self.device)  # type: ignore[arg-type]
 
         self.model.eval()

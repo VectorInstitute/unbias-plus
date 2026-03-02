@@ -15,6 +15,13 @@ wheels/
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
+.coverage
+
+# Experimental files
+archive/
+**.txt
+**.xml
+
 
 # Pre-commit & virtualenv caches
 .cache/
