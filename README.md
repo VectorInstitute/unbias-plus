@@ -5,6 +5,7 @@
 [![docs](https://github.com/VectorInstitute/unbias-plus/actions/workflows/docs.yml/badge.svg)](https://github.com/VectorInstitute/unbias-plus/actions/workflows/docs.yml)
 [![codecov](https://codecov.io/github/VectorInstitute/unbias-plus/graph/badge.svg?token=83MYFZ3UPA)](https://codecov.io/github/VectorInstitute/unbias-plus)
 [![License](https://img.shields.io/github/license/VectorInstitute/unbias-plus)](https://github.com/VectorInstitute/unbias-plus/blob/main/LICENSE.md)
+[![Contact](https://img.shields.io/badge/Contact-shaina.raza%40vectorinstitute.ai-green)](mailto:shaina.raza@vectorinstitute.ai)
 
 Bias detection and debiasing using a single LLM. Analyze text for biased language, get structured results (binary label, severity, biased segments with replacements and reasoning), and a neutral rewrite—all via one fine-tuned causal language model.
 
@@ -171,6 +172,27 @@ json_str = pipe.analyze_to_json("...")   # pretty-printed JSON string
 - **Linting / formatting**: `ruff` (format + lint), config in `pyproject.toml`.
 - **Type checking**: `mypy` with strict options, `mypy_path = "src"`.
 
+
+## 👥 Team
+
+Developed by the **AI Engineering** team at the [Vector Institute](https://vectorinstitute.ai).
+
+| Ahmed Y. Radwan | Sindhuja Chaduvula | Shaina Raza |
+|:-:|:-:|:-:|
+| Vector Institute | Vector Institute | Vector Institute |
+
+## Acknowledgement
+
+Resources used in preparing this research are provided, in part, by the Province of Ontario, the Government of Canada through CIFAR, and companies sponsoring the Vector Institute.
+
+This research is also supported by the European Union's Horizon Europe research and innovation programme under the AIXPERT project (Grant Agreement No. 101214389).
+
+
+
 ## License
 
-Licensed under the **Apache License 2.0**. See [LICENSE](https://github.com/VectorInstitute/unbias-plus/blob/main/LICENSE) in the repository.
+Licensed under the **Apache License 2.0**. See [LICENSE](https://github.com/VectorInstitute/unbias-plus/blob/main/LICENSE.md) in the repository.
+
+## Support
+
+* Open an issue on GitHub: [https://github.com/VectorInstitute/unbias-plus/issues](https://github.com/VectorInstitute/unbias-plus/issues)

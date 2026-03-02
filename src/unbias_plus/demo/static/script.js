@@ -104,7 +104,7 @@
      renderSummary(biased_segments);
      highlightEl.innerHTML = buildHighlightedHTML(original_text, biased_segments);
      attachMarkTooltips(biased_segments);
-     unbiasedEl.textContent = unbiased_text;
+     unbiasedEl.innerHTML = buildUnbiasedHTML(original_text, unbiased_text, biased_segments);
      renderSegmentCards(biased_segments);
    }
 
@@ -271,3 +271,22 @@
        setTimeout(() => { copyBtn.innerHTML = original; }, 1800);
      });
    });
+
+   // ============================================================
+   // UNBIASED HTML BUILDER
+   // ============================================================
+   function buildUnbiasedHTML(original, unbiased, segments) {
+    // Collect all original biased phrases
+    const originals = segments.map(s => s.original).filter(Boolean);
+    const replacements = segments.map(s => s.replacement).filter(Boolean);
+
+    let html = escapeHtmlText(unbiased);
+
+    replacements.forEach((rep) => {
+      if (!rep) return;
+      const escaped = escapeHtmlText(rep);
+      html = html.replace(escaped, `<mark class="replaced-green">${escaped}</mark>`);
+    });
+
+    return html;
+  }
