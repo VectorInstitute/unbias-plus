@@ -1,17 +1,26 @@
+"""Fine-tune Qwen2.5-7B using SFT with completion-only loss on VLDBench data."""
+
+from __future__ import annotations
+
 import json
 import os
+from typing import Any, Dict, List, Tuple, cast
+
+
 os.environ["TORCHDYNAMO_DISABLE"] = "1"
+
 import torch
 from datasets import Dataset
+from trl import SFTConfig, SFTTrainer
 from unsloth import FastLanguageModel
-from trl import SFTTrainer, SFTConfig
-from accelerate import Accelerator
-
-accelerator = Accelerator()
 
 
-input_path = "/projects/aixpert/users/sindhu/Unbias/checkpoints_gpt/checkpoint.json"
-output_dir = "/projects/aixpert/users/sindhu/Unbias/Models/Qwen25_Unbias_4k_5epoch"
+INPUT_PATH = "/Unbias/checkpoints_gpt/checkpoint.json"
+OUTPUT_DIR = "/Unbias/Models/Qwen25_Unbias_4k_5epoch"
+
+BASE_MODEL = "Qwen/Qwen2.5-7B-Instruct"
+MAX_SEQ_LENGTH = 8192
+TRAIN_SAMPLES = 4000  # use first 4k samples
 
 
 SYSTEM_PROMPT = """
@@ -37,7 +46,7 @@ You are an expert linguist and bias detection specialist. Your job is to:
 
 ## SEVERITY SCALE
 - **high**: Dehumanizing, hateful, or strongly prejudiced language
-- **medium**: Framing bias, loaded terms, misleading generalizations  
+- **medium**: Framing bias, loaded terms, misleading generalizations
 - **low**: Subtle word choice bias, mild framing issues
 
 ## SEGMENT RULES
@@ -72,25 +81,30 @@ Rules:
 - Return ONLY valid JSON.
 """.strip()
 
-with open(input_path, "r", encoding="utf-8") as f:
-    raw_data = json.load(f)
 
-raw_data = raw_data[:4000]
+def load_raw_data(path: str, limit: int) -> List[Dict[str, Any]]:
+    """Load and optionally truncate raw JSON training data."""
+    with open(path, "r", encoding="utf-8") as f:
+        data = cast(List[Dict[str, Any]], json.load(f))
+    return data[:limit]
 
-print(f"Loaded {len(raw_data)} samples (first 1000 only)")
 
-max_seq_length = 8192
+def load_base_model(model_name: str, max_seq_length: int) -> Tuple[Any, Any]:
+    """Load Qwen model in 4-bit mode using Unsloth."""
+    model, tokenizer = FastLanguageModel.from_pretrained(
+        model_name=model_name,
+        max_seq_length=max_seq_length,
+        load_in_4bit=True,
+    )
 
-model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name="Qwen/Qwen2.5-7B-Instruct",
-    max_seq_length=max_seq_length,
-    load_in_4bit=True,
-)
+    tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = "right"
 
-tokenizer.pad_token = tokenizer.eos_token
-tokenizer.padding_side = "right"
+    return model, tokenizer
 
-def format_sample(sample):
+
+def format_sample(sample: Dict[str, Any], tokenizer: Any) -> Dict[str, str]:
+    """Convert raw sample into completion-only chat training format."""
     completion = {
         "binary_label": sample["binary_label"],
         "severity": sample["severity"],
@@ -101,100 +115,169 @@ def format_sample(sample):
 
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": f"Analyze the following article:\n\n{sample['article_text']}"},
+        {
+            "role": "user",
+            "content": f"Analyze the following article:\n\n{sample['article_text']}",
+        },
     ]
 
-    text = tokenizer.apply_chat_template(
+    prompt = tokenizer.apply_chat_template(
         messages,
         tokenize=False,
         add_generation_prompt=True,
     )
 
-    text += json.dumps(completion, ensure_ascii=False)
+    full_text = prompt + json.dumps(completion, ensure_ascii=False)
+    return {"text": full_text}
 
-    return {"text": text}
-dataset = Dataset.from_list(raw_data)
-dataset = dataset.map(format_sample, remove_columns=dataset.column_names)
 
-print("Dataset ready:", len(dataset))
-print(dataset[0]["text"])
+def build_dataset(raw_data: List[Dict[str, Any]], tokenizer: Any) -> Dataset:
+    """Build HuggingFace Dataset with formatted training text."""
+    dataset = Dataset.from_list(raw_data)
+    return dataset.map(
+        lambda x: format_sample(x, tokenizer),
+        remove_columns=dataset.column_names,
+    )
 
-print("Checking token lengths...")
 
-max_tokens = 0
-lengths = []
+def filter_by_token_length(
+    dataset: Dataset, tokenizer: Any, max_length: int
+) -> Dataset:
+    """Filter dataset samples exceeding max token length."""
 
-for i in range(len(dataset)):
-    tokens = tokenizer(dataset[i]["text"], add_special_tokens=False)["input_ids"]
-    length = len(tokens)
-    lengths.append(length)
-    if length > max_tokens:
-        max_tokens = length
+    def is_valid(example: Dict[str, str]) -> bool:
+        tokens = tokenizer(example["text"], add_special_tokens=False)["input_ids"]
+        return len(tokens) <= max_length
 
-print(f"Max token length: {max_tokens}")
-print(f"Average token length: {sum(lengths) / len(lengths):.2f}")
-print(f"Samples > {max_seq_length} tokens: {sum(l > max_seq_length for l in lengths)}")
+    return dataset.filter(is_valid)
 
-print("Filtering samples exceeding max_seq_length...")
 
-dataset = dataset.filter(
-    lambda x: len(tokenizer(x["text"], add_special_tokens=False)["input_ids"]) <= max_seq_length
-)
+def print_token_stats(dataset: Dataset, tokenizer: Any) -> None:
+    """Print token statistics for dataset."""
+    lengths: List[int] = []
+    max_tokens = 0
 
-print("Dataset size after filtering:", len(dataset))
+    for idx in range(len(dataset)):
+        tokens = tokenizer(dataset[idx]["text"], add_special_tokens=False)["input_ids"]
+        token_length = len(tokens)
+        lengths.append(token_length)
+        max_tokens = max(max_tokens, token_length)
 
-model = FastLanguageModel.get_peft_model(
-    model,
-    r=32,
-    lora_alpha=64,
-    lora_dropout=0.05,
-    bias="none",
-    use_gradient_checkpointing=True,
-    target_modules=[
-        "q_proj", "k_proj", "v_proj", "o_proj",
-        "gate_proj", "up_proj", "down_proj"
-    ]
-)
+    print(f"Max token length: {max_tokens}")
+    print(f"Average token length: {sum(lengths) / len(lengths):.2f}")
+    print(
+        f"Samples > {MAX_SEQ_LENGTH} tokens: "
+        f"{sum(token_length > MAX_SEQ_LENGTH for token_length in lengths)}"
+    )
 
-training_args = SFTConfig(
-    output_dir=output_dir,
-    per_device_train_batch_size=2,
-    gradient_accumulation_steps=8,
-    num_train_epochs=5,
-    learning_rate=2e-4,
-    warmup_ratio=0.03,
-    lr_scheduler_type="cosine",
-    logging_steps=10,
-    save_steps=20,
-    save_total_limit=3,
-    bf16=torch.cuda.is_bf16_supported(),
-    fp16=not torch.cuda.is_bf16_supported(),
-    optim="paged_adamw_8bit",
-    weight_decay=0.01,
-    max_grad_norm=1.0,
-    report_to="none",
-    seed=42,
-    dataset_text_field="text",
-    completion_only_loss=True,
-    remove_unused_columns=False,
-    ddp_find_unused_parameters=False,
-    dataset_num_proc=4,
-    max_length=8192,
-    torch_compile=False,
-)
 
-trainer = SFTTrainer(
-    model=model,
-    tokenizer=tokenizer,
-    train_dataset=dataset,
-    packing=False,
-    args=training_args,
-)
+def configure_lora(model: Any) -> Any:
+    """Attach LoRA adapters to model."""
+    return FastLanguageModel.get_peft_model(
+        model,
+        r=32,
+        lora_alpha=64,
+        lora_dropout=0.05,
+        bias="none",
+        use_gradient_checkpointing=True,
+        target_modules=[
+            "q_proj",
+            "k_proj",
+            "v_proj",
+            "o_proj",
+            "gate_proj",
+            "up_proj",
+            "down_proj",
+        ],
+    )
 
-print("Starting Qwen2.5-7B Completion-Only Training...")
-trainer.train()
 
-model.save_pretrained(output_dir)
-tokenizer.save_pretrained(output_dir)
+def build_training_args(output_dir: str) -> SFTConfig:
+    """Create SFT training configuration."""
+    return SFTConfig(
+        output_dir=output_dir,
+        per_device_train_batch_size=2,
+        gradient_accumulation_steps=8,
+        num_train_epochs=5,
+        learning_rate=2e-4,
+        warmup_ratio=0.03,
+        lr_scheduler_type="cosine",
+        logging_steps=10,
+        save_steps=20,
+        save_total_limit=3,
+        bf16=torch.cuda.is_bf16_supported(),
+        fp16=not torch.cuda.is_bf16_supported(),
+        optim="paged_adamw_8bit",
+        weight_decay=0.01,
+        max_grad_norm=1.0,
+        report_to="none",
+        seed=42,
+        dataset_text_field="text",
+        completion_only_loss=True,
+        remove_unused_columns=False,
+        ddp_find_unused_parameters=False,
+        dataset_num_proc=4,
+        max_length=MAX_SEQ_LENGTH,
+        torch_compile=False,
+    )
 
-print(f"Model saved to {output_dir}")
+
+def train_model(
+    model: Any, tokenizer: Any, dataset: Dataset, training_args: SFTConfig
+) -> None:
+    """Train model using TRL SFTTrainer."""
+    try:
+        # Newer TRL uses `processing_class` instead of `tokenizer`
+        trainer = SFTTrainer(
+            model=model,
+            train_dataset=dataset,
+            args=training_args,
+            processing_class=tokenizer,
+        )
+    except TypeError:
+        # Older TRL: fall back to minimal signature
+        trainer = SFTTrainer(
+            model=model,
+            train_dataset=dataset,
+            args=training_args,
+        )
+
+    print("Starting Qwen2.5-7B completion-only training...")
+    trainer.train()
+
+
+def main() -> None:
+    """Run full SFT fine-tuning pipeline."""
+    print("Loading raw data...")
+    raw_data = load_raw_data(INPUT_PATH, TRAIN_SAMPLES)
+    print(f"Loaded {len(raw_data)} samples")
+
+    print("Loading base model...")
+    model, tokenizer = load_base_model(BASE_MODEL, MAX_SEQ_LENGTH)
+
+    print("Building dataset...")
+    dataset = build_dataset(raw_data, tokenizer)
+
+    print("Checking token lengths...")
+    print_token_stats(dataset, tokenizer)
+
+    print("Filtering overlength samples...")
+    dataset = filter_by_token_length(dataset, tokenizer, MAX_SEQ_LENGTH)
+    print("Dataset size after filtering:", len(dataset))
+
+    print("Configuring LoRA...")
+    model = configure_lora(model)
+
+    print("Building training args...")
+    training_args = build_training_args(OUTPUT_DIR)
+
+    train_model(model, tokenizer, dataset, training_args)
+
+    print("Saving model...")
+    model.save_pretrained(OUTPUT_DIR)
+    tokenizer.save_pretrained(OUTPUT_DIR)
+    print(f"Model saved to {OUTPUT_DIR}")
+
+
+if __name__ == "__main__":
+    main()

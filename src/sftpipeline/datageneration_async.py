@@ -1,9 +1,13 @@
-from google import genai
-import pandas as pd
+"""Asynchronous Gemini-based data generation pipeline for VLDBench."""
+
+import asyncio
 import json
 import os
-import asyncio
+from typing import Any, Dict, List
+
+import pandas as pd
 from dotenv import load_dotenv
+from google import genai
 from tqdm import tqdm
 
 
@@ -19,74 +23,21 @@ TEMPERATURE = 0.2
 MAX_RETRIES = 3
 MAX_CONCURRENT_REQUESTS = 10
 
-os.makedirs(CHECKPOINT_DIR, exist_ok=True)
 
-load_dotenv(ENV_PATH)
-API_KEY = os.getenv("GEMINI_API_KEY")
-
-if API_KEY is None:
-    raise ValueError("GEMINI_API_KEY not found")
-
-client = genai.Client(api_key=API_KEY)
-
-df = pd.read_csv(INPUT_FILE)
-total_rows = len(df)
-print("Total rows:", total_rows)
-
-if os.path.exists(CHECKPOINT_FILE):
-    with open(CHECKPOINT_FILE, "r", encoding="utf-8") as f:
-        results = json.load(f)
-
-    if len(results) > 0:
-        last_saved_index = max(r["index"] for r in results)
-        start_index = last_saved_index + 1
-        print(f"Resuming from index {start_index}")
-    else:
-        start_index = 0
-else:
-    results = []
-    start_index = 0
-    print("Starting fresh.")
-
-results_lock = asyncio.Lock()
-
-
-schema = {
+schema: Dict[str, Any] = {
     "type": "object",
     "properties": {
         "severity": {"type": "integer", "minimum": 2, "maximum": 4},
         "bias_found": {"type": "boolean"},
         "unbiased_text": {"type": "string"},
-        "biased_segments": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "original": {"type": "string"},
-                    "replacement": {"type": "string"},
-                    "severity": {
-                        "type": "string",
-                        "enum": ["high", "medium", "low"]
-                    },
-                    "bias_type": {"type": "string"},
-                    "reasoning": {"type": "string"}
-                },
-                "required": [
-                    "original",
-                    "replacement",
-                    "severity",
-                    "bias_type",
-                    "reasoning"
-                ]
-            }
-        }
+        "biased_segments": {"type": "array"},
     },
-    "required": ["severity", "bias_found", "unbiased_text", "biased_segments"]
+    "required": ["severity", "bias_found", "unbiased_text", "biased_segments"],
 }
 
 
-def build_prompt_biased_only(article_text):
-
+def build_prompt_biased_only(article_text: str) -> str:
+    """Build Gemini prompt for biased text rewriting."""
     return f"""
 You are an expert linguist and bias detection specialist.
 
@@ -170,17 +121,28 @@ ARTICLE
 \"\"\"{article_text}\"\"\"
 """
 
-async def save_checkpoint():
+
+async def save_checkpoint(
+    results: List[Dict[str, Any]],
+    results_lock: asyncio.Lock,
+) -> None:
+    """Save intermediate results to checkpoint file."""
     async with results_lock:
         ordered = sorted(results, key=lambda x: x["index"])
         with open(CHECKPOINT_FILE, "w", encoding="utf-8") as f:
             json.dump(ordered, f, indent=2, ensure_ascii=False)
-        print("Checkpoint saved.")
 
-async def process_row(idx, semaphore):
 
+async def process_row(
+    idx: int,
+    df: pd.DataFrame,
+    client: genai.Client,
+    semaphore: asyncio.Semaphore,
+    results: List[Dict[str, Any]],
+    results_lock: asyncio.Lock,
+) -> None:
+    """Process a single dataset row asynchronously."""
     async with semaphore:
-
         row = df.iloc[idx]
         article = row["article_text"]
         binary_label = row["classification_label"]
@@ -193,112 +155,117 @@ async def process_row(idx, semaphore):
                 "severity": 0,
                 "bias_found": False,
                 "biased_segments": [],
-                "unbiased_text": article
+                "unbiased_text": article,
             }
-
         else:
-            retries = 0
-            parsed = None
-
-            while retries < MAX_RETRIES:
-                try:
-                    loop = asyncio.get_running_loop()
-
-                    response = await loop.run_in_executor(
-                        None,
-                        lambda: client.models.generate_content(
-                            model="gemini-3-flash-preview",
-                            contents=build_prompt_biased_only(article),
-                            config={
-                                "temperature": TEMPERATURE,
-                                "response_mime_type": "application/json",
-                                "response_schema": schema
-                            }
-                        )
-                    )
-
-                    parsed = response.parsed
-                    if parsed is not None:
-                        break
-
-                except Exception as e:
-                    print(f"Retry {retries+1} failed at index {idx}: {e}")
-
-                retries += 1
-                await asyncio.sleep(2)
-
+            parsed = await generate_with_retries(article, client, idx)
             if parsed is None:
-                print(f"Skipping index {idx}")
                 return
-
-            severity = parsed.get("severity", 2)
-            if not isinstance(severity, int):
-                severity = 2
-            parsed["severity"] = max(2, min(4, severity))
-
-            validated_segments = []
-
-            for seg in parsed.get("biased_segments", []):
-                if (
-                    isinstance(seg, dict)
-                    and isinstance(seg.get("original"), str)
-                    and seg["original"] in article
-                ):
-                    validated_segments.append(seg)
-
-            parsed["biased_segments"] = validated_segments
-            parsed["bias_found"] = True
 
             result_entry = {
                 "index": idx,
                 "binary_label": binary_label,
                 "article_text": article,
                 "severity": parsed["severity"],
-                "bias_found": parsed["bias_found"],
+                "bias_found": True,
                 "biased_segments": parsed["biased_segments"],
-                "unbiased_text": parsed.get("unbiased_text")
+                "unbiased_text": parsed.get("unbiased_text"),
             }
 
         async with results_lock:
             results.append(result_entry)
 
 
-async def main():
+async def generate_with_retries(
+    article: str,
+    client: genai.Client,
+    idx: int,
+) -> Dict[str, Any] | None:
+    """Call Gemini with retry logic and validate output."""
+    retries = 0
+    while retries < MAX_RETRIES:
+        try:
+            loop = asyncio.get_running_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: client.models.generate_content(
+                    model="gemini-3-flash-preview",
+                    contents=build_prompt_biased_only(article),
+                    config={
+                        "temperature": TEMPERATURE,
+                        "response_mime_type": "application/json",
+                        "response_schema": schema,
+                    },
+                ),
+            )
+            parsed = response.parsed
+            if not isinstance(parsed, dict):
+                retries += 1
+                await asyncio.sleep(2)
+                continue
 
-    global results  # make intent explicit (safe + clean)
+            severity = int(parsed.get("severity", 2))
+            parsed["severity"] = max(2, min(4, severity))
+
+            return parsed
+        except Exception as exc:
+            print(f"Retry {retries + 1} failed at index {idx}: {exc}")
+
+        retries += 1
+        await asyncio.sleep(2)
+
+    print(f"Skipping index {idx}")
+    return None
+
+
+async def main() -> None:
+    """Run full asynchronous data generation pipeline."""
+    os.makedirs(CHECKPOINT_DIR, exist_ok=True)
+
+    load_dotenv(ENV_PATH)
+    api_key = os.getenv("GEMINI_API_KEY")
+    if api_key is None:
+        raise ValueError("GEMINI_API_KEY not found")
+
+    client = genai.Client(api_key=api_key)
+
+    df = pd.read_csv(INPUT_FILE)
+    total_rows = len(df)
+    print("Total rows:", total_rows)
+
+    results: List[Dict[str, Any]] = []
+    results_lock = asyncio.Lock()
 
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
 
-    batch_size = MAX_CONCURRENT_REQUESTS
-    indices = list(range(start_index, total_rows))
+    indices = list(range(total_rows))
 
-    for i in tqdm(range(0, len(indices), batch_size),
-                  desc="Processing VLDBench"):
-
-        batch_indices = indices[i:i + batch_size]
-
+    for start in tqdm(
+        range(0, len(indices), MAX_CONCURRENT_REQUESTS),
+        desc="Processing VLDBench",
+    ):
+        batch = indices[start : start + MAX_CONCURRENT_REQUESTS]
         tasks = [
-            process_row(idx, semaphore)
-            for idx in batch_indices
+            process_row(
+                idx,
+                df,
+                client,
+                semaphore,
+                results,
+                results_lock,
+            )
+            for idx in batch
         ]
-
         await asyncio.gather(*tasks)
+        await save_checkpoint(results, results_lock)
 
-        # Save checkpoint after each batch
-        await save_checkpoint()
-
-    # Final save
-    ordered_results = sorted(results, key=lambda x: x["index"])
-
-    # Reassign clean sequential indices
-    for new_idx, row in enumerate(ordered_results):
-        row["index"] = new_idx
+    ordered = sorted(results, key=lambda x: x["index"])
 
     with open(FINAL_OUTPUT_FILE, "w", encoding="utf-8") as f:
-        json.dump(ordered_results, f, indent=2, ensure_ascii=False)
+        json.dump(ordered, f, indent=2, ensure_ascii=False)
 
-    print("\nFinal results saved with corrected indices.")
-    print(f"Total samples: {len(ordered_results)}")
+    print("Final dataset saved.")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

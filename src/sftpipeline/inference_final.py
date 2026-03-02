@@ -1,15 +1,26 @@
-import os
-import json
-import torch
-import pandas as pd
-from tqdm import tqdm
-from dotenv import load_dotenv
-from transformers import AutoTokenizer, AutoModelForCausalLM
-import outlines
-from typing import List, Literal
-from pydantic import BaseModel, Field
+"""Run inference with a fine-tuned Qwen2.5-7B model and save structured outputs.
 
-print("Running inference with fine-tuned Qwen2.5-7B model")
+This script:
+- Loads a fine-tuned model wrapped with Outlines for schema-constrained JSON output.
+- Filters test articles by token length.
+- Runs inference with dynamic token budgeting (avoids context overflow).
+- Writes results incrementally to a JSON file.
+
+No heavyweight work executes at import time (pre-commit/doctest friendly).
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from typing import Any, Dict, List, Literal, Tuple
+
+import outlines
+import pandas as pd
+import torch
+from pydantic import BaseModel, Field
+from tqdm import tqdm
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
 FT_MODEL = "/Unbias/Models/Qwen25_Unbias_4k_5epoch"
@@ -19,9 +30,13 @@ OUTPUT_FILE = "ft_model_inference_resultsfinal.json"
 
 MAX_SEQ_LENGTH = 8192
 MAX_ARTICLE_TOKENS = 5000
-MAX_NEW_TOKENS = 8000
 
+MODEL_LIMIT = 32768
+TOKEN_BUFFER = 500
+HARD_MAX_NEW_CAP = 15000
+TRUNCATION_RETRY_CAP = 12000
 
+PRINT_CONTEXT_DEBUG = True
 
 SYSTEM_PROMPT = """
 You are an expert linguist and bias detection specialist. Your job is to:
@@ -87,7 +102,11 @@ GlobalSeverity = Literal[2, 3, 4]
 
 
 class BiasedSegment(BaseModel):
-    original: str = Field(..., description="Exact case-sensitive substring from input text")
+    """Represent a single biased segment found in the article."""
+
+    original: str = Field(
+        ..., description="Exact case-sensitive substring from input text"
+    )
     replacement: str = Field(..., description="Neutral alternative phrase")
     severity: SegmentSeverity
     bias_type: BiasType
@@ -95,15 +114,26 @@ class BiasedSegment(BaseModel):
 
 
 class BiasOutput(BaseModel):
+    """Represent structured bias detection output with a full neutral rewrite."""
+
     severity: GlobalSeverity
     biased_segments: List[BiasedSegment]
     unbiased_text: str
 
+
+@dataclass(frozen=True)
+class InferenceOutput:
+    """Store normalized output for saving to disk."""
+
+    binary_label: str
+    bias_found: bool
+    severity: int
+    biased_segments: List[Dict[str, Any]]
+    unbiased_text: str
+
+
 def build_prompt(article_text: str) -> str:
-    """
-    Outlines does not automatically apply chat templates.
-    So we embed 'SYSTEM' instructions + the article in one prompt string.
-    """
+    """Build a single prompt string embedding system instructions and the article."""
     return f"""SYSTEM:
 {SYSTEM_PROMPT}
 
@@ -114,24 +144,35 @@ ARTICLE:
 \"\"\"{article_text}\"\"\"
 """
 
-def get_token_length(tokenizer, text: str) -> int:
+
+def get_token_length(tokenizer: Any, text: str) -> int:
+    """Return token length of text using the provided tokenizer."""
     return len(tokenizer.encode(text, add_special_tokens=False))
 
 
-def post_validate(article_text: str, parsed: dict) -> dict:
-    """
-    Ensure segments exist in original article.
-    """
-    filtered = []
+def post_validate(article_text: str, parsed: Dict[str, Any]) -> Dict[str, Any]:
+    """Filter segments whose `original` is not an exact substring of the article."""
+    filtered: List[Dict[str, Any]] = []
     for seg in parsed.get("biased_segments", []):
-        if seg["original"] in article_text:
+        orig = seg.get("original")
+        if isinstance(orig, str) and orig and orig in article_text:
             filtered.append(seg)
 
     parsed["biased_segments"] = filtered
     return parsed
 
 
-def load_model(model_path: str):
+def compute_max_new_tokens(tokenizer: Any, prompt: str) -> int:
+    """Compute a safe generation budget based on prompt token length."""
+    input_tokens = len(tokenizer.encode(prompt, add_special_tokens=False))
+    available = MODEL_LIMIT - input_tokens - TOKEN_BUFFER
+    if available <= 0:
+        raise ValueError("Prompt too long for model context window.")
+    return min(HARD_MAX_NEW_CAP, available)
+
+
+def load_model(model_path: str) -> Tuple[Any, Any]:
+    """Load a CausalLM and wrap it with Outlines."""
     tokenizer = AutoTokenizer.from_pretrained(model_path)
 
     model = AutoModelForCausalLM.from_pretrained(
@@ -145,26 +186,29 @@ def load_model(model_path: str):
     outlines_model = outlines.from_transformers(model, tokenizer)
     return outlines_model, tokenizer
 
-def run_inference(outlines_model, tokenizer, article_text: str):
 
-    prompt = build_prompt(article_text)
-
+def _print_context_debug(tokenizer: Any, prompt: str, json_text: str) -> None:
+    """Print token usage diagnostics for debugging context limits."""
     input_tokens = len(tokenizer.encode(prompt, add_special_tokens=False))
-    model_limit = 32768
-    buffer = 500
+    output_tokens = len(tokenizer.encode(json_text, add_special_tokens=False))
+    total = input_tokens + output_tokens
 
-    max_new = model_limit - input_tokens - buffer
-
-    print(f"\n--- Context Debug ---")
+    print("\n--- Context Debug ---")
     print(f"Input tokens: {input_tokens}")
-    print(f"Available for generation: {model_limit - input_tokens}")
-    print(f"Max new tokens allowed: {max_new}")
-    print(f"Total possible usage (input + max_new): {input_tokens + max_new}")
-    print(f"Model limit: {model_limit}")
+    print(f"Output tokens: {output_tokens}")
+    print(f"Total tokens: {total}")
+    print(f"Model limit: {MODEL_LIMIT}")
+    print(f"Headroom left: {MODEL_LIMIT - total}")
     print("----------------------\n")
 
-    if max_new <= 0:
-        raise ValueError("Prompt too long for model context window.")
+
+def run_inference(
+    outlines_model: Any, tokenizer: Any, article_text: str
+) -> InferenceOutput:
+    """Run schema-constrained inference with dynamic token budgeting and validation."""
+    prompt = build_prompt(article_text)
+
+    max_new = compute_max_new_tokens(tokenizer, prompt)
 
     json_text = outlines_model(
         prompt,
@@ -172,22 +216,12 @@ def run_inference(outlines_model, tokenizer, article_text: str):
         max_new_tokens=max_new,
     )
 
-    output_tokens = len(tokenizer.encode(json_text, add_special_tokens=False))
-
-    print(f"Generated tokens: {output_tokens}")
-    print(f"Final total tokens: {input_tokens + output_tokens}")
-    print(f"Headroom left: {model_limit - (input_tokens + output_tokens)}\n")
-
+    if PRINT_CONTEXT_DEBUG:
+        _print_context_debug(tokenizer, prompt, json_text)
 
     if not json_text.strip().endswith("}"):
-
-        print("⚠️ Truncation detected. Retrying with capped generation...")
-
-    
         article_tokens = len(tokenizer.encode(article_text, add_special_tokens=False))
-        capped_max = min(int(article_tokens * 2), 12000)
-
-        print(f"Retrying with capped max_new: {capped_max}")
+        capped_max = min(int(article_tokens * 2), TRUNCATION_RETRY_CAP)
 
         json_text = outlines_model(
             prompt,
@@ -198,64 +232,81 @@ def run_inference(outlines_model, tokenizer, article_text: str):
         if not json_text.strip().endswith("}"):
             raise ValueError("Model output still truncated after retry.")
 
-
     obj = BiasOutput.model_validate_json(json_text).model_dump()
     obj = post_validate(article_text, obj)
 
-    return {
-        "binary_label": "biased",
-        "bias_found": True,
-        "severity": obj["severity"],
-        "biased_segments": obj["biased_segments"],
-        "unbiased_text": obj["unbiased_text"],
-    }
+    return InferenceOutput(
+        binary_label="biased",
+        bias_found=True,
+        severity=int(obj["severity"]),
+        biased_segments=list(obj["biased_segments"]),
+        unbiased_text=str(obj["unbiased_text"]),
+    )
 
-def main():
+
+def filter_articles(
+    df: pd.DataFrame, tokenizer: Any, max_article_tokens: int
+) -> pd.DataFrame:
+    """Filter DataFrame to articles with token length below a threshold."""
+    token_lengths: List[int] = []
+    keep_mask: List[bool] = []
+
+    for _, row in df.iterrows():
+        article = row["article_text"]
+        length = get_token_length(tokenizer, article)
+        token_lengths.append(length)
+        keep_mask.append(length <= max_article_tokens)
+
+    out = df.copy()
+    out["token_length"] = token_lengths
+    return out[keep_mask].reset_index(drop=True)
+
+
+def save_results(results: List[Dict[str, Any]], path: str) -> None:
+    """Write inference results to a JSON file."""
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(results, f, indent=2, ensure_ascii=False)
+
+
+def main() -> None:
+    """Run inference over the test CSV and save outputs to a JSON file."""
+    print("Running inference with fine-tuned Qwen2.5-7B model")
+
     print("Loading dataset...")
     df = pd.read_csv(TEST_CSV)
 
     print("Loading fine-tuned model...")
     outlines_model, tokenizer = load_model(FT_MODEL)
 
-    print("Filtering articles <= 5000 tokens...")
-
-    token_lengths = []
-    keep_mask = []
-
-    for _, row in df.iterrows():
-        article = row["article_text"]
-        length = get_token_length(tokenizer, article)
-        token_lengths.append(length)
-        keep_mask.append(length <= MAX_ARTICLE_TOKENS)
-
-    df["token_length"] = token_lengths
-    df = df[keep_mask].reset_index(drop=True)
-
+    print(f"Filtering articles <= {MAX_ARTICLE_TOKENS} tokens...")
+    df = filter_articles(df, tokenizer, MAX_ARTICLE_TOKENS)
     print(f"Final sample count: {len(df)}")
 
-    results = []
+    results: List[Dict[str, Any]] = []
 
-    for i, row in tqdm(df.iterrows(), total=len(df)):
-        print("\n" + "=" * 80)
-        print(f"Processing sample {i+1}/{len(df)}")
-        print("=" * 80)
-
+    for idx, row in tqdm(df.iterrows(), total=len(df)):
         article = row["article_text"]
 
         try:
-            output = run_inference(outlines_model, tokenizer, article)
+            out = run_inference(outlines_model, tokenizer, article)
 
-            results.append({
-                "index": i,
-                "token_length": row["token_length"],
-                "output": output
-            })
+            results.append(
+                {
+                    "index": int(idx),
+                    "token_length": int(row["token_length"]),
+                    "output": {
+                        "binary_label": out.binary_label,
+                        "bias_found": out.bias_found,
+                        "severity": out.severity,
+                        "biased_segments": out.biased_segments,
+                        "unbiased_text": out.unbiased_text,
+                    },
+                }
+            )
 
-            with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-                json.dump(results, f, indent=2, ensure_ascii=False)
-
-        except Exception as e:
-            print(f"Error at index {i}: {e}")
+            save_results(results, OUTPUT_FILE)
+        except Exception as exc:
+            print(f"Error at index {idx}: {exc}")
             continue
 
     print("\nInference complete.")

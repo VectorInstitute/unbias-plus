@@ -31,10 +31,10 @@ pip install --upgrade --force-reinstall --no-cache-dir --no-deps unsloth_zoo
 
 # Repository Structure
 ``` text
-├── datageneration_async.py 
-├── sft_training.py 
+├── datageneration_async.py
+├── sft_training.py
 ├── inference_final.py
-├── evaluate_models.py 
+├── evaluate_models.py
 └── README.md
 ```
 
@@ -156,4 +156,3 @@ uv run datageneration_async.py\
 uv run sft_training.py\
 uv run inference_final.py\
 uv run evaluate_models.py
-

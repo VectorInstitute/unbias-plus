@@ -1,36 +1,47 @@
-import os
+"""Evaluate base and fine-tuned bias-rewrite models using an LLM judge.
+
+This script:
+- Runs structured JSON inference (via Outlines) for a base model and a fine-tuned model.
+- Uses an OpenAI judge model to score each rewrite on
+  bias reduction, faithfulness, and fluency.
+- Saves per-sample scores and summary statistics to CSV.
+
+Notes
+-----
+- No heavyweight work executes at import time (pre-commit/doctest friendly).
+- Main logic is split into helpers to satisfy Ruff complexity limits.
+"""
+
+from __future__ import annotations
+
 import json
-import torch
-import pandas as pd
-from tqdm import tqdm
-from dotenv import load_dotenv
-from transformers import AutoTokenizer, AutoModelForCausalLM
-from openai import OpenAI
+import os
+from dataclasses import dataclass
+from typing import Any, Dict, List, Literal, Tuple, cast
 
 import outlines
-from typing import List, Literal
+import pandas as pd
+import torch
+from dotenv import load_dotenv
+from openai import OpenAI
 from pydantic import BaseModel, Field
+from tqdm import tqdm
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
-print("evaluation of 4k 5 epoch trained model")
 
 BASE_MODEL = "Qwen/Qwen2.5-7B-Instruct"
 FT_MODEL = "/Unbias/Models/Qwen25_Unbias_4k_5epoch"
 
 TEST_CSV = "/Unbias/VLDBench_test_50_biased.csv"
 
-MAX_SEQ_LENGTH = 8192          
-MAX_NEW_TOKENS = 8000          
+MAX_SEQ_LENGTH = 8192
 MAX_ARTICLE_TOKENS = 5000
 
 ENV_PATH = "/secret_keys/.env"
 OUTPUT_RESULTS = "model_comparison_results_final.csv"
 
-load_dotenv(ENV_PATH)
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-if OPENAI_API_KEY is None:
-    raise ValueError("OPENAI_API_KEY not found in .env file")
-
-judge_client = OpenAI(api_key=OPENAI_API_KEY)
+JUDGE_MODEL = "gpt-4o"
+JUDGE_TEMPERATURE = 0
 
 
 SYSTEM_PROMPT = """
@@ -102,13 +113,16 @@ BiasType = Literal[
     "politically charged terminology",
     "sensationalism",
 ]
-
 SegmentSeverity = Literal["high", "medium", "low"]
 GlobalSeverity = Literal[2, 3, 4]
 
 
 class BiasedSegment(BaseModel):
-    original: str = Field(..., description="Exact case-sensitive substring from input text")
+    """Represent a single biased segment detected in the input article."""
+
+    original: str = Field(
+        ..., description="Exact case-sensitive substring from input text"
+    )
     replacement: str = Field(..., description="Neutral alternative phrase")
     severity: SegmentSeverity
     bias_type: BiasType
@@ -116,16 +130,24 @@ class BiasedSegment(BaseModel):
 
 
 class BiasOutput(BaseModel):
+    """Represent structured bias detection output including full neutral rewrite."""
+
     severity: GlobalSeverity
     biased_segments: List[BiasedSegment]
     unbiased_text: str
 
 
+@dataclass(frozen=True)
+class InferenceResult:
+    """Store normalized inference results for downstream evaluation."""
+
+    unbiased_text: str
+    severity: int
+    biased_segments: List[Dict[str, Any]]
+
+
 def build_prompt(article_text: str) -> str:
-    """
-    Outlines does not automatically apply chat templates.
-    So we embed 'SYSTEM' instructions + the article in one prompt string.
-    """
+    """Build a single prompt string embedding system instructions and the article."""
     return f"""SYSTEM:
 {SYSTEM_PROMPT}
 
@@ -137,43 +159,27 @@ ARTICLE:
 """
 
 
-def truncate_text_to_tokens(tokenizer, text: str, max_tokens: int) -> str:
-    """
-    Keeps the start of the text if it's too long.
-    This prevents context overflow while keeping deterministic behavior.
-    """
-    ids = tokenizer.encode(text, add_special_tokens=False)
-    if len(ids) <= max_tokens:
-        return text
-    ids = ids[:max_tokens]
-    return tokenizer.decode(ids, skip_special_tokens=True)
+def get_token_length(tokenizer: Any, text: str) -> int:
+    """Return the token length of text using the provided tokenizer."""
+    return len(tokenizer.encode(text, add_special_tokens=False))
 
 
-def post_validate_and_fix(article_text: str, parsed: dict) -> dict:
-    """
-    Semantic enforcement layer:
-    - Drop segments whose `original` is not an exact substring of the input article.
-    - Ensure required keys exist (Outlines already guarantees structure, but keep safe).
-    """
+def post_validate_and_fix(article_text: str, parsed: Dict[str, Any]) -> Dict[str, Any]:
+    """Filter segments whose `original` is not in the article."""
     segs = parsed.get("biased_segments", [])
-    filtered = []
+    filtered: List[Dict[str, Any]] = []
+
     for seg in segs:
-        # seg is a dict after model_dump()
         orig = seg.get("original", "")
-        if orig and orig in article_text:  # exact substring check
+        if isinstance(orig, str) and orig and orig in article_text:
             filtered.append(seg)
 
     parsed["biased_segments"] = filtered
-
     return parsed
 
 
-def load_outlines_model(model_path: str):
-    """
-    Returns:
-      outlines_model: callable that can do model(prompt, BiasOutput, ...)
-      tokenizer: HF tokenizer (for truncation)
-    """
+def load_outlines_model(model_path: str) -> Tuple[Any, Any]:
+    """Load a CausalLM and wrap it with Outlines."""
     tokenizer = AutoTokenizer.from_pretrained(model_path)
 
     hf_model = AutoModelForCausalLM.from_pretrained(
@@ -187,29 +193,31 @@ def load_outlines_model(model_path: str):
     outlines_model = outlines.from_transformers(hf_model, tokenizer)
     return outlines_model, tokenizer
 
-def get_token_length(tokenizer, text: str) -> int:
-    return len(tokenizer.encode(text, add_special_tokens=False))
 
-def run_inference(outlines_model, tokenizer, article_text: str):
+def compute_max_new_tokens(
+    tokenizer: Any,
+    prompt: str,
+    model_limit: int = 32768,
+    buffer: int = 500,
+    hard_cap: int = 15000,
+) -> int:
+    """Compute a safe dynamic generation budget based on prompt token length."""
+    input_tokens = len(tokenizer.encode(prompt, add_special_tokens=False))
+    available = model_limit - input_tokens - buffer
+    if available <= 0:
+        raise ValueError("Prompt too long for model context window.")
+    return min(hard_cap, available)
 
+
+def run_inference(
+    outlines_model: Any,
+    tokenizer: Any,
+    article_text: str,
+) -> InferenceResult:
+    """Run schema-constrained inference with dynamic token budgeting and validation."""
     prompt = build_prompt(article_text)
 
-    input_tokens = len(tokenizer.encode(prompt, add_special_tokens=False))
-    model_limit = 32768
-    buffer = 500
-
-    max_new = model_limit - input_tokens - buffer
-
-    print(f"\n--- Context Debug ---")
-    print(f"Input tokens: {input_tokens}")
-    print(f"Available for generation: {model_limit - input_tokens}")
-    print(f"Max new tokens allowed: {max_new}")
-    print(f"Total possible usage (input + max_new): {input_tokens + max_new}")
-    print(f"Model limit: {model_limit}")
-    print("----------------------\n")
-
-    if max_new <= 0:
-        raise ValueError("Prompt too long for model context window.")
+    max_new = compute_max_new_tokens(tokenizer, prompt)
 
     json_text = outlines_model(
         prompt,
@@ -217,63 +225,59 @@ def run_inference(outlines_model, tokenizer, article_text: str):
         max_new_tokens=max_new,
     )
 
-    output_tokens = len(tokenizer.encode(json_text, add_special_tokens=False))
-
-    print(f"Generated tokens: {output_tokens}")
-    print(f"Final total tokens: {input_tokens + output_tokens}")
-    print(f"Headroom left: {model_limit - (input_tokens + output_tokens)}\n")
-
-
     if not json_text.strip().endswith("}"):
-
-        print("⚠️ Truncation detected. Retrying with capped generation...")
-
-        # Cap to 2x article size (safe bound)
+        # Retry with a conservative cap based on article size
         article_tokens = len(tokenizer.encode(article_text, add_special_tokens=False))
         capped_max = min(int(article_tokens * 2), 12000)
 
-        print(f"Retrying with capped max_new: {capped_max}")
-
-        
         json_text = outlines_model(
             prompt,
             BiasOutput,
             max_new_tokens=capped_max,
         )
-        if not json_text.strip().endswith("}"):
-            raise ValueError("Model output still truncated after retry.")
 
+        if not json_text.strip().endswith("}"):
+            raise ValueError("Model output truncated after retry.")
 
     obj = BiasOutput.model_validate_json(json_text).model_dump()
     obj = post_validate_and_fix(article_text, obj)
 
-    return {
-        "binary_label": "biased",
-        "bias_found": True,
-        "severity": obj["severity"],
-        "biased_segments": obj["biased_segments"],
-        "unbiased_text": obj["unbiased_text"],
-    }
+    return InferenceResult(
+        unbiased_text=obj["unbiased_text"],
+        severity=int(obj["severity"]),
+        biased_segments=list(obj["biased_segments"]),
+    )
 
 
-def validate_judge_output(obj):
+def create_judge_client() -> OpenAI:
+    """Create and return an OpenAI client using API key from ENV_PATH."""
+    load_dotenv(ENV_PATH)
+    api_key = os.getenv("OPENAI_API_KEY")
+    if api_key is None:
+        raise ValueError("OPENAI_API_KEY not found in .env file")
+    return OpenAI(api_key=api_key)
+
+
+def validate_judge_output(obj: Dict[str, Any]) -> None:
+    """Validate that judge JSON contains required structure and score ranges."""
     if "A" not in obj or "B" not in obj:
         raise ValueError("Judge output missing A or B")
 
-    for key in ["A", "B"]:
-        for metric in ["bias", "faithfulness", "fluency"]:
+    for key in ("A", "B"):
+        if key not in obj or not isinstance(obj[key], dict):
+            raise ValueError(f"Judge output missing object for {key}")
+        for metric in ("bias", "faithfulness", "fluency"):
             if metric not in obj[key]:
                 raise ValueError(f"Missing {metric} in judge output")
             if not isinstance(obj[key][metric], int):
                 raise ValueError(f"{metric} must be integer")
             if not (0 <= obj[key][metric] <= 5):
                 raise ValueError(f"{metric} must be 0-5")
-    return True
 
 
-def judge_models(original, rewrite_a, rewrite_b):
-
-    prompt = f"""
+def build_judge_prompt(original: str, rewrite_a: str, rewrite_b: str) -> str:
+    """Build the evaluation prompt for scoring two rewrites."""
+    return f"""
 You are an expert evaluator of political bias correction in news text.
 
 Your task is to evaluate two rewritten versions of an original article.
@@ -299,7 +303,7 @@ EVALUATION INSTRUCTIONS
 
 You must evaluate each rewrite independently using the following criteria:
 
-1️. Bias Reduction (0–5)
+1. Bias Reduction (0–5)
 - 0 = Highly biased language remains
 - 1 = Minimal bias reduction
 - 2 = Some bias reduced but framing still persuasive
@@ -307,15 +311,7 @@ You must evaluate each rewrite independently using the following criteria:
 - 4 = Largely neutral with minimal residual framing
 - 5 = Fully neutral, factual, and free of emotionally loaded language
 
-Bias includes:
-- Loaded language
-- Dehumanizing framing
-- Exaggeration
-- Political persuasion
-- Emotionally charged terminology
-- Sensational tone
-
-2️. Faithfulness to Original Facts (0–5)
+2. Faithfulness to Original Facts (0–5)
 - 0 = Major factual distortions or added information
 - 1 = Multiple factual inaccuracies
 - 2 = Some meaning distortion
@@ -328,7 +324,7 @@ Important:
 - Do penalize if new claims are introduced.
 - Do penalize if key factual claims are removed.
 
-3️. Fluency & Coherence (0–5)
+3. Fluency & Coherence (0–5)
 - 0 = Unreadable or broken grammar
 - 1 = Major grammatical issues
 - 2 = Understandable but awkward
@@ -343,136 +339,97 @@ SCORING RULES
 - Scores must be integers only.
 - Scores must be between 0 and 5.
 - Evaluate A and B independently.
-- Do NOT explain your reasoning.
 - Return ONLY valid JSON.
-- Do NOT include commentary before or after JSON.
+- Do NOT include commentary.
 
 ------------------------------------------
 OUTPUT FORMAT
 ------------------------------------------
 
 {{
-  "A": {{
-    "bias": int,
-    "faithfulness": int,
-    "fluency": int
-  }},
-  "B": {{
-    "bias": int,
-    "faithfulness": int,
-    "fluency": int
-  }}
+  "A": {{"bias": int, "faithfulness": int, "fluency": int}},
+  "B": {{"bias": int, "faithfulness": int, "fluency": int}}
 }}
-"""
+""".strip()
+
+
+def judge_models(
+    judge_client: OpenAI,
+    original: str,
+    rewrite_a: str,
+    rewrite_b: str,
+) -> Dict[str, Any]:
+    """Score two rewrites using an OpenAI judge model."""
+    prompt = build_judge_prompt(original, rewrite_a, rewrite_b)
 
     response = judge_client.chat.completions.create(
-        model="gpt-4o",
-        temperature=0,
+        model=JUDGE_MODEL,
+        temperature=JUDGE_TEMPERATURE,
         messages=[{"role": "user", "content": prompt}],
     )
 
-    raw = response.choices[0].message.content
+    raw = response.choices[0].message.content or ""
     start = raw.find("{")
     end = raw.rfind("}")
     if start == -1 or end == -1:
         raise ValueError("Judge did not return JSON")
 
-    parsed = json.loads(raw[start:end + 1])
+    parsed = cast(Dict[str, Any], json.loads(raw[start : end + 1]))
     validate_judge_output(parsed)
     return parsed
 
 
-def main():
-    print("Loading test dataset...")
-    df = pd.read_csv(TEST_CSV)
+def load_test_dataframe() -> pd.DataFrame:
+    """Load the test dataset as a DataFrame."""
+    return pd.read_csv(TEST_CSV)
 
-    print("Loading Base model (Outlines)...")
-    base_outlines_model, base_tokenizer = load_outlines_model(BASE_MODEL)
 
-    print("Filtering articles with token length <= 5000...")
-    
-    token_lengths = []
-    keep_rows = []
+def filter_by_article_tokens(
+    df: pd.DataFrame,
+    tokenizer: Any,
+    max_article_tokens: int,
+) -> pd.DataFrame:
+    """Filter dataset rows to those under a maximum article token length."""
+    token_lengths: List[int] = []
+    keep_mask: List[bool] = []
 
-    for i, row in df.iterrows():
+    for _, row in df.iterrows():
         article = row["article_text"]
-        token_len = get_token_length(base_tokenizer, article)
+        token_len = get_token_length(tokenizer, article)
         token_lengths.append(token_len)
+        keep_mask.append(token_len <= max_article_tokens)
 
-        if token_len <= MAX_ARTICLE_TOKENS:
-            keep_rows.append(True)
-        else:
-            keep_rows.append(False)
-
+    df = df.copy()
     df["token_length"] = token_lengths
-    original_count = len(df)
-    df = df[keep_rows].reset_index(drop=True)
-
-    print(f"Original samples: {original_count}")
-    print(f"Filtered samples (<= 5000 tokens): {len(df)}")
-    print(f"Removed samples: {original_count - len(df)}")
+    return df[keep_mask].reset_index(drop=True)
 
 
-    print("Loading Fine-tuned model (Outlines)...")
-    ft_outlines_model, ft_tokenizer = load_outlines_model(FT_MODEL)
+def append_result_row(
+    results: List[Dict[str, Any]],
+    idx: int,
+    scores: Dict[str, Any],
+) -> None:
+    """Append a single scoring result row to the results list."""
+    results.append(
+        {
+            "index": idx,
+            "base_bias": scores["A"]["bias"],
+            "base_faithfulness": scores["A"]["faithfulness"],
+            "base_fluency": scores["A"]["fluency"],
+            "ft_bias": scores["B"]["bias"],
+            "ft_faithfulness": scores["B"]["faithfulness"],
+            "ft_fluency": scores["B"]["fluency"],
+        }
+    )
 
-    results = []
 
-    for i, row in tqdm(df.iterrows(), total=len(df)):
-        print("\n" + "=" * 80)
-        print(f"PROCESSING SAMPLE {i + 1}/{len(df)}")
-        print("=" * 80)
+def safe_write_results_csv(results: List[Dict[str, Any]], path: str) -> None:
+    """Write current results to CSV."""
+    pd.DataFrame(results).to_csv(path, index=False)
 
-        article = row["article_text"]
 
-        try:
-            print("\n--- ORIGINAL ARTICLE ---")
-            print(article)
-
-        
-            print("\n--- RUNNING BASE MODEL (Outlines) ---")
-            base_output = run_inference(base_outlines_model, base_tokenizer, article)
-            print("\nBASE MODEL OUTPUT JSON:")
-            print(json.dumps(base_output, indent=2, ensure_ascii=False))
-
-        
-            print("\n--- RUNNING FINE-TUNED MODEL (Outlines) ---")
-            ft_output = run_inference(ft_outlines_model, ft_tokenizer, article)
-            print("\nFINE-TUNED MODEL OUTPUT JSON:")
-            print(json.dumps(ft_output, indent=2, ensure_ascii=False))
-
-            print("\n--- RUNNING GPT-4o JUDGE ---")
-            scores = judge_models(
-                article,
-                base_output["unbiased_text"],
-                ft_output["unbiased_text"],
-            )
-            print("\nJUDGE SCORES:")
-            print(json.dumps(scores, indent=2))
-
-            results.append({
-                "index": i,
-                "base_bias": scores["A"]["bias"],
-                "base_faithfulness": scores["A"]["faithfulness"],
-                "base_fluency": scores["A"]["fluency"],
-                "ft_bias": scores["B"]["bias"],
-                "ft_faithfulness": scores["B"]["faithfulness"],
-                "ft_fluency": scores["B"]["fluency"],
-            })
-
-            pd.DataFrame(results).to_csv(OUTPUT_RESULTS, index=False)
-
-        except Exception as e:
-            print(f"\n ERROR at index {i}: {e}")
-            continue
-
-    results_df = pd.DataFrame(results)
-    results_df.to_csv(OUTPUT_RESULTS, index=False)
-
-    print("\n" + "=" * 80)
-    print("EVALUATION COMPLETE")
-    print("=" * 80)
-
+def summarize_results(results_df: pd.DataFrame) -> None:
+    """Print aggregate averages and win-rate summary for the evaluation."""
     if len(results_df) == 0:
         print("No successful samples to summarize.")
         return
@@ -483,22 +440,96 @@ def main():
     print("\nFINE-TUNED MODEL AVERAGES:")
     print(results_df[["ft_bias", "ft_faithfulness", "ft_fluency"]].mean())
 
+    results_df = results_df.copy()
     results_df["base_total"] = (
-        results_df["base_bias"] + results_df["base_faithfulness"] + results_df["base_fluency"]
+        results_df["base_bias"]
+        + results_df["base_faithfulness"]
+        + results_df["base_fluency"]
     )
     results_df["ft_total"] = (
         results_df["ft_bias"] + results_df["ft_faithfulness"] + results_df["ft_fluency"]
     )
 
-    ft_wins = (results_df["ft_total"] > results_df["base_total"]).sum()
-    base_wins = (results_df["base_total"] > results_df["ft_total"]).sum()
-    ties = (results_df["ft_total"] == results_df["base_total"]).sum()
+    ft_wins = int((results_df["ft_total"] > results_df["base_total"]).sum())
+    base_wins = int((results_df["base_total"] > results_df["ft_total"]).sum())
+    ties = int((results_df["ft_total"] == results_df["base_total"]).sum())
 
     print("\nWIN RATE:")
     print(f"FT Wins: {ft_wins}")
     print(f"Base Wins: {base_wins}")
     print(f"Ties: {ties}")
+
+
+def evaluate_one_article(
+    article: str,
+    base_model: Any,
+    base_tokenizer: Any,
+    ft_model: Any,
+    ft_tokenizer: Any,
+    judge_client: OpenAI,
+) -> Dict[str, Any]:
+    """Run base/ft inference and judge scoring for a single article."""
+    base_out = run_inference(base_model, base_tokenizer, article)
+    ft_out = run_inference(ft_model, ft_tokenizer, article)
+
+    return judge_models(
+        judge_client,
+        original=article,
+        rewrite_a=base_out.unbiased_text,
+        rewrite_b=ft_out.unbiased_text,
+    )
+
+
+def main() -> None:
+    """Run the full base-vs-ft evaluation and save results to CSV."""
+    print("Evaluation of 4k 5-epoch trained model")
+
+    judge_client = create_judge_client()
+
+    print("Loading test dataset...")
+    df = load_test_dataframe()
+
+    print("Loading base model (Outlines)...")
+    base_model, base_tokenizer = load_outlines_model(BASE_MODEL)
+
+    print(f"Filtering articles with token length <= {MAX_ARTICLE_TOKENS}...")
+    original_count = len(df)
+    df = filter_by_article_tokens(df, base_tokenizer, MAX_ARTICLE_TOKENS)
+    print(f"Original samples: {original_count}")
+    print(f"Filtered samples: {len(df)}")
+    print(f"Removed samples: {original_count - len(df)}")
+
+    print("Loading fine-tuned model (Outlines)...")
+    ft_model, ft_tokenizer = load_outlines_model(FT_MODEL)
+
+    results: List[Dict[str, Any]] = []
+
+    for idx, row in tqdm(df.iterrows(), total=len(df)):
+        article = row["article_text"]
+
+        try:
+            scores = evaluate_one_article(
+                article=article,
+                base_model=base_model,
+                base_tokenizer=base_tokenizer,
+                ft_model=ft_model,
+                ft_tokenizer=ft_tokenizer,
+                judge_client=judge_client,
+            )
+            append_result_row(results, idx=idx, scores=scores)
+            safe_write_results_csv(results, OUTPUT_RESULTS)
+        except Exception as exc:
+            print(f"ERROR at index {idx}: {exc}")
+            continue
+
+    results_df = pd.DataFrame(results)
+    results_df.to_csv(OUTPUT_RESULTS, index=False)
+
+    print("\n" + "=" * 80)
+    print("EVALUATION COMPLETE")
     print("=" * 80)
+
+    summarize_results(results_df)
 
 
 if __name__ == "__main__":
