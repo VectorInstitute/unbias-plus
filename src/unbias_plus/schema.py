@@ -170,8 +170,10 @@ class BiasResult(BaseModel):
             raise ValueError(f"severity must be between 1 and 5, got {v}")
         return v
 
+
 def _find_case_insensitive(text: str, phrase: str, start: int = 0) -> int:
     return text.lower().find(phrase.lower(), start)
+
 
 def compute_offsets(
     original_text: str, segments: list[BiasedSegment]

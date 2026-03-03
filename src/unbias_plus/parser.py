@@ -7,6 +7,9 @@ from typing import Any
 from unbias_plus.schema import BiasResult
 
 
+SEVERITY_RANK = {"low": 1, "medium": 2, "high": 3}
+
+
 def parse_llm_output(raw_output: str) -> BiasResult:
     """Parse raw LLM output string into a BiasResult object.
 
@@ -118,8 +121,6 @@ def _deduplicate_segments(segments: list[dict]) -> list[dict]:
         Deduplicated list with one entry per unique original phrase.
 
     """
-    _SEVERITY_RANK = {"low": 1, "medium": 2, "high": 3}
-
     seen: dict[str, dict] = {}
     for seg in segments:
         original = seg.get("original", "").strip()
@@ -144,8 +145,8 @@ def _deduplicate_segments(segments: list[dict]) -> list[dict]:
                 merged["reasoning"] = existing_reasoning.strip() + " " + new_reasoning
 
             # Keep highest severity
-            existing_rank = _SEVERITY_RANK.get(merged.get("severity", "low").lower(), 1)
-            new_rank = _SEVERITY_RANK.get(seg.get("severity", "low").lower(), 1)
+            existing_rank = SEVERITY_RANK.get(merged.get("severity", "low").lower(), 1)
+            new_rank = SEVERITY_RANK.get(seg.get("severity", "low").lower(), 1)
             if new_rank > existing_rank:
                 merged["severity"] = seg["severity"]
 
