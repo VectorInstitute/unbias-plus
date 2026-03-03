@@ -2,13 +2,25 @@
 name = "unbias-plus"
 version = "0.1.0"
 description = "Bias detection and debiasing using a single LLM"
-readme = "README.md"
+readme = {file = "README.md", content-type = "text/markdown"}
+
 authors = [
     {name = "Ahmed Y. Radwan", email = "ahmed.radwan@vectorinstitute.ai"}
 ]
-license = "Apache-2.0"
-repository = "https://github.com/VectorInstitute/unbias-plus"
+license = {text = "Apache-2.0"}
 requires-python = ">=3.10,<3.12"
+
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Operating System :: OS Independent",
+]
 
 dependencies = [
     # Core ML/DL
@@ -22,7 +34,7 @@ dependencies = [
     "bitsandbytes==0.48.1",
     "trl==0.22.2",
     "unsloth[colab-new]",
-    "unsloth-zoo>=2025.10.10",
+    "unsloth-zoo>=2025.10.10,<2026.3.1",
     # Build tools (for optional flash-attn / CUDA builds)
     "cmake==4.1.0",
     "ninja>=1.13.0",
@@ -48,6 +60,10 @@ dependencies = [
     "fastapi>=0.110.0",
     "uvicorn>=0.29.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/VectorInstitute/unbias-plus"
+Repository = "https://github.com/VectorInstitute/unbias-plus"
 
 [project.optional-dependencies]
 # Install with: uv sync --extra train (requires CUDA/nvcc to build)
@@ -98,7 +114,7 @@ extra-index-url = ["https://download.pytorch.org/whl/cu124"]
 index-strategy = "unsafe-best-match"
 
 [tool.uv.sources]
-unsloth = { git = "https://github.com/unslothai/unsloth.git" }
+unsloth = { git = "https://github.com/unslothai/unsloth.git", tag = "February-2026" }
 unsloth-zoo = { git = "https://github.com/unslothai/unsloth-zoo.git" }
 
 [tool.uv.extra-build-dependencies]

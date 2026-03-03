@@ -5,8 +5,8 @@ resolution-markers = [
     "python_full_version >= '3.11' and sys_platform == 'win32'",
     "python_full_version >= '3.11' and sys_platform == 'emscripten'",
     "(python_full_version >= '3.11' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.11' and platform_python_implementation != 'CPython' and sys_platform == 'linux') or (python_full_version >= '3.11' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
-    "(python_full_version >= '3.11' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (python_full_version >= '3.11' and sys_platform == 'darwin')",
     "(python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version < '3.11' and platform_python_implementation != 'CPython' and sys_platform == 'linux') or (python_full_version < '3.11' and sys_platform != 'darwin' and sys_platform != 'linux')",
+    "(python_full_version >= '3.11' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (python_full_version >= '3.11' and sys_platform == 'darwin')",
     "(python_full_version < '3.11' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (python_full_version < '3.11' and sys_platform == 'darwin')",
 ]
 
@@ -3206,7 +3206,7 @@ requires-dist = [
     { name = "tqdm", specifier = ">=4.67.3" },
     { name = "transformers", specifier = ">=4.35.0" },
     { name = "trl", specifier = "==0.22.2" },
-    { name = "unsloth", extras = ["colab-new"], git = "https://github.com/unslothai/unsloth.git" },
+    { name = "unsloth", extras = ["colab-new"], git = "https://github.com/unslothai/unsloth.git?tag=February-2026" },
     { name = "unsloth-zoo", git = "https://github.com/unslothai/unsloth-zoo.git" },
     { name = "uvicorn", specifier = ">=0.29.0" },
     { name = "wheel", specifier = ">=0.45.1" },
@@ -3240,7 +3240,7 @@ docs = [
 [[package]]
 name = "unsloth"
 version = "2026.2.1"
-source = { git = "https://github.com/unslothai/unsloth.git#98c558364d17f57e363c170ef2bc8f57cd1c33d9" }
+source = { git = "https://github.com/unslothai/unsloth.git?tag=February-2026#07dbd8620b096dae11dfbaacb2120493975d24d4" }
 
 [package.optional-dependencies]
 colab-new = [
@@ -3265,8 +3265,8 @@ colab-new = [
 
 [[package]]
 name = "unsloth-zoo"
-version = "2026.2.1"
-source = { git = "https://github.com/unslothai/unsloth-zoo.git#5b80d552999687023063562271b101484f1cc5f8" }
+version = "2026.3.1"
+source = { git = "https://github.com/unslothai/unsloth-zoo.git#88405da43d4b7413b6d630a981714390e97664b1" }
 dependencies = [
     { name = "accelerate" },
     { name = "cut-cross-entropy" },
