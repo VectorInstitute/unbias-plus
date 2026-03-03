@@ -80,6 +80,10 @@ def parse_llm_output(raw_output: str) -> BiasResult:
             f"Raw output:\n{raw_output}"
         )
 
+    # Deduplicate segments with the same original phrase before schema validation
+    if "biased_segments" in data and isinstance(data["biased_segments"], list):
+        data["biased_segments"] = _deduplicate_segments(data["biased_segments"])
+
     try:
         return BiasResult(**data)
     except Exception as e:
@@ -91,6 +95,61 @@ def parse_llm_output(raw_output: str) -> BiasResult:
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+
+def _deduplicate_segments(segments: list[dict]) -> list[dict]:
+    """Merge duplicate segments that share the same original phrase.
+
+    When the LLM returns the same original text multiple times with
+    different bias_types, this merges them into a single segment:
+    - keeps the first replacement
+    - joins all unique bias_types with ' / '
+    - joins all unique reasonings together
+    - keeps the highest severity
+
+    Parameters
+    ----------
+    segments : list[dict]
+        Raw list of segment dicts from the parsed JSON.
+
+    Returns
+    -------
+    list[dict]
+        Deduplicated list with one entry per unique original phrase.
+
+    """
+    _SEVERITY_RANK = {"low": 1, "medium": 2, "high": 3}
+
+    seen: dict[str, dict] = {}
+    for seg in segments:
+        original = seg.get("original", "").strip()
+        if not original:
+            continue
+
+        if original not in seen:
+            seen[original] = dict(seg)
+        else:
+            merged = seen[original]
+
+            # Merge bias_type — append only if not already present
+            existing_types = {t.strip() for t in merged.get("bias_type", "").split("/")}
+            new_type = seg.get("bias_type", "").strip()
+            if new_type and new_type not in existing_types:
+                merged["bias_type"] = merged["bias_type"].strip() + " / " + new_type
+
+            # Merge reasoning — append only if not already present
+            existing_reasoning = merged.get("reasoning", "")
+            new_reasoning = seg.get("reasoning", "").strip()
+            if new_reasoning and new_reasoning not in existing_reasoning:
+                merged["reasoning"] = existing_reasoning.strip() + " " + new_reasoning
+
+            # Keep highest severity
+            existing_rank = _SEVERITY_RANK.get(merged.get("severity", "low").lower(), 1)
+            new_rank = _SEVERITY_RANK.get(seg.get("severity", "low").lower(), 1)
+            if new_rank > existing_rank:
+                merged["severity"] = seg["severity"]
+
+    return list(seen.values())
 
 
 def _try_parse_json(text: str) -> Any | None:
@@ -131,13 +190,10 @@ def _extract_json(raw_output: str) -> str:
         return fenced.group(1).strip()
 
     # Find the outermost { ... } block using brace counting
-    # (greedy regex fails on nested braces with truncation)
     start = raw_output.find("{")
     if start == -1:
         return raw_output.strip()
 
-    # Walk forward tracking brace depth to find where JSON ends
-    # (or where it was cut off)
     depth = 0
     last_valid_end = start
     in_string = False
@@ -164,7 +220,7 @@ def _extract_json(raw_output: str) -> str:
                 break
             if depth < 0:
                 break
-        last_valid_end = i + 1  # track furthest point reached
+        last_valid_end = i + 1
 
     return raw_output[start:last_valid_end].strip()
 
@@ -186,7 +242,6 @@ def _fix_truncated_json(text: str) -> str:
     str
         JSON string with best-effort closing brackets/braces appended.
     """
-    # Track structure with a stack
     stack = []
     in_string = False
     escape_next = False
@@ -208,11 +263,9 @@ def _fix_truncated_json(text: str) -> str:
         elif ch in "}]" and stack:
             stack.pop()
 
-    # If we ended mid-string, close the string first
     if in_string:
         text += '"'
 
-    # Close any open arrays/objects in reverse order
     closers = {"{": "}", "[": "]"}
     text += "".join(closers[ch] for ch in reversed(stack))
 
@@ -234,8 +287,6 @@ def _fix_missing_commas(text: str) -> str:
     str
         JSON string with commas inserted where clearly missing.
     """
-    # Insert comma between } or ] or " or number/bool/null followed by "
-    # e.g. ..."value"\n  "key": ... -> ..."value",\n  "key": ...
     return re.sub(
         r'(["\d\]}\w])\s*\n(\s*")',
         lambda m: f"{m.group(1)},\n{m.group(2)}",
@@ -261,27 +312,22 @@ def _extract_fields_by_regex(raw_output: str) -> dict | None:
     """
     data: dict = {}
 
-    # binary_label
     m = re.search(r'"binary_label"\s*:\s*"([^"]+)"', raw_output)
     if m:
         data["binary_label"] = m.group(1)
 
-    # severity
     m = re.search(r'"severity"\s*:\s*(\d+)', raw_output)
     if m:
         data["severity"] = int(m.group(1))
 
-    # bias_found
     m = re.search(r'"bias_found"\s*:\s*(true|false)', raw_output, re.IGNORECASE)
     if m:
         data["bias_found"] = m.group(1).lower() == "true"
 
-    # unbiased_text — grab whatever we can, even if truncated
     m = re.search(r'"unbiased_text"\s*:\s*"(.*?)(?:"|$)', raw_output, re.DOTALL)
     if m:
         data["unbiased_text"] = m.group(1).replace('\\"', '"').strip()
 
-    # biased_segments — try to grab full array, fall back to empty list
     m = re.search(r'"biased_segments"\s*:\s*(\[.*?\])\s*[,}]', raw_output, re.DOTALL)
     if m:
         segments = _try_parse_json(m.group(1))
@@ -289,7 +335,6 @@ def _extract_fields_by_regex(raw_output: str) -> dict | None:
     else:
         data["biased_segments"] = []
 
-    # Only return if we got the minimum required fields
     required = {"binary_label", "severity", "bias_found", "biased_segments"}
     if required.issubset(data.keys()):
         return data
