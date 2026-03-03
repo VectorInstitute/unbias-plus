@@ -54,7 +54,7 @@ jobs:
           python-version-file: ".python-version"
 
       - name: Install the project
-        run: uv sync --group dev
+        run: uv sync --group dev --no-extra flash --no-extra train
 
       - name: Install dependencies and check code
         run: |
