@@ -8,7 +8,7 @@ authors = [
     {name = "Ahmed Y. Radwan", email = "ahmed.radwan@vectorinstitute.ai"}
 ]
 license = {text = "Apache-2.0"}
-requires-python = ">=3.10,<3.12"
+requires-python = ">=3.10"
 
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -32,9 +32,6 @@ dependencies = [
     # Fine-tuning
     "peft>=0.17.1",
     "bitsandbytes==0.48.1",
-    "trl==0.22.2",
-    "unsloth[colab-new]",
-    "unsloth-zoo>=2025.10.10,<2026.3.1",
     # Build tools (for optional flash-attn / CUDA builds)
     "cmake==4.1.0",
     "ninja>=1.13.0",
@@ -66,10 +63,16 @@ Homepage = "https://github.com/VectorInstitute/unbias-plus"
 Repository = "https://github.com/VectorInstitute/unbias-plus"
 
 [project.optional-dependencies]
-# Install with: uv sync --extra train (requires CUDA/nvcc to build)
 train = [
-    "flash-attn==2.7.3",
+    "peft>=0.17.0",
+    "trl>=0.22.0",
+    "unsloth[colab-new]",
+    "unsloth-zoo>=2025.10.10,<2026.3.1",
 ]
+flash = [
+    "flash-attn>=2.7.0",
+]
+
 
 [project.scripts]
 unbias-plus = "unbias_plus.cli:main"
