@@ -171,6 +171,10 @@ class BiasResult(BaseModel):
         return v
 
 
+def _find_case_insensitive(text: str, phrase: str, start: int = 0) -> int:
+    return text.lower().find(phrase.lower(), start)
+
+
 def compute_offsets(
     original_text: str, segments: list[BiasedSegment]
 ) -> list[BiasedSegment]:
@@ -200,10 +204,9 @@ def compute_offsets(
         if not phrase:
             continue
 
-        start = original_text.find(phrase, cursor)
+        start = _find_case_insensitive(original_text, phrase, cursor)
         if start == -1:
-            # Fallback: search from beginning for out-of-order responses
-            start = original_text.find(phrase, 0)
+            start = _find_case_insensitive(original_text, phrase, 0)
 
         if start == -1:
             logger.warning("Could not find segment in text: '%s'", phrase)
