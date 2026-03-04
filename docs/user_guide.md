@@ -40,12 +40,12 @@ Analyze a file and output JSON:
 unbias-plus --file article.txt --json
 ```
 
-Start the API server (default model `meta-llama/Llama-3.2-3B`, port 8000):
+Start the API server and demo UI (default model `vector-institute/Unbias-plus-Qwen2.5`, port 8000). The demo UI is served at the same host/port:
 
 ```bash
 unbias-plus --serve
 unbias-plus --serve --model path/to/model --port 8000
-unbias-plus --serve --load-in-4bit   # reduce VRAM
+unbias-plus --serve --load-in-4bit   # reduce VRAM (default for the bundled model)
 ```
 
 **Options:** `--model`, `--load-in-4bit`, `--max-new-tokens`, `--host`, `--port`, `--json`.
@@ -54,7 +54,7 @@ unbias-plus --serve --load-in-4bit   # reduce VRAM
 
 ## REST API
 
-Start the server with `unbias-plus --serve`, then:
+Start the server with `unbias-plus --serve`. The demo web UI is at `http://localhost:8000/`; use the same host/port for the API:
 
 | Endpoint | Description |
 |----------|-------------|
@@ -71,7 +71,8 @@ Programmatic server start:
 
 ```python
 from unbias_plus.api import serve
-serve("VectorInstitute/unbias-plus-llama3", port=8000, load_in_4bit=False)
+serve()  # default model vector-institute/Unbias-plus-Qwen2.5, port 8000
+# Or: serve("path/to/model", port=8000, load_in_4bit=False)
 ```
 
 ---
@@ -81,7 +82,7 @@ serve("VectorInstitute/unbias-plus-llama3", port=8000, load_in_4bit=False)
 ```python
 from unbias_plus import UnBiasPlus, BiasResult, BiasedSegment
 
-pipe = UnBiasPlus("meta-llama/Llama-3.2-3B", load_in_4bit=False)
+pipe = UnBiasPlus()  # default: vector-institute/Unbias-plus-Qwen2.5 (loads in 4-bit by default)
 result = pipe.analyze("Women are too emotional to lead.")
 
 # Result fields
@@ -92,6 +93,7 @@ print(result.unbiased_text)   # full neutral rewrite
 
 for seg in result.biased_segments:
     print(seg.original, seg.replacement, seg.severity, seg.bias_type, seg.reasoning)
+    # seg.start, seg.end are character offsets in the original text
 
 # Formatted outputs
 cli_str = pipe.analyze_to_cli("...")   # human-readable terminal output
@@ -114,4 +116,4 @@ uv sync --group docs
 mkdocs serve
 ```
 
-Then open `http://127.0.0.1:8000` in your browser.
+Then open `http://127.0.0.1:8000` in your browser (if that port is already in use by another app, run `mkdocs serve -a 127.0.0.1:8001` and use port 8001).

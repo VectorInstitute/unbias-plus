@@ -71,7 +71,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 app = FastAPI(
     title="unbias-plus API",
-    description="Bias detection and debiasing using a single LLM.",
+    description="Bias detection and debiasing: identify segments, classify severity, reasoning and replacements, full neutral rewrite.",
     version="0.1.0",
     lifespan=lifespan,
 )

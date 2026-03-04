@@ -1,5 +1,7 @@
 # API Reference
 
+Reference for the `unbias_plus` package: pipeline, model, schema, FastAPI server, CLI, prompt, parser, and formatters. All public classes and functions are listed below.
+
 ## Package
 
 ::: unbias_plus
