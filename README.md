@@ -7,11 +7,11 @@
 [![License](https://img.shields.io/github/license/VectorInstitute/unbias-plus)](https://github.com/VectorInstitute/unbias-plus/blob/main/LICENSE.md)
 [![Contact](https://img.shields.io/badge/Contact-shaina.raza%40vectorinstitute.ai-green)](mailto:shaina.raza@vectorinstitute.ai)
 
-Bias detection and debiasing using a single LLM. Analyze text for biased language, get structured results (binary label, severity, biased segments with replacements and reasoning), and a neutral rewrite—all via one fine-tuned causal language model.
+Bias detection and debiasing in text: identify biased segments, classify severity, get reasoning and neutral replacements per segment, and a full neutral rewrite. Structured output (binary label, severity, biased segments with offsets) via CLI, REST API, or Python.
 
 ## Overview
 
-Single-model pipeline: one HuggingFace causal LM does both detection and debiasing. Input text → prompt → LLM → JSON → validated `BiasResult` (and optional CLI/API formatting). Entry points: CLI (`unbias-plus`), REST API (FastAPI + demo UI), or Python (`UnBiasPlus`).
+Input text → analysis → validated `BiasResult`: binary label (biased/unbiased), overall severity (1–5), `biased_segments` (original phrase, replacement, severity, bias type, reasoning, character offsets), and full `unbiased_text`. Entry points: CLI (`unbias-plus`), REST API (FastAPI + demo UI), or Python (`UnBiasPlus`).
 
 **Project structure:**
 ```
@@ -38,9 +38,12 @@ unbias-plus/
 
 ## Features
 
-- **Single-model pipeline**: One HuggingFace causal LM handles both detection and debiasing (no separate classifier + generator).
-- **Structured output**: Pydantic-validated results with `binary_label` (biased/unbiased), overall `severity` (1–5), `biased_segments` (original phrase, replacement, severity, bias type, reasoning, character offsets), and full `unbiased_text`.
-- **Demo UI**: `--serve` launches a FastAPI server that also serves a visual web interface at `http://localhost:8000` — no separate frontend server needed.
+- **Bias detection**: Identifies biased phrases in text and returns them as segments with character-level offsets for highlighting.
+- **Classification**: Binary label (biased/unbiased), per-segment severity (low/medium/high), and bias type (e.g. loaded language, framing).
+- **Reasoning**: Each segment includes an explanation of why it is considered biased.
+- **Debiasing**: Per-segment neutral replacements and a full rewritten `unbiased_text`.
+- **Structured output**: Pydantic-validated `BiasResult` with `binary_label`, `severity` (1–5), `biased_segments`, and `unbiased_text`.
+- **Demo UI**: `--serve` launches a FastAPI server that also serves a visual web interface at `http://localhost:8000`.
 - **CLI**: Analyze from command line with `--text`, `--file`, or start the API + UI with `--serve`. Optional 4-bit quantization and JSON output.
 - **REST API**: FastAPI server with `/health` and `/analyze` (POST JSON `{"text": "..."}`). Model loaded at startup via lifespan.
 - **Python API**: Use `UnBiasPlus` in code; call `analyze()`, `analyze_to_cli()`, `analyze_to_dict()`, or `analyze_to_json()`.
