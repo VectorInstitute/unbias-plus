@@ -76,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#unbias-plus" class="md-skip">
+        <a href="#what-is-unbias-plus" class="md-skip">
           Skip to content
         </a>
       
@@ -275,6 +275,44 @@
   
 
       
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="team/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Team
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="license/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  License
+
+      </a>
+    </li>
+  
+
+      
     </ul>
   </div>
 </nav>
@@ -386,10 +424,21 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#what-it-does" class="md-nav__link">
+  <a href="#highlights" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What it does
+        Highlights
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#video-tutorials" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Video tutorials
       
     </span>
   </a>
@@ -408,10 +457,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#documentation" class="md-nav__link">
+  <a href="#contents" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Documentation
+        Contents
       
     </span>
   </a>
@@ -480,6 +529,60 @@
   
 
     
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="team/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Team
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="license/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    License
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
   </ul>
 </nav>
                   </div>
@@ -507,10 +610,21 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#what-it-does" class="md-nav__link">
+  <a href="#highlights" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What it does
+        Highlights
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#video-tutorials" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Video tutorials
       
     </span>
   </a>
@@ -529,10 +643,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#documentation" class="md-nav__link">
+  <a href="#contents" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Documentation
+        Contents
       
     </span>
   </a>
@@ -559,29 +673,46 @@
   
 
 
-<h1 id="unbias-plus">unbias-plus<a class="headerlink" href="#unbias-plus" title="Permanent link">&para;</a></h1>
-<p>Bias detection and debiasing using a single LLM. Analyze text for biased language, get structured results (binary label, severity, biased segments with replacements and reasoning), and a full neutral rewrite—all via one fine-tuned causal language model.</p>
-<h2 id="what-it-does">What it does<a class="headerlink" href="#what-it-does" title="Permanent link">&para;</a></h2>
+<h1 id="what-is-unbias-plus">What is unbias-plus?<a class="headerlink" href="#what-is-unbias-plus" title="Permanent link">&para;</a></h1>
+<p><strong>unbias-plus</strong> is an AI-driven toolkit for bias detection and debiasing in text. It identifies biased segments, classifies severity, suggests neutral replacements with reasoning, and produces a full neutral rewrite—supporting risk identification, mitigation, and more trustworthy text systems.</p>
+<p><a href="https://pypi.org/project/unbias-plus/"><img alt="PyPI version" src="https://img.shields.io/pypi/v/unbias-plus.svg" /></a>
+<a href="https://colab.research.google.com/drive/1FlUSeFFXr3VeADiStOIzX7hOV6IlliC8?usp=sharing"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a> — <em>Setup, usage, CLI, and API.</em></p>
+<hr />
+<h2 id="highlights">Highlights<a class="headerlink" href="#highlights" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Single-model pipeline</strong>: One HuggingFace causal LM handles both detection and debiasing (no separate classifier + generator).</li>
-<li><strong>Structured output</strong>: Pydantic-validated <code>BiasResult</code> with <code>binary_label</code> (biased/unbiased), overall <code>severity</code> (1–5), <code>biased_segments</code> (original phrase, replacement, severity, bias type, reasoning), and <code>unbiased_text</code>.</li>
-<li><strong>Multiple entry points</strong>: CLI (<code>unbias-plus</code>), REST API (FastAPI), or Python API (<code>UnBiasPlus</code>).</li>
+<li><strong>Bias detection</strong> — Pinpoints biased phrases in text and returns them as structured segments with character-level offsets for highlighting.</li>
+<li><strong>Classification</strong> — Overall binary label (biased/unbiased), per-segment severity (low/medium/high), and bias type (e.g. loaded language, framing).</li>
+<li><strong>Reasoning</strong> — Each segment includes an explanation of why it is considered biased, so you can review and act with context.</li>
+<li><strong>Debiasing</strong> — Per-segment neutral replacements plus a full rewritten <code>unbiased_text</code> of the input.</li>
+<li><strong>Structured output</strong> — Pydantic-validated <code>BiasResult</code>: <code>binary_label</code>, <code>severity</code> (1–5), <code>biased_segments</code>, and <code>unbiased_text</code>. Use via <strong>CLI</strong> (<code>unbias-plus --text "..."</code>), <strong>REST API</strong> (FastAPI + demo UI), or <strong>Python API</strong> (<code>UnBiasPlus().analyze()</code>).</li>
+<li><strong>Production-ready</strong> — Optional 4-bit quantization and default fine-tuned model <a href="https://huggingface.co/vector-institute/Unbias-plus-Qwen2.5">vector-institute/Unbias-plus-Qwen2.5</a>.</li>
 </ul>
+<hr />
+<h2 id="video-tutorials">Video tutorials<a class="headerlink" href="#video-tutorials" title="Permanent link">&para;</a></h2>
+<p>Videos show how to use the <strong>demo UI</strong> when you run the API with <code>unbias-plus --serve</code>:</p>
+<ul>
+<li><a href="https://drive.google.com/file/d/1aNh0bqeA2rTZ-uKi_cfrljo_UHP1M4Uq/view?usp=sharing">Demo UI (silent)</a></li>
+<li><a href="https://drive.google.com/file/d/1uPiLQ5GZKQH7cBeuV2QQeituxFPC6zTK/view?usp=sharing">Demo UI (voiced)</a></li>
+</ul>
+<hr />
 <h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>sync
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">source</span><span class="w"> </span>.venv/bin/activate
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">source</span><span class="w"> </span>.venv/bin/activate<span class="w">   </span><span class="c1"># or .venv\Scripts\activate on Windows</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>unbias-plus<span class="w"> </span>--text<span class="w"> </span><span class="s2">&quot;Women are too emotional to lead.&quot;</span>
 </span></code></pre></div>
 <p>Or in Python:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">unbias_plus</span><span class="w"> </span><span class="kn">import</span> <span class="n">UnBiasPlus</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">pipe</span> <span class="o">=</span> <span class="n">UnBiasPlus</span><span class="p">(</span><span class="s2">&quot;meta-llama/Llama-3.2-3B&quot;</span><span class="p">)</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">pipe</span> <span class="o">=</span> <span class="n">UnBiasPlus</span><span class="p">()</span>  <span class="c1"># uses default model, or pass model_name_or_path=</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">result</span> <span class="o">=</span> <span class="n">pipe</span><span class="o">.</span><span class="n">analyze</span><span class="p">(</span><span class="s2">&quot;Women are too emotional to lead.&quot;</span><span class="p">)</span>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">binary_label</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">unbiased_text</span><span class="p">)</span>
 </span></code></pre></div>
-<h2 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h2>
+<hr />
+<h2 id="contents">Contents<a class="headerlink" href="#contents" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="user_guide/">User Guide</a> — Installation, CLI, REST API, Python API, and development.</li>
 <li><a href="api/">API Reference</a> — Module and class reference for <code>unbias_plus</code>.</li>
+<li><a href="team/">Team</a> — Contributors, acknowledgement, and support.</li>
+<li><a href="license/">License</a> — Apache License 2.0.</li>
 </ul>
 
 
