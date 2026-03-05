@@ -7,6 +7,7 @@ on:
   push:
     branches:
       - main
+      - unbias-pretrained
     paths:
       - .pre-commit-config.yaml
       - .github/workflows/code_checks.yml
@@ -22,6 +23,7 @@ on:
   pull_request:
     branches:
       - main
+      - unbias-pretrained
     paths:
       - .pre-commit-config.yaml
       - .github/workflows/code_checks.yml
@@ -54,7 +56,7 @@ jobs:
           python-version-file: ".python-version"
 
       - name: Install the project
-        run: uv sync --group dev --no-extra flash --no-extra train
+        run: uv sync --group dev --no-extra train
 
       - name: Install dependencies and check code
         run: |
