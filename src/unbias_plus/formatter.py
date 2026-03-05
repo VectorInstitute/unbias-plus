@@ -46,11 +46,10 @@ def format_cli(result: BiasResult) -> str:
     """
     lines = []
     lines.append("=" * 60)
-    lines.append(
-        f"BIAS DETECTED: {result.binary_label.upper()} "
-        f"| Overall Severity: {result.severity}/5"
-    )
-    lines.append(f"Segments found: {len(result.biased_segments)}")
+    if result.bias_found:
+        lines.append(f"Segments found: {len(result.biased_segments)}")
+    if not result.biased_segments:
+        lines.append("\nNo biased segments detected.")
     lines.append("=" * 60)
 
     if result.biased_segments:
