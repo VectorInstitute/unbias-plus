@@ -7,6 +7,7 @@ on:
   push:
     branches:
       - main
+      - unbias-pretrained
     paths:
       - .pre-commit-config.yaml
       - .github/workflows/code_checks.yml
@@ -22,6 +23,7 @@ on:
   pull_request:
     branches:
       - main
+      - unbias-pretrained
     paths:
       - .pre-commit-config.yaml
       - .github/workflows/code_checks.yml
