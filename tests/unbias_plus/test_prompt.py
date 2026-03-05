@@ -1,30 +1,31 @@
 """Tests for prompt module."""
 
-from unbias_plus.prompt import SYSTEM_PROMPT, build_prompt
+from unbias_plus.prompt import SYSTEM_PROMPT, build_messages
 
 
-def test_build_prompt_contains_text(sample_text: str) -> None:
-    """Test build_prompt includes the input text in output."""
-    prompt = build_prompt(sample_text)
-    assert sample_text in prompt
+def test_build_messages_contains_text(sample_text: str) -> None:
+    """Test build_messages includes the input text in user message."""
+    messages = build_messages(sample_text)
+    assert sample_text in messages[1]["content"]
 
 
-def test_build_prompt_contains_system_prompt(sample_text: str) -> None:
-    """Test build_prompt includes the system prompt."""
-    prompt = build_prompt(sample_text)
-    assert "JSON" in prompt
+def test_build_messages_contains_system_prompt(sample_text: str) -> None:
+    """Test build_messages includes JSON in system prompt."""
+    messages = build_messages(sample_text)
+    assert "JSON" in messages[0]["content"]
 
 
-def test_build_prompt_returns_string(sample_text: str) -> None:
-    """Test build_prompt returns a string."""
-    prompt = build_prompt(sample_text)
-    assert isinstance(prompt, str)
+def test_build_messages_returns_list(sample_text: str) -> None:
+    """Test build_messages returns a list of dicts."""
+    messages = build_messages(sample_text)
+    assert isinstance(messages, list)
 
 
-def test_build_prompt_ends_with_json_cue(sample_text: str) -> None:
-    """Test build_prompt ends with JSON output cue."""
-    prompt = build_prompt(sample_text)
-    assert prompt.strip().endswith("JSON output:")
+def test_build_messages_has_system_and_user(sample_text: str) -> None:
+    """Test build_messages returns system and user roles."""
+    messages = build_messages(sample_text)
+    assert messages[0]["role"] == "system"
+    assert messages[1]["role"] == "user"
 
 
 def test_system_prompt_mentions_binary_label() -> None:

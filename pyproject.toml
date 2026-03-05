@@ -27,7 +27,7 @@ dependencies = [
     "torch>=2.0.0,<=2.6.0",
     "torchaudio>=0.13.0,<=2.6.0",
     "torchvision>=0.13.0,<=0.21.0",
-    "transformers>=4.35.0,<5.0.0",
+    "transformers>=4.35.0,<5.2.0",
     "accelerate>=1.0.0,<=1.10.1",
     # Fine-tuning
     "peft>=0.17.1",
@@ -68,8 +68,6 @@ train = [
     "trl>=0.22.0",
     "unsloth[colab-new]",
     "unsloth-zoo>=2025.10.10,<2026.3.1",
-]
-flash = [
     "flash-attn>=2.7.0",
 ]
 
@@ -113,6 +111,7 @@ artifacts = ["src/unbias_plus/demo/**"]
 [tool.uv]
 default-groups = ["dev", "docs"]
 index-url = "https://pypi.org/simple"
+extra-build-dependencies = { flash-attn = ["torch"] }
 extra-index-url = ["https://download.pytorch.org/whl/cu124"]
 index-strategy = "unsafe-best-match"
 

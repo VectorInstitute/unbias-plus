@@ -4507,10 +4507,8 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-flash = [
-    { name = "flash-attn" },
-]
 train = [
+    { name = "flash-attn" },
     { name = "peft" },
     { name = "trl" },
     { name = "unsloth", extra = ["colab-new"] },
@@ -4551,7 +4549,7 @@ requires-dist = [
     { name = "datasets", specifier = ">=2.18.0" },
     { name = "einops", specifier = ">=0.8.1" },
     { name = "fastapi", specifier = ">=0.110.0" },
-    { name = "flash-attn", marker = "extra == 'flash'", specifier = ">=2.7.0" },
+    { name = "flash-attn", marker = "extra == 'train'", specifier = ">=2.7.0" },
     { name = "jsonlines", specifier = ">=4.0.0" },
     { name = "ninja", specifier = ">=1.13.0" },
     { name = "numpy", specifier = ">=1.24.0" },
@@ -4569,14 +4567,14 @@ requires-dist = [
     { name = "torchaudio", specifier = ">=0.13.0,<=2.6.0" },
     { name = "torchvision", specifier = ">=0.13.0,<=0.21.0" },
     { name = "tqdm", specifier = ">=4.67.3" },
-    { name = "transformers", specifier = ">=4.35.0,<5.0.0" },
+    { name = "transformers", specifier = ">=4.35.0,<5.2.0" },
     { name = "trl", marker = "extra == 'train'", specifier = ">=0.22.0" },
     { name = "unsloth", extras = ["colab-new"], marker = "extra == 'train'", git = "https://github.com/unslothai/unsloth.git?tag=February-2026" },
     { name = "unsloth-zoo", marker = "extra == 'train'", git = "https://github.com/unslothai/unsloth-zoo.git" },
     { name = "uvicorn", specifier = ">=0.29.0" },
     { name = "wheel", specifier = ">=0.45.1" },
 ]
-provides-extras = ["train", "flash"]
+provides-extras = ["train"]
 
 [package.metadata.requires-dev]
 dev = [

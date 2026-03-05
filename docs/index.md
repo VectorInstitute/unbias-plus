@@ -3,7 +3,8 @@
 **unbias-plus** is an AI-driven toolkit for bias detection and debiasing in text. It identifies biased segments, classifies severity, suggests neutral replacements with reasoning, and produces a full neutral rewrite—supporting risk identification, mitigation, and more trustworthy text systems.
 
 [![PyPI version](https://img.shields.io/pypi/v/unbias-plus.svg)](https://pypi.org/project/unbias-plus/)
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1FlUSeFFXr3VeADiStOIzX7hOV6IlliC8?usp=sharing) — *Setup, usage, CLI, and API.*
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1FlUSeFFXr3VeADiStOIzX7hOV6IlliC8?usp=sharing)
+[![GitHub](https://img.shields.io/badge/GitHub-repo-blue?logo=github)](https://github.com/VectorInstitute/unbias-plus) — *Setup, usage, CLI, and API.*
 
 ---
 
