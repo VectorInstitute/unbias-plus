@@ -5,7 +5,7 @@ from pathlib import Path
 from unbias_plus.formatter import format_cli, format_dict, format_json
 from unbias_plus.model import DEFAULT_MODEL, UnBiasModel
 from unbias_plus.parser import parse_llm_output
-from unbias_plus.prompt import build_prompt
+from unbias_plus.prompt import build_messages
 from unbias_plus.schema import BiasResult, compute_offsets
 
 
@@ -20,18 +20,18 @@ class UnBiasPlus:
     ----------
     model_name_or_path : str | Path
         HuggingFace model ID or local path to the fine-tuned
-        model. Defaults to 'meta-llama/Llama-3.2-3B'.
+        model. Defaults to 'vector-institute/Qwen3-4B-UnBias-Plus-SFT'.
     device : str | None, optional
         Device to run on ('cuda' or 'cpu'). Auto-detected if None.
     load_in_4bit : bool, optional
         Load model in 4-bit quantization. Default is False.
     max_new_tokens : int, optional
-        Maximum tokens to generate. Default is 1024.
+        Maximum tokens to generate. Default is 4096.
 
     Examples
     --------
     >>> from unbias_plus import UnBiasPlus  # doctest: +SKIP
-    >>> pipe = UnBiasPlus("meta-llama/Llama-3.2-3B")  # doctest: +SKIP
+    >>> pipe = UnBiasPlus()  # doctest: +SKIP
     >>> result = pipe.analyze("Women are too emotional to lead.")  # doctest: +SKIP
     >>> print(result.binary_label)  # doctest: +SKIP
     biased
@@ -43,22 +43,8 @@ class UnBiasPlus:
         model_name_or_path: str | Path = DEFAULT_MODEL,
         device: str | None = None,
         load_in_4bit: bool = False,
-        max_new_tokens: int = 2048,
+        max_new_tokens: int = 4096,
     ) -> None:
-        """Initialize the pipeline with the LLM.
-
-        Parameters
-        ----------
-        model_name_or_path : str | Path
-            HuggingFace model ID or local path.
-        device : str | None
-            Target device. Auto-detected if None.
-        load_in_4bit : bool
-            Whether to use 4-bit quantization.
-        max_new_tokens : int
-            Max tokens to generate per call.
-
-        """
         self._model = UnBiasModel(
             model_name_or_path=model_name_or_path,
             device=device,
@@ -69,7 +55,7 @@ class UnBiasPlus:
     def analyze(self, text: str) -> BiasResult:
         """Analyze input text for bias.
 
-        Runs the full pipeline: builds prompt, runs inference,
+        Runs the full pipeline: builds chat messages, runs inference,
         parses JSON output, computes character offsets for each
         segment, and attaches the original text to the result.
 
@@ -96,8 +82,8 @@ class UnBiasPlus:
         True
 
         """
-        prompt = build_prompt(text)
-        raw_output = self._model.generate(prompt)
+        messages = build_messages(text)
+        raw_output = self._model.generate(messages)
         result = parse_llm_output(raw_output)
 
         # Compute character-level offsets for frontend highlighting

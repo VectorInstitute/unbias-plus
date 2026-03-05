@@ -13,20 +13,23 @@ SEVERITY_RANK = {"low": 1, "medium": 2, "high": 3}
 def parse_llm_output(raw_output: str) -> BiasResult:
     """Parse raw LLM output string into a BiasResult object.
 
-    Attempts multiple strategies to extract and parse a JSON object
-    from the raw LLM output, then validates it against the BiasResult schema.
+    Handles Qwen3 thinking blocks (<think>...</think>) as well as
+    plain JSON output from any model. Attempts multiple strategies
+    to extract and parse a JSON object from the raw LLM output,
+    then validates it against the BiasResult schema.
 
     Strategies (in order):
-    1. Direct JSON parse of extracted block
-    2. Fix truncated strings (LLM cut off mid-output)
-    3. Fix missing commas between JSON items
-    4. Aggressive key-by-key extraction as last resort
+    1. Strip thinking block if present (Qwen3 with enable_thinking=True)
+    2. Direct JSON parse of extracted block
+    3. Fix truncated strings (LLM cut off mid-output)
+    4. Fix missing commas between JSON items
+    5. Aggressive key-by-key extraction as last resort
 
     Parameters
     ----------
     raw_output : str
-        Raw string returned by the LLM, may include extra text,
-        markdown code fences, or be truncated/malformed.
+        Raw string returned by the LLM, may include a thinking block,
+        extra text, markdown code fences, or be truncated/malformed.
 
     Returns
     -------
@@ -56,7 +59,13 @@ def parse_llm_output(raw_output: str) -> BiasResult:
     'biased'
 
     """
-    cleaned = _extract_json(raw_output)
+    # Strip thinking block before any JSON extraction.
+    # Works for all cases:
+    #   - Qwen3 with thinking: removes <think>...</think>, leaves JSON
+    #   - Qwen3 without thinking / any other model: no-op
+    text = _strip_thinking_block(raw_output)
+
+    cleaned = _extract_json(text)
 
     # Strategy 1: Direct parse
     data = _try_parse(cleaned)
@@ -75,7 +84,7 @@ def parse_llm_output(raw_output: str) -> BiasResult:
 
     # Strategy 5: Regex-based field extraction (last resort)
     if data is None:
-        data = _extract_fields_by_regex(raw_output)
+        data = _extract_fields_by_regex(text)
 
     if data is None:
         raise ValueError(
@@ -98,6 +107,37 @@ def parse_llm_output(raw_output: str) -> BiasResult:
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+
+def _strip_thinking_block(raw_output: str) -> str:
+    """Remove Qwen3 <think>...</think> block from model output.
+
+    Safe to call on any model output — if no thinking block is present
+    the string is returned unchanged. Also handles the edge case where
+    the model hit max_new_tokens mid-think and never closed the tag.
+
+    Parameters
+    ----------
+    raw_output : str
+        Raw LLM output, possibly containing a thinking block.
+
+    Returns
+    -------
+    str
+        Output with thinking block removed, ready for JSON extraction.
+    """
+    # Clean close: <think>...</think> followed by JSON
+    if "</think>" in raw_output:
+        return raw_output.split("</think>", 1)[-1].strip()
+
+    # Unclosed thinking block: model hit max_new_tokens mid-think.
+    # Nothing after <think> will be valid JSON — return empty so
+    # fallback strategies handle it gracefully.
+    if "<think>" in raw_output:
+        return ""
+
+    # No thinking block — return as-is (any other model)
+    return raw_output
 
 
 def _deduplicate_segments(segments: list[dict]) -> list[dict]:

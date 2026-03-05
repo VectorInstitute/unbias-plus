@@ -61,7 +61,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--max-new-tokens",
         type=int,
-        default=1024,
+        default=2048,
         help="Maximum number of tokens to generate. Default: 1024",
     )
     parser.add_argument(

@@ -7,6 +7,15 @@ from pydantic import BaseModel, field_validator
 
 logger = logging.getLogger(__name__)
 
+# Maps string severity labels the model may return for global severity
+# to the correct integer scale (0, 2, 3, 4).
+_STR_TO_INT_SEVERITY: dict[str, int] = {
+    "none": 0,
+    "low": 2,
+    "medium": 3,
+    "high": 4,
+}
+
 
 class BiasedSegment(BaseModel):
     """A single biased segment detected in the text.
@@ -16,9 +25,11 @@ class BiasedSegment(BaseModel):
     original : str
         The original biased phrase from the input text.
     replacement : str
-        The suggested neutral replacement.
+        The suggested neutral replacement. Defaults to empty string
+        if the model omits it (e.g. under 4-bit quantization).
     severity : str
         Severity level: 'low', 'medium', or 'high'.
+        Defaults to 'medium' if omitted by the model.
     bias_type : str
         Type of bias (e.g. 'loaded language', 'framing bias').
     reasoning : str
@@ -45,38 +56,25 @@ class BiasedSegment(BaseModel):
     """
 
     original: str
-    replacement: str
-    severity: str
-    bias_type: str
-    reasoning: str
+    replacement: str = ""  # optional — model may omit under 4-bit quantization
+    severity: str = "medium"  # optional — defaults to medium if omitted
+    bias_type: str = ""
+    reasoning: str = ""
     start: int | None = None
     end: int | None = None
 
     @field_validator("severity")
     @classmethod
     def validate_severity(cls, v: str) -> str:
-        """Validate severity is one of the allowed values.
-
-        Parameters
-        ----------
-        v : str
-            The severity value to validate.
-
-        Returns
-        -------
-        str
-            The validated severity value.
-
-        Raises
-        ------
-        ValueError
-            If severity is not 'low', 'medium', or 'high'.
-
-        """
+        """Validate and normalise segment severity to low/medium/high."""
         allowed = {"low", "medium", "high"}
-        if v.lower() not in allowed:
-            raise ValueError(f"severity must be one of {allowed}, got '{v}'")
-        return v.lower()
+        normalized = v.lower().strip()
+        if normalized not in allowed:
+            logger.warning(
+                "Unexpected segment severity '%s', defaulting to 'medium'", v
+            )
+            return "medium"
+        return normalized
 
 
 class BiasResult(BaseModel):
@@ -87,7 +85,13 @@ class BiasResult(BaseModel):
     binary_label : str
         Overall label: 'biased' or 'unbiased'.
     severity : int
-        Overall severity score from 1 (low) to 5 (high).
+        Overall severity score:
+          0 = neutral / no bias
+          2 = recurring biased framing
+          3 = strong persuasive tone
+          4 = inflammatory rhetoric
+        If the model returns a string ('low', 'medium', 'high'),
+        it is coerced to the nearest integer value.
     bias_found : bool
         Whether any bias was detected in the text.
     biased_segments : list[BiasedSegment]
@@ -122,53 +126,49 @@ class BiasResult(BaseModel):
     @field_validator("binary_label")
     @classmethod
     def validate_binary_label(cls, v: str) -> str:
-        """Validate binary_label is 'biased' or 'unbiased'.
-
-        Parameters
-        ----------
-        v : str
-            The binary label value to validate.
-
-        Returns
-        -------
-        str
-            The validated binary label.
-
-        Raises
-        ------
-        ValueError
-            If label is not 'biased' or 'unbiased'.
-
-        """
+        """Validate binary_label is 'biased' or 'unbiased'."""
         allowed = {"biased", "unbiased"}
-        if v.lower() not in allowed:
+        normalized = v.lower().strip()
+        if normalized not in allowed:
             raise ValueError(f"binary_label must be one of {allowed}, got '{v}'")
-        return v.lower()
+        return normalized
 
-    @field_validator("severity")
+    @field_validator("severity", mode="before")
     @classmethod
-    def validate_severity(cls, v: int) -> int:
-        """Validate severity is between 1 and 5.
+    def validate_severity(cls, v: int | str) -> int:
+        """Coerce and validate global severity.
 
-        Parameters
-        ----------
-        v : int
-            The severity score to validate.
-
-        Returns
-        -------
-        int
-            The validated severity score.
-
-        Raises
-        ------
-        ValueError
-            If severity is not between 1 and 5.
-
+        Accepts:
+          - int 0, 2, 3, 4  (correct model output)
+          - str 'low', 'medium', 'high', 'none'  (model confused scales)
+          - any other int   (clamped to nearest valid value)
         """
-        if not 1 <= v <= 5:
-            raise ValueError(f"severity must be between 1 and 5, got {v}")
-        return v
+        # String coercion — model confused global vs segment severity scale
+        if isinstance(v, str):
+            normalized = v.lower().strip()
+            if normalized in _STR_TO_INT_SEVERITY:
+                coerced = _STR_TO_INT_SEVERITY[normalized]
+                logger.warning(
+                    "Global severity returned as string '%s', coerced to %d",
+                    v,
+                    coerced,
+                )
+                return coerced
+            # Try parsing as int string e.g. "3"
+            try:
+                v = int(v)
+            except ValueError:
+                logger.warning("Unrecognized severity '%s', defaulting to 2", v)
+                return 2
+
+        # Clamp out-of-range integer values gracefully
+        if v <= 0:
+            return 0
+        if v in {2, 3, 4}:
+            return v
+        if v == 1:
+            return 2
+        return 4  # anything > 4
 
 
 def _find_case_insensitive(text: str, phrase: str, start: int = 0) -> int:

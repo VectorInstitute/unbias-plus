@@ -32,15 +32,15 @@ def test_biased_segment_severity_normalized() -> None:
 
 
 def test_biased_segment_invalid_severity() -> None:
-    """Test BiasedSegment raises ValidationError for invalid severity."""
-    with pytest.raises(ValidationError):
-        BiasedSegment(
-            original="test",
-            replacement="test",
-            severity="extreme",
-            bias_type="test",
-            reasoning="test",
-        )
+    """Test BiasedSegment coerces invalid severity to 'medium'."""
+    seg = BiasedSegment(
+        original="test",
+        replacement="test",
+        severity="extreme",
+        bias_type="test",
+        reasoning="test",
+    )
+    assert seg.severity == "medium"
 
 
 def test_bias_result_valid(sample_result: BiasResult) -> None:
@@ -55,7 +55,7 @@ def test_bias_result_label_normalized() -> None:
     """Test BiasResult normalizes binary_label to lowercase."""
     result = BiasResult(
         binary_label="BIASED",
-        severity=1,
+        severity=2,
         bias_found=True,
         biased_segments=[],
         unbiased_text="test",
@@ -68,7 +68,7 @@ def test_bias_result_invalid_label() -> None:
     with pytest.raises(ValidationError):
         BiasResult(
             binary_label="maybe",
-            severity=1,
+            severity=2,
             bias_found=False,
             biased_segments=[],
             unbiased_text="test",
@@ -76,22 +76,22 @@ def test_bias_result_invalid_label() -> None:
 
 
 def test_bias_result_severity_out_of_range() -> None:
-    """Test BiasResult raises ValidationError for severity out of range."""
-    with pytest.raises(ValidationError):
-        BiasResult(
-            binary_label="biased",
-            severity=6,
-            bias_found=True,
-            biased_segments=[],
-            unbiased_text="test",
-        )
+    """Test BiasResult clamps severity > 4 to 4."""
+    result = BiasResult(
+        binary_label="biased",
+        severity=6,
+        bias_found=True,
+        biased_segments=[],
+        unbiased_text="test",
+    )
+    assert result.severity == 4
 
 
 def test_bias_result_unbiased_empty_segments() -> None:
     """Test BiasResult accepts empty biased_segments when unbiased."""
     result = BiasResult(
         binary_label="unbiased",
-        severity=1,
+        severity=0,
         bias_found=False,
         biased_segments=[],
         unbiased_text="This text is neutral.",
