@@ -77,7 +77,7 @@ def build_messages(text: str) -> list[dict]:
             "content": (
                 "Analyze the following text for bias and return the result "
                 "in the required JSON format.\n\n"
-                f"TEXT:\n{text}"
+                f"TEXT:\n{text}\n\n/no_think"
             ),
         },
     ]

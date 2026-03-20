@@ -1,9 +1,16 @@
 """LLM model loader and inference for unbias-plus."""
 
+import threading
 from pathlib import Path
+from typing import Iterator
 
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    BitsAndBytesConfig,
+    TextIteratorStreamer,
+)
 
 
 DEFAULT_MODEL = "vector-institute/Qwen3-8B-UnBias-Plus-SFT"
@@ -68,11 +75,11 @@ class UnBiasModel:
         self.tokenizer.padding_side = "left"
 
         # --- Quantization config ---
-        # Default model always loads in 4bit to keep VRAM manageable (~5GB).
-        # For any custom model, load_in_4bit remains opt-in.
-        effective_load_in_4bit = load_in_4bit or (
-            self.model_name_or_path == DEFAULT_MODEL
-        )
+        # Load in 4-bit only when explicitly requested. The default model
+        # (Qwen3-8B) fits in BF16 within the L4's 23GB VRAM (~18GB total),
+        # and BF16 is significantly faster: bitsandbytes 4-bit dequantizes
+        # on CPU which pegs the CPU and starves the GPU.
+        effective_load_in_4bit = load_in_4bit
         quantization_config = None
         if effective_load_in_4bit:
             quantization_config = BitsAndBytesConfig(
@@ -160,3 +167,63 @@ class UnBiasModel:
         # that could corrupt JSON extraction.
         new_tokens = output_ids[0][input_ids.shape[-1] :]
         return str(self.tokenizer.decode(new_tokens, skip_special_tokens=True))
+
+    def generate_stream(self, messages: list[dict]) -> Iterator[str]:
+        """Stream raw token text for a list of chat messages.
+
+        Runs model generation in a background thread and yields decoded
+        token strings via a ``TextIteratorStreamer`` as they are produced.
+        Uses the same greedy decoding settings as :meth:`generate`.
+
+        Parameters
+        ----------
+        messages : list[dict]
+            List of ``{"role": ..., "content": ...}`` dicts.
+
+        Yields
+        ------
+        str
+            Decoded token text, one chunk per model step.
+
+        """
+        template_kwargs: dict = {
+            "tokenize": True,
+            "add_generation_prompt": True,
+            "return_tensors": "pt",
+            "return_dict": True,
+            "truncation": True,
+            "max_length": MAX_SEQ_LENGTH,
+            "enable_thinking": self.enable_thinking,
+        }
+        if self.enable_thinking:
+            template_kwargs["thinking_budget"] = self.thinking_budget
+
+        tokenized = self.tokenizer.apply_chat_template(messages, **template_kwargs)
+        input_ids = tokenized["input_ids"].to(self.device)
+        attention_mask = tokenized["attention_mask"].to(self.device)
+
+        streamer = TextIteratorStreamer(
+            self.tokenizer,
+            skip_prompt=True,
+            skip_special_tokens=True,
+        )
+
+        generate_kwargs = {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "max_new_tokens": self.max_new_tokens,
+            "do_sample": False,
+            "temperature": None,
+            "top_p": None,
+            "pad_token_id": self.tokenizer.pad_token_id,
+            "eos_token_id": self.tokenizer.eos_token_id,
+            "streamer": streamer,
+        }
+
+        thread = threading.Thread(target=self.model.generate, kwargs=generate_kwargs)
+        thread.start()
+
+        for token_text in streamer:
+            yield token_text
+
+        thread.join()

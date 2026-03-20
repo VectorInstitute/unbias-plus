@@ -1,6 +1,7 @@
 """Formatters for displaying BiasResult output."""
 
 import json
+from typing import Any, cast
 
 from unbias_plus.schema import BiasResult
 
@@ -98,7 +99,7 @@ def format_dict(result: BiasResult) -> dict:
     True
 
     """
-    return result.model_dump()
+    return cast(dict[Any, Any], result.model_dump())
 
 
 def format_json(result: BiasResult) -> str:

@@ -17,7 +17,19 @@
    const copyBtn      = document.getElementById("copy-btn");
    const tooltip      = document.getElementById("tooltip");
 
-   const MAX_CHARS = 5000;
+   const MAX_CHARS = 1000;
+
+   // ============================================================
+   // EXAMPLE CHIPS
+   // ============================================================
+
+   document.querySelectorAll(".example-chip").forEach(chip => {
+     chip.addEventListener("click", () => {
+       inputEl.value = chip.dataset.text;
+       inputEl.dispatchEvent(new Event("input"));
+       inputEl.focus();
+     });
+   });
 
    // ============================================================
    // CHAR COUNTER
@@ -45,44 +57,188 @@
      const text = inputEl.value.trim();
      if (!text) return;
      if (text.length > MAX_CHARS) {
-       alert("Text too long. Please keep it under 5000 characters.");
+       alert("Text too long. Please keep it under 1000 characters.");
        return;
      }
 
      analyzeBtn.disabled = true;
      resultsEl.classList.add("hidden");
      loadingEl.classList.remove("hidden");
+     unbiasedEl.innerHTML = "";
+
+     const labelEl = document.querySelector(".loading-label");
+     let tokenCount = 0;
+     let firstTokenReceived = false;
+     let accumulated = "";
+     let streamingSegments = [];
+
+     // Elapsed timer — updates label every second until first token arrives.
+     // After 8 s of silence, shows a cold-start warning with a live counter.
+     const startTime = Date.now();
+     const timerInterval = setInterval(() => {
+       if (firstTokenReceived) return;
+       const elapsed = Math.floor((Date.now() - startTime) / 1000);
+       if (!labelEl) return;
+       if (elapsed < 8) {
+         labelEl.textContent = "Connecting to inference server...";
+       } else {
+         labelEl.innerHTML =
+           "Cold start: loading model from GCS\u00a0\u00a0"
+           + "<span style='font-variant-numeric:tabular-nums;'>" + elapsed + "s</span>"
+           + "<br><span style='font-size:0.85em;opacity:0.6;'>First request after idle takes ~7 min. Hang tight.</span>";
+       }
+     }, 1000);
 
      try {
-       const res = await fetch("/analyze", {
+       const res = await fetch("/analyze/stream", {
          method: "POST",
          headers: { "Content-Type": "application/json" },
          body: JSON.stringify({ text }),
        });
 
-       const data = await res.json();
-
-       if (!res.ok || data.detail) {
-         throw new Error(data.detail || "Server error");
+       if (!res.ok) {
+         let detail = "Server error (" + res.status + ")";
+         try { detail = (await res.json()).detail || detail; } catch {}
+         throw new Error(detail);
        }
 
-       renderResults(data);
+       const reader = res.body.getReader();
+       const decoder = new TextDecoder();
+       let buffer = "";
+
+       while (true) {
+         const { done, value } = await reader.read();
+         if (done) break;
+
+         buffer += decoder.decode(value, { stream: true });
+         const lines = buffer.split("\n");
+         buffer = lines.pop();
+
+         for (const line of lines) {
+           if (!line.startsWith("data: ")) continue;
+           let payload;
+           try { payload = JSON.parse(line.slice(6)); } catch { continue; }
+
+           if (payload.t !== undefined) {
+             if (!firstTokenReceived) {
+               firstTokenReceived = true;
+               clearInterval(timerInterval);
+             }
+             tokenCount++;
+             accumulated += payload.t;
+             if (labelEl) labelEl.textContent = "Analyzing... (" + tokenCount + " tokens)";
+
+             const newSegs = parseNewSegments(accumulated, streamingSegments.length, text);
+             if (newSegs.length > 0) {
+               streamingSegments = streamingSegments.concat(newSegs);
+               renderStreamingPartial(text, streamingSegments);
+             }
+
+           } else if (payload.result !== undefined) {
+             // Final result: complete render with unbiased text + server-side offsets
+             renderResults(payload.result);
+           } else if (payload.error !== undefined) {
+             throw new Error(payload.error);
+           }
+         }
+       }
 
      } catch (err) {
-       alert(`Analysis failed: ${err.message}`);
-     } finally {
+       clearInterval(timerInterval);
        analyzeBtn.disabled = false;
-       loadingEl.classList.add("hidden");
+       const elapsed = Math.floor((Date.now() - startTime) / 1000);
+       const isColdStart = elapsed > 8 && !firstTokenReceived;
+       if (isColdStart) {
+         if (labelEl) labelEl.innerHTML =
+           "Connection dropped after " + elapsed + "s — model is still loading.<br>"
+           + "<span style='font-size:0.85em;opacity:0.6;'>GPU is warming up (~7 min total). Click Analyze again to reconnect.</span>";
+       } else {
+         loadingEl.classList.add("hidden");
+         if (labelEl) labelEl.textContent = "Analyzing bias patterns...";
+         alert("Analysis failed: " + err.message);
+       }
+       return;
      }
+     clearInterval(timerInterval);
+     analyzeBtn.disabled = false;
+     loadingEl.classList.add("hidden");
+     if (labelEl) labelEl.textContent = "Analyzing bias patterns...";
    }
 
    // ============================================================
-   // RENDER RESULTS
+   // PROGRESSIVE SEGMENT PARSER
+   // Walks accumulated raw JSON text, extracts complete segment
+   // objects from the biased_segments array using brace counting,
+   // skips already-rendered ones, computes offsets client-side.
+   // ============================================================
+
+   function parseNewSegments(raw, alreadyParsed, inputText) {
+     const markerIdx = raw.indexOf('"biased_segments"');
+     if (markerIdx === -1) return [];
+
+     const bracketIdx = raw.indexOf('[', markerIdx);
+     if (bracketIdx === -1) return [];
+
+     const newSegs = [];
+     let depth = 0;
+     let objStart = -1;
+     let segIdx = 0;
+
+     for (let i = bracketIdx + 1; i < raw.length; i++) {
+       const ch = raw[i];
+       if (ch === '{') {
+         if (depth === 0) objStart = i;
+         depth++;
+       } else if (ch === '}') {
+         depth--;
+         if (depth === 0 && objStart !== -1) {
+           if (segIdx >= alreadyParsed) {
+             // New complete segment object
+             try {
+               const seg = JSON.parse(raw.slice(objStart, i + 1));
+               // Compute char offsets client-side (mirrors server compute_offsets)
+               const idx = inputText.indexOf(seg.original);
+               seg.start = idx === -1 ? null : idx;
+               seg.end   = idx === -1 ? null : idx + (seg.original || "").length;
+               newSegs.push(seg);
+             } catch {}
+           }
+           segIdx++;
+           objStart = -1;
+         }
+       } else if (ch === ']' && depth === 0) {
+         break; // end of biased_segments array
+       }
+     }
+
+     return newSegs;
+   }
+
+   // ============================================================
+   // PARTIAL RENDER (called as each streaming segment arrives)
+   // Shows highlights + cards immediately; leaves unbiased panel
+   // empty until the final result event fills it in.
+   // ============================================================
+
+   function renderStreamingPartial(inputText, segments) {
+     // Reveal panels on first segment
+     resultsEl.classList.remove("hidden");
+     document.querySelector(".summary-bar").classList.remove("hidden");
+     document.querySelector(".panels").classList.remove("hidden");
+     document.querySelector(".breakdown-section").classList.remove("hidden");
+     noBiasEl.classList.add("hidden");
+
+     renderSummary(segments);
+     highlightEl.innerHTML = buildHighlightedHTML(inputText, segments);
+     attachMarkTooltips(segments);
+     renderSegmentCards(segments);
+   }
+
+   // ============================================================
+   // RENDER RESULTS (final — called on result event)
    // ============================================================
 
    function renderResults(data) {
-     // API returns: binary_label, severity, bias_found, biased_segments,
-     // unbiased_text, original_text
      const { original_text, unbiased_text, bias_found, biased_segments } = data;
 
      resultsEl.classList.remove("hidden");
@@ -131,11 +287,9 @@
 
    // ============================================================
    // HIGHLIGHTED HTML BUILDER
-   // Uses start/end offsets computed server-side by pipeline.py
    // ============================================================
 
    function buildHighlightedHTML(text, segments) {
-     // Filter segments that have valid offsets and sort by start
      const sorted = segments
        .filter(s => s.start != null && s.end != null)
        .sort((a, b) => a.start - b.start);
@@ -145,7 +299,7 @@
 
      sorted.forEach((seg, idx) => {
        const { start, end, severity } = seg;
-       if (start < cursor) return; // skip overlapping
+       if (start < cursor) return;
 
        if (start > cursor) {
          html += escapeHtml(text.slice(cursor, start));
@@ -276,8 +430,6 @@
    // UNBIASED HTML BUILDER
    // ============================================================
    function buildUnbiasedHTML(original, unbiased, segments) {
-    // Collect all original biased phrases
-    const originals = segments.map(s => s.original).filter(Boolean);
     const replacements = segments.map(s => s.replacement).filter(Boolean);
 
     let html = escapeHtmlText(unbiased);

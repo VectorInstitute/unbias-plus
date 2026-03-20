@@ -43,7 +43,7 @@ class UnBiasPlus:
         model_name_or_path: str | Path = DEFAULT_MODEL,
         device: str | None = None,
         load_in_4bit: bool = False,
-        max_new_tokens: int = 4096,
+        max_new_tokens: int = 1024,
     ) -> None:
         self._model = UnBiasModel(
             model_name_or_path=model_name_or_path,

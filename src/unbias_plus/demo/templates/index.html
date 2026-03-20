@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>UnBias</title>
+  <title>UnBias+ | Vector Institute</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300;0,400;0,600;0,700;0,800;1,300;1,400&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
@@ -14,8 +14,11 @@
   <div class="noise"></div>
 
   <header>
-    <div class="logo">
-      <span class="logo-un">Un</span><span class="logo-bias">Bias</span><span class="logo-plus"> Plus</span>
+    <div class="header-left">
+      <div class="logo">
+        <span class="logo-un">Un</span><span class="logo-bias">Bias</span><span class="logo-plus"> Plus</span>
+      </div>
+      <span class="logo-tagline">Detect and neutralize bias in text</span>
     </div>
     <img
       src="/static/Vector-Logo-FullColour_Horizontal.png"
@@ -32,14 +35,24 @@
         <span class="label-num">01</span>
         <span class="label-text">Paste your text</span>
       </div>
+
+      <!-- EXAMPLE CHIPS -->
+      <div class="examples">
+        <span class="examples-label">Try an example</span>
+        <button class="example-chip" data-text="Women are too emotional to lead effectively in high-pressure corporate environments where tough decisions need to be made quickly.">Gender bias</button>
+        <button class="example-chip" data-text="Asian students naturally excel at math and science because of their cultural background and inherent work ethic. Meanwhile, other groups tend to perform worse in STEM fields due to cultural factors.">Racial stereotypes</button>
+        <button class="example-chip" data-text="We are seeking a young, energetic candidate to join our fast-paced startup. The ideal hire will be a native English speaker who can keep up with our dynamic team. Older applicants may find the pace challenging.">Hiring language</button>
+        <button class="example-chip" data-text="The aggressive expansion strategy championed by our male executives has driven record profits. The female board members, ever cautious and risk-averse, had reservations, but ultimately the bold vision prevailed.">Workplace framing</button>
+      </div>
+
       <textarea
         id="input-text"
         placeholder="Paste any text here — news article, social media post, report, essay..."
         spellcheck="false"
       ></textarea>
       <div class="input-footer">
-        <span id="char-count" class="char-count">0 / 5000</span>
-        <span class="disclaimer-inline">⚠ Results may not always be as expected</span>
+        <span id="char-count" class="char-count">0 / 1000</span>
+        <span class="disclaimer-inline">⚠ Because bias is a subjective and context-dependent concept, results should be interpreted as indicative rather than definitive.</span>
         <button id="analyze-btn" class="analyze-btn">
           <span class="btn-text">Analyze for Bias</span>
           <span class="btn-arrow">→</span>

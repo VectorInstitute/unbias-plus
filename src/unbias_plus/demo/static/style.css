@@ -1,42 +1,42 @@
 /* ============================================================
-   UnBias — Clean White Editorial
-   Typefaces: Syne (display) + DM Sans (body) + DM Mono (labels)
-   Palette: Crisp white + slate ink + vivid coral accent
+   UnBias+ -- Vector Institute Brand
+   Typefaces: Open Sans (display + body) + DM Mono (labels)
+   Palette: White + Black + Vector Magenta #EB088A
    ============================================================ */
 
-   :root {
-    --bg:          #f7f7f5;        /* warm off-white */
-    --bg-2:        #ffffff;
-    --bg-3:        #f0f0ed;
-    --border:      #e4e4e0;
-    --border-2:    #d0d0ca;
+  :root {
+   --bg:          #ffffff;        /* Vector white */
+   --bg-2:        #ffffff;
+   --bg-3:        #f5f5f5;
+   --border:      #e4e4e0;
+   --border-2:    #d0d0ca;
 
-    --text:        #1a1a1a;
-    --text-2:      #5c5c5c;
-    --text-3:      #9a9a9a;
+   --text:        #000000;        /* Vector black */
+   --text-2:      #3c3c3c;
+   --text-3:      #9a9a9a;
 
-    --accent:      #e8460a;        /* vivid coral-red — purposeful, editorial */
-    --accent-dim:  rgba(232,70,10,0.07);
-    --accent-hover: #c93a06;
+   --accent:      #EB088A;        /* Vector magenta -- primary brand colour */
+   --accent-dim:  rgba(235,8,138,0.07);
+   --accent-hover: #c9076f;
 
-    --high:        #d63232;
-    --high-bg:     rgba(214,50,50,0.08);
-    --high-border: rgba(214,50,50,0.25);
+   --high:        #d63232;
+   --high-bg:     rgba(214,50,50,0.08);
+   --high-border: rgba(214,50,50,0.25);
 
-    --medium:      #d97706;
-    --medium-bg:   rgba(217,119,6,0.08);
-    --medium-border: rgba(217,119,6,0.25);
+   --medium:      #d97706;
+   --medium-bg:   rgba(217,119,6,0.08);
+   --medium-border: rgba(217,119,6,0.25);
 
-    --low:         #a87d00;
-    --low-bg:      rgba(168,125,0,0.08);
-    --low-border:  rgba(168,125,0,0.25);
+   --low:         #a87d00;
+   --low-bg:      rgba(168,125,0,0.08);
+   --low-border:  rgba(168,125,0,0.25);
 
-    --radius:      12px;
-    --radius-sm:   7px;
-    --font-display: 'Syne', sans-serif;
-    --font-body:    'DM Sans', sans-serif;
-    --font-mono:    'DM Mono', monospace;
-  }
+   --radius:      12px;
+   --radius-sm:   7px;
+   --font-display: 'Open Sans', sans-serif;
+   --font-body:    'Open Sans', sans-serif;
+   --font-mono:    'DM Mono', monospace;
+ }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -52,7 +52,7 @@
     overflow-x: hidden;
   }
 
-  /* Noise texture overlay — very subtle on light bg */
+  /* Noise texture overlay -- very subtle on light bg */
   .noise {
     pointer-events: none;
     position: fixed;
@@ -68,11 +68,24 @@
      ============================================================ */
 
   header {
-    padding: 28px 64px;
+    padding: 24px 64px;
     border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
     justify-content: space-between;
+  }
+
+  .header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .logo-tagline {
+    font-family: var(--font-body);
+    font-size: 13px;
+    color: var(--text-3);
+    font-weight: 300;
   }
 
   .logo {
@@ -84,18 +97,22 @@
   }
 
   .logo-un {
-    color: var(--text-2);
+    color: var(--text);
   }
 
   .logo-bias {
     color: var(--accent);
   }
 
+  .logo-plus {
+    color: var(--text-2);
+    font-weight: 400;
+  }
 
   .vector-logo {
     height: 64px;
     width: auto;
-    opacity: 0.82;
+    opacity: 0.9;
   }
 
   /* ============================================================
@@ -128,7 +145,7 @@
     font-size: 11px;
     color: var(--accent);
     background: var(--accent-dim);
-    border: 1px solid rgba(232,70,10,0.15);
+    border: 1px solid rgba(235,8,138,0.2);
     padding: 2px 8px;
     border-radius: 4px;
     letter-spacing: 0.05em;
@@ -146,6 +163,47 @@
   /* ============================================================
      INPUT SECTION
      ============================================================ */
+
+  /* ============================================================
+     EXAMPLE CHIPS
+     ============================================================ */
+
+  .examples {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+
+  .examples-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    margin-right: 2px;
+  }
+
+  .example-chip {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-2);
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 5px 14px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+    white-space: nowrap;
+  }
+
+  .example-chip:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-dim);
+  }
 
   .input-section {
     animation: fadeUp 0.5s ease both;
@@ -171,7 +229,7 @@
 
   textarea:focus {
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(232,70,10,0.08);
+    box-shadow: 0 0 0 3px rgba(235,8,138,0.08);
   }
 
   .input-footer {
@@ -224,7 +282,7 @@
   .analyze-btn:hover {
     background: var(--accent);
     transform: translateY(-1px);
-    box-shadow: 0 6px 24px rgba(232,70,10,0.2);
+    box-shadow: 0 6px 24px rgba(235,8,138,0.25);
   }
 
   .analyze-btn:active { transform: translateY(0); }
@@ -278,6 +336,9 @@
     font-size: 12px;
     color: var(--text-3);
     letter-spacing: 0.04em;
+    text-align: center;
+    line-height: 1.6;
+    min-height: 2.4em;
   }
 
   @keyframes loadPulse {
@@ -469,7 +530,7 @@
     border-radius: var(--radius);
     padding: 20px 24px;
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto 1fr minmax(140px, 260px);
     align-items: start;
     gap: 16px;
     transition: border-color 0.15s;
@@ -529,6 +590,9 @@
     gap: 4px;
     text-align: right;
     min-width: 140px;
+    max-width: 280px;
+    word-break: break-word;
+    overflow-wrap: break-word;
   }
 
   .seg-rep-label {
@@ -544,6 +608,8 @@
     font-size: 13px;
     color: var(--accent);
     font-weight: 500;
+    word-break: break-word;
+    overflow-wrap: break-word;
   }
 
   /* ============================================================
@@ -670,6 +736,9 @@
     .panels { grid-template-columns: 1fr; }
     .segment-card { grid-template-columns: auto 1fr; }
     .seg-replacement { grid-column: 2; align-items: flex-start; text-align: left; }
+    .examples { gap: 6px; }
+    .examples-label { display: none; }
+    .logo-tagline { display: none; }
   }
 
   .site-footer {

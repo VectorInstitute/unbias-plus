@@ -31,9 +31,8 @@ dependencies = [
     "accelerate>=1.0.0,<=1.10.1",
     # Fine-tuning
     "peft>=0.17.1",
-    "bitsandbytes==0.48.1",
     # Build tools (for optional flash-attn / CUDA builds)
-    "cmake==4.1.0",
+    "cmake>=3.30.0",
     "ninja>=1.13.0",
     "setuptools>=80.9.0",
     "wheel>=0.45.1",
@@ -56,6 +55,8 @@ dependencies = [
     # API server
     "fastapi>=0.110.0",
     "uvicorn>=0.29.0",
+    # OpenAI-compatible client for vLLM remote inference
+    "openai>=2.28.0",
 ]
 
 [project.urls]
@@ -66,9 +67,10 @@ Repository = "https://github.com/VectorInstitute/unbias-plus"
 train = [
     "peft>=0.17.0",
     "trl>=0.22.0",
-    "unsloth[colab-new]",
-    "unsloth-zoo>=2025.10.10,<2026.3.1",
-    "flash-attn>=2.7.0",
+    "unsloth[colab-new]; sys_platform == 'linux'",
+    "unsloth-zoo>=2025.10.10,<2026.3.1; sys_platform == 'linux'",
+    "flash-attn>=2.7.0; sys_platform == 'linux'",
+    "bitsandbytes==0.49.2",
 ]
 
 
@@ -111,13 +113,25 @@ artifacts = ["src/unbias_plus/demo/**"]
 [tool.uv]
 default-groups = ["dev", "docs"]
 index-url = "https://pypi.org/simple"
-extra-build-dependencies = { flash-attn = ["torch"] }
 extra-index-url = ["https://download.pytorch.org/whl/cu124"]
 index-strategy = "unsafe-best-match"
 
 [tool.uv.sources]
+torch = { index = "pytorch-cu124" }
+torchvision = { index = "pytorch-cu124" }
+torchaudio = { index = "pytorch-cu124" }
+cmake = { index = "pypi" }
+markupsafe = { index = "pypi" }
 unsloth = { git = "https://github.com/unslothai/unsloth.git", tag = "February-2026" }
 unsloth-zoo = { git = "https://github.com/unslothai/unsloth-zoo.git" }
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
 
 [tool.mypy]
 python_version = "3.10"

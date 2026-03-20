@@ -1,0 +1,58 @@
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Python artifacts
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.egg-info
+*.egg
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv
+venv
+env
+
+# Testing and dev
+tests/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Documentation
+docs/
+mkdocs.yml
+*.md
+!README.md
+
+# CI/CD
+.github/
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Environment files
+.env
+.env.*
+*.env
+
+# Node (if any)
+node_modules/
+
+# Model cache (don't bake into image — download at runtime)
+.cache/
+*.bin
+*.safetensors

@@ -61,17 +61,19 @@ def parse_llm_output(raw_output: str) -> BiasResult:
     'biased'
 
     """
-    # Step 1: Extract JSON by brace counting first.
-    # This stops at the closing } of the root JSON object so any
-    # hallucinated text appended after (e.g. "assistant\n<think>\nuser\n...")
-    # is ignored entirely before any other processing.
-    cleaned = _extract_json(raw_output)
+    # Step 1: Strip thinking block FIRST.
+    # Qwen3 outputs <think>...</think> before the JSON. The think block
+    # often contains {/} characters (e.g. the model referencing the output
+    # schema while reasoning). If we brace-count first, we grab that inner
+    # block instead of the real JSON — producing segments with no unbiased_text.
+    # Stripping first is safe for all models: no-op if no thinking block present.
+    no_think = _strip_thinking_block(raw_output)
 
-    # Step 2: Strip thinking block from the extracted text.
-    # Safe to call on any model — no-op if no thinking block present.
-    # Runs after extraction so a <think> tag hallucinated after the JSON
-    # never causes _strip_thinking_block to incorrectly empty the string.
-    text = _strip_thinking_block(cleaned)
+    # Step 2: Extract JSON by brace counting.
+    # Now operates on clean output only. Stops at the closing } of the root
+    # JSON object so any hallucinated text after (e.g. "assistant\n<think>\n...")
+    # is ignored entirely.
+    text = _extract_json(no_think)
 
     # Strategy 1: Direct parse
     data = _try_parse(text)
