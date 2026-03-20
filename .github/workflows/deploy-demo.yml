@@ -313,6 +313,7 @@ jobs:
             --min-instances=0 \
             --max-instances=10 \
             --timeout=900 \
+            --no-cpu-throttling \
             --allow-unauthenticated \
             --set-env-vars="VLLM_BASE_URL=${{ steps.vllm-url.outputs.url }}/v1,VLLM_MODEL_NAME=unbias-plus,MAX_INPUT_CHARS=1000,TOKENIZERS_PARALLELISM=false" \
             --quiet
@@ -328,14 +329,14 @@ jobs:
         run: |
           URL="${{ steps.deploy.outputs.url }}/health"
           echo "Checking $URL..."
-          for i in $(seq 1 10); do
-            HTTP=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 10 "$URL" 2>/dev/null || echo "000")
+          for i in $(seq 1 20); do
+            HTTP=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$URL" 2>/dev/null)
             if [ "$HTTP" = "200" ]; then
               echo "✓ Health check passed"
               curl -s "$URL" | python3 -m json.tool || true
               exit 0
             fi
-            echo "  Attempt $i/10 — HTTP $HTTP, retrying..."
+            echo "  Attempt $i/20 — HTTP $HTTP, retrying..."
             sleep 5
           done
           echo "✗ Demo health check failed"
