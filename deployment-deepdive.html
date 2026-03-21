@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UnBias Plus Deployment Deep Dive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.1.0/reveal.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.1.0/theme/black.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.1.0/reveal.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  :root {
+    --magenta: #EB088A;
+    --cobalt: #313CFF;
+    --violet: #8A25C9;
+    --turquoise: #48C0D9;
+    --black: #0a0a0a;
+    --card: #141414;
+    --border: #222;
+    --text: #f0f0f0;
+    --muted: #888;
+    --green: #22c55e;
+    --orange: #f59e0b;
+    --red: #ef4444;
+  }
+
+  :root { --r-main-font-size: 26px; }
+  .reveal { font-family: 'Open Sans', sans-serif; color: var(--text); background: var(--black); }
+  .reveal h1, .reveal h2, .reveal h3 { font-family: 'Open Sans', sans-serif; font-weight: 800; text-transform: none; letter-spacing: -0.02em; }
+  .reveal h1 { font-size: 1.9em; line-height: 1.15; }
+  .reveal h2 { font-size: 1.25em; color: var(--text); border-bottom: 2px solid var(--magenta); padding-bottom: 0.2em; margin-bottom: 0.4em; }
+  .reveal h3 { font-size: 0.95em; color: var(--turquoise); font-weight: 600; margin-bottom: 0.25em; }
+  .reveal p, .reveal li { font-size: 0.75em; line-height: 1.55; }
+  .reveal ul { list-style: none; padding: 0; }
+  .reveal ul li::before { content: "→ "; color: var(--magenta); font-weight: 700; }
+  .reveal code, .reveal pre { font-family: 'DM Mono', monospace; }
+  .reveal pre { background: #0d0d0d; border: 1px solid var(--border); border-radius: 6px; padding: 0.7em; font-size: 0.6em; }
+  .reveal pre code { color: #e2e8f0; }
+  .reveal section { padding: 0.4em 1.4em 0; overflow: hidden; }
+  .reveal .slides { text-align: left; }
+
+  /* ── Layout helpers ── */
+  .cols { display: grid; gap: 1.2em; }
+  .cols-2 { grid-template-columns: 1fr 1fr; }
+  .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .cols-60-40 { grid-template-columns: 60fr 40fr; }
+  .cols-40-60 { grid-template-columns: 40fr 60fr; }
+
+  /* ── Cards ── */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 0.8em 1em; }
+  .card-magenta { border-color: var(--magenta); }
+  .card-cobalt  { border-color: var(--cobalt); }
+  .card-violet  { border-color: var(--violet); }
+  .card-turquoise { border-color: var(--turquoise); }
+  .card-red     { border-color: var(--red); }
+  .card-green   { border-color: var(--green); }
+
+  /* ── Tags / Pills ── */
+  .tag { display: inline-block; border-radius: 999px; padding: 0.2em 0.8em; font-size: 0.65em; font-weight: 700; font-family: 'DM Mono', monospace; text-transform: uppercase; letter-spacing: 0.05em; }
+  .tag-magenta { background: rgba(235,8,138,0.15); color: var(--magenta); border: 1px solid var(--magenta); }
+  .tag-cobalt  { background: rgba(49,60,255,0.15);  color: #7b84ff;       border: 1px solid var(--cobalt); }
+  .tag-green   { background: rgba(34,197,94,0.15);  color: var(--green);  border: 1px solid var(--green); }
+  .tag-red     { background: rgba(239,68,68,0.15);  color: var(--red);    border: 1px solid var(--red); }
+  .tag-orange  { background: rgba(245,158,11,0.15); color: var(--orange); border: 1px solid var(--orange); }
+  .tag-turq    { background: rgba(72,192,217,0.15); color: var(--turquoise); border: 1px solid var(--turquoise); }
+
+  /* ── Accent text ── */
+  .accent  { color: var(--magenta); font-weight: 700; }
+  .muted   { color: var(--muted); }
+  .mono    { font-family: 'DM Mono', monospace; }
+  .big-num { font-size: 2.4em; font-weight: 800; line-height: 1; }
+  .label   { font-size: 0.65em; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+
+  /* ── Title slide ── */
+  .title-slide { display: flex; flex-direction: column; justify-content: center; padding: 0 !important; height: 100%; }
+  .title-bar { width: 100%; height: 5px; background: linear-gradient(90deg, var(--magenta), var(--cobalt), var(--violet)); margin-bottom: 1.5em; }
+  .eyebrow { font-size: 0.65em; text-transform: uppercase; letter-spacing: 0.15em; color: var(--magenta); font-weight: 700; margin-bottom: 0.4em; font-family: 'DM Mono', monospace; }
+
+  /* ── Section divider ── */
+  .section-divider { display: flex; flex-direction: column; justify-content: center; text-align: center !important; padding: 0 !important; height: 100%; }
+  .section-num { font-size: 4em; font-weight: 800; color: rgba(235,8,138,0.12); line-height: 1; font-family: 'DM Mono', monospace; }
+  .section-title { font-size: 2em !important; font-weight: 800; margin-top: -0.2em; }
+
+  /* ── Architecture diagrams ── */
+  .arch-diagram { width: 100%; height: auto; }
+
+  /* ── Step list ── */
+  .step-list { counter-reset: steps; list-style: none; padding: 0; }
+  .step-list li { counter-increment: steps; display: flex; gap: 1em; align-items: flex-start; margin-bottom: 0.8em; }
+  .step-list li::before { content: counter(steps); min-width: 1.8em; height: 1.8em; background: var(--magenta); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.75em; flex-shrink: 0; margin-top: 0.1em; }
+
+  /* ── Timeline ── */
+  .timeline { position: relative; padding-left: 1.6em; }
+  .timeline::before { content: ''; position: absolute; left: 0.5em; top: 0.5em; bottom: 0.5em; width: 2px; background: linear-gradient(to bottom, var(--magenta), var(--cobalt)); }
+  .tl-item { position: relative; margin-bottom: 0.8em; }
+  .tl-dot { position: absolute; left: -1.2em; top: 0.3em; width: 8px; height: 8px; border-radius: 50%; background: var(--magenta); }
+  .tl-item.cobalt .tl-dot { background: var(--cobalt); }
+  .tl-item.violet .tl-dot { background: var(--violet); }
+  .tl-item.green .tl-dot  { background: var(--green); }
+
+  /* ── SSE wave animation ── */
+  @keyframes pulse-wave { 0%,100%{opacity:0.3;transform:scaleY(0.4)} 50%{opacity:1;transform:scaleY(1)} }
+  .wave-bar { display: inline-block; width: 4px; border-radius: 2px; background: var(--magenta); margin: 0 2px; animation: pulse-wave 1.2s ease-in-out infinite; }
+  .wave-bar:nth-child(2){animation-delay:.15s}
+  .wave-bar:nth-child(3){animation-delay:.3s}
+  .wave-bar:nth-child(4){animation-delay:.45s}
+  .wave-bar:nth-child(5){animation-delay:.6s}
+
+  /* ── Cold-start timeline bars ── */
+  .cold-bar { height: 28px; border-radius: 6px; display: flex; align-items: center; padding: 0 10px; font-size: 0.62em; font-weight: 600; color: white; white-space: nowrap; overflow: hidden; font-family: 'DM Mono', monospace; }
+
+  /* ── GHA pipeline ── */
+  .pipe-step { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 0.6em 0.9em; font-size: 0.7em; display: flex; align-items: center; gap: 0.5em; }
+  .pipe-arrow { color: var(--magenta); font-size: 1.2em; display: flex; align-items: center; }
+
+  /* ── Icons ── */
+  .icon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .icon svg { width: 1.1em; height: 1.1em; stroke-width: 2; }
+  .icon-lg svg { width: 1.4em; height: 1.4em; }
+  .icon-red svg { stroke: var(--red); }
+  .icon-green svg { stroke: var(--green); }
+  .icon-orange svg { stroke: var(--orange); }
+  .icon-muted svg { stroke: var(--muted); }
+  .icon-magenta svg { stroke: var(--magenta); }
+  .icon-turq svg { stroke: var(--turquoise); }
+
+  /* ── Gotcha card ── */
+  .gotcha { display: flex; gap: 0.8em; align-items: flex-start; background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.3); border-radius: 10px; padding: 0.9em 1em; margin-bottom: 0.7em; }
+  .gotcha-fix { display: flex; gap: 0.8em; align-items: flex-start; background: rgba(34,197,94,0.06); border: 1px solid rgba(34,197,94,0.3); border-radius: 10px; padding: 0.9em 1em; }
+  .gotcha-icon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 1.2em; line-height: 1; }
+  .gotcha-icon svg { width: 1.2em; height: 1.2em; stroke-width: 2; stroke: var(--red); }
+  .gotcha-icon.icon-green svg { stroke: var(--green); }
+
+  /* ── Comparison table ── */
+  .cmp-table { width: 100%; border-collapse: collapse; font-size: 0.72em; }
+  .cmp-table th { padding: 0.6em 1em; text-align: left; background: rgba(255,255,255,0.04); color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.85em; }
+  .cmp-table td { padding: 0.7em 1em; border-top: 1px solid var(--border); }
+  .cmp-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .cmp-table .best { color: var(--green); font-weight: 700; }
+  .cmp-table .bad  { color: var(--red); }
+  .cmp-table .ok   { color: var(--orange); }
+  .cmp-table .col-hl { background: rgba(235,8,138,0.05); }
+
+  /* reveal overrides */
+  .reveal .progress { background: rgba(255,255,255,0.1); }
+  .reveal .progress span { background: var(--magenta); }
+  .reveal .controls { color: var(--magenta); }
+  .reveal .slide-number { color: var(--muted); font-family: 'DM Mono', monospace; font-size: 0.7em; }
+</style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ════════════════════════════════════════════════════════
+     SLIDE 1 — Title
+════════════════════════════════════════════════════════ -->
+<section class="title-slide">
+  <div class="title-bar"></div>
+  <div style="padding: 0 2.5em">
+    <div class="eyebrow">Vector Institute · Engineering Deep Dive</div>
+    <h1>UnBias Plus<br><span class="accent">Deployment Journey</span></h1>
+    <p style="font-size:0.8em; color:var(--muted); margin-top:0.5em; max-width:600px;">
+      From a single GPU VM to a fully serverless, auto-scaling inference pipeline on GCP.
+    </p>
+    <div style="display:flex; gap:0.8em; margin-top:1.8em; flex-wrap:wrap;">
+      <span class="tag tag-magenta">Cloud Run GPU</span>
+      <span class="tag tag-cobalt">vLLM</span>
+      <span class="tag tag-turq">GCS Model Cache</span>
+      <span class="tag tag-green">Scale to Zero</span>
+      <span class="tag tag-orange">GitHub Actions CI/CD</span>
+    </div>
+    <p style="margin-top:1.5em; font-size:0.6em; color:var(--muted);">Use arrow keys or swipe to navigate · Press F for fullscreen</p>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════
+     SLIDE 2 — What is UnBias Plus
+════════════════════════════════════════════════════════ -->
+<section>
+  <h2>What is UnBias Plus?</h2>
+  <div class="cols cols-60-40" style="align-items:start;">
+    <div>
+      <p style="margin-bottom:1em;">A fine-tuned LLM pipeline that takes arbitrary text and returns a <strong>structured bias analysis</strong>: not just a binary flag, but actionable detail.</p>
+      <div class="timeline">
+        <div class="tl-item">
+          <div class="tl-dot"></div>
+          <div><strong>Detects</strong> biased segments with character-level offsets for UI highlighting</div>
+        </div>
+        <div class="tl-item cobalt">
+          <div class="tl-dot"></div>
+          <div><strong>Classifies</strong> severity, bias type, and explains its reasoning</div>
+        </div>
+        <div class="tl-item violet">
+          <div class="tl-dot"></div>
+          <div><strong>Suggests</strong> neutral replacement phrases per segment</div>
+        </div>
+        <div class="tl-item green">
+          <div class="tl-dot"></div>
+          <div><strong>Rewrites</strong> the full text as a neutrally-worded alternative</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card card-magenta">
+        <div class="label">Model</div>
+        <div style="font-size:0.75em; font-family:'DM Mono',monospace; color:var(--magenta); margin:0.3em 0;">Qwen3-8B-UnBias-Plus-SFT</div>
+        <div class="label" style="margin-top:0.8em;">Parameters</div>
+        <div class="big-num" style="font-size:1.8em; margin-top:0.2em;">8B</div>
+        <div class="label" style="margin-top:0.8em;">Context window</div>
+        <div style="font-size:1em; font-weight:700; margin-top:0.2em;">8,192 tokens</div>
+        <div class="label" style="margin-top:0.8em;">Output format</div>
+        <div style="font-size:0.78em; margin-top:0.2em;">Structured JSON → <span class="mono">BiasResult</span></div>
+      </div>
+      <div class="card" style="margin-top:1em; font-size:0.72em;">
+        <span class="mono" style="color:var(--turquoise);">POST /analyze/stream</span><br>
+        <span class="muted">→ SSE token stream + final result</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════
+     SECTION DIVIDER — MVP
+════════════════════════════════════════════════════════ -->
+<section class="section-divider">
+  <div class="section-num">01</div>
+  <h2 class="section-title">The MVP</h2>
+  <p style="color:var(--muted); text-align:center;">Compute Engine VM · HuggingFace Transformers · SSE</p>
+</section>
+
+<!-- ════════════════════════════════════════════════════════
+     SLIDE 3 — MVP Architecture
+════════════════════════════════════════════════════════ -->
+<section>
+  <h2>MVP Architecture</h2>
+  <div class="cols cols-2" style="align-items:start; gap:1.5em;">
+    <div>
+      <!-- SVG Architecture Diagram -->
+      <svg viewBox="0 0 560 430" class="arch-diagram" xmlns="http://www.w3.org/2000/svg" style="width:100%; max-height:480px;">
+        <defs>
+          <marker id="arrow1" markerWidth="10" markerHeight="7" refX="8" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#EB088A"/>
+          </marker>
+          <marker id="arrow1v" markerWidth="10" markerHeight="7" refX="8" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#8A25C9"/>
+          </marker>
+          <linearGradient id="vmGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#1a1a2e"/>
+            <stop offset="100%" stop-color="#0d0d1a"/>
+          </linearGradient>
+        </defs>
+
+        <!-- Browser -->
+        <rect x="155" y="10" width="250" height="66" rx="10" fill="#141414" stroke="#313CFF" stroke-width="1.5"/>
+        <text x="280" y="36" text-anchor="middle" fill="#7b84ff" font-size="14" font-family="DM Mono">User Browser</text>
+        <text x="280" y="54" text-anchor="middle" fill="#888" font-size="11" font-family="DM Mono">POST /analyze/stream</text>
+        <text x="280" y="69" text-anchor="middle" fill="#EB088A" font-size="11" font-family="DM Mono">← SSE token stream</text>
+
+        <!-- Arrow down -->
+        <line x1="280" y1="76" x2="280" y2="108" stroke="#EB088A" stroke-width="1.5" marker-end="url(#arrow1)"/>
+        <text x="296" y="98" fill="#888" font-size="10" font-family="DM Mono">HTTPS</text>
+
+        <!-- VM box -->
+        <rect x="20" y="112" width="520" height="304" rx="12" fill="url(#vmGrad)" stroke="#444" stroke-width="1.5"/>
+        <text x="280" y="134" text-anchor="middle" fill="#aaa" font-size="12" font-family="DM Mono" letter-spacing="1">COMPUTE ENGINE VM · us-central1-a</text>
+        <text x="280" y="152" text-anchor="middle" fill="#666" font-size="11" font-family="DM Mono">L4 GPU · 24 GB VRAM</text>
+
+        <!-- FastAPI box -->
+        <rect x="50" y="160" width="460" height="68" rx="8" fill="#1a1a1a" stroke="#EB088A" stroke-width="1"/>
+        <text x="280" y="184" text-anchor="middle" fill="#EB088A" font-size="14" font-family="Open Sans" font-weight="700">FastAPI</text>
+        <text x="280" y="202" text-anchor="middle" fill="#888" font-size="11" font-family="DM Mono">/analyze  /analyze/stream  /health</text>
+        <text x="280" y="220" text-anchor="middle" fill="#555" font-size="10" font-family="DM Mono">input capped at 1,000 chars · model ctx: 8,192 tokens</text>
+
+        <!-- Arrow down -->
+        <line x1="280" y1="228" x2="280" y2="252" stroke="#EB088A" stroke-width="1.5" marker-end="url(#arrow1)"/>
+
+        <!-- HF Transformers box -->
+        <rect x="50" y="255" width="460" height="72" rx="8" fill="#1a1a1a" stroke="#8A25C9" stroke-width="1"/>
+        <text x="280" y="279" text-anchor="middle" fill="#b06ee0" font-size="14" font-family="Open Sans" font-weight="700">HuggingFace Transformers</text>
+        <text x="280" y="297" text-anchor="middle" fill="#888" font-size="11" font-family="DM Mono">AutoModelForCausalLM + TextIteratorStreamer</text>
+        <text x="280" y="314" text-anchor="middle" fill="#666" font-size="10" font-family="DM Mono">generate() in background thread → yield tokens</text>
+
+        <!-- Arrow down -->
+        <line x1="280" y1="327" x2="280" y2="351" stroke="#8A25C9" stroke-width="1.5" marker-end="url(#arrow1v)"/>
+
+        <!-- Model weights box -->
+        <rect x="50" y="354" width="460" height="52" rx="8" fill="#1a1a1a" stroke="#48C0D9" stroke-width="1"/>
+        <text x="280" y="377" text-anchor="middle" fill="#48C0D9" font-size="13" font-family="Open Sans" font-weight="700">Qwen3-8B-UnBias-Plus-SFT weights</text>
+        <text x="280" y="395" text-anchor="middle" fill="#888" font-size="11" font-family="DM Mono">loaded into L4 VRAM at startup · BF16 ~16 GB</text>
+      </svg>
+    </div>
+    <div>
+      <div class="card card-cobalt" style="margin-bottom:1em;">
+        <div class="label">Deployment</div>
+        <ul style="margin-top:0.5em;">
+          <li style="font-size:0.78em;">Single always-on VM (L4, 24 GB VRAM)</li>
+          <li style="font-size:0.78em;">Model loaded into VRAM at startup</li>
+          <li style="font-size:0.78em;">FastAPI serves <span class="mono">/analyze</span> and <span class="mono">/analyze/stream</span></li>
+          <li style="font-size:0.78em;">Input capped at 1,000 chars — model context window is 8,192 tokens</li>
+          <li style="font-size:0.78em;">Manual deploy via SSH</li>
+        </ul>
+      </div>
+      <div class="card card-magenta">
+        <div class="label">The SSE innovation</div>
+        <p style="font-size:0.78em; margin-top:0.5em;">Instead of waiting 20–30s for a full response, we stream tokens as they generate, giving users a <strong>live experience</strong> that feels instant.</p>
+        <div style="margin-top:0.8em; display:flex; align-items:center; gap:0.5em;">
+          <span style="font-size:0.72em; font-family:'DM Mono',monospace; color:var(--muted);">Streaming:</span>
+          <span class="wave-bar" style="height:16px;"></span>
+          <span class="wave-bar" style="height:22px;"></span>
+          <span class="wave-bar" style="height:14px;"></span>
+          <span class="wave-bar" style="height:20px;"></span>
+          <span class="wave-bar" style="height:18px;"></span>
+          <span style="font-size:0.65em; font-family:'DM Mono',monospace; color:var(--magenta); margin-left:0.3em;">{"t": "biased"}</span>
+        </div>
+      </div>
+      <div class="card" style="margin-top:1em; font-size:0.72em; border-color:#333;">
+        <div class="label">SSE event format</div>
+        <pre style="margin:0.4em 0 0; padding:0.6em; font-size:0.9em; background:transparent; border:none;"><span style="color:#888;">// token during generation</span>
+<span style="color:#48C0D9;">data:</span> <span style="color:#e2e8f0;">{"t": "biased"}</span>
+
+<span style="color:#888;">// final structured result</span>
+<span style="color:#48C0D9;">data:</span> <span style="color:#e2e8f0;">{"result": {...BiasResult}}</span></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════
+     SLIDE 4 — MVP Pain Points
+════════════════════════════════════════════════════════ -->
+<section>
+  <h2>MVP Drawbacks</h2>
+  <div class="cols cols-2" style="gap:1em;">
+
+    <div class="card card-red">
+      <div style="display:flex; gap:0.6em; align-items:center; margin-bottom:0.7em;">
+        <span class="icon icon-lg icon-red"><i data-lucide="x-octagon"></i></span>
+        <strong>No Concurrency</strong>
+      </div>
+      <p style="font-size:0.78em; margin:0 0 0.8em;">HuggingFace <span class="mono">model.generate()</span> is a single blocking call. A second user waits in a queue behind the first.</p>
+      <!-- sequential diagram -->
+      <div style="background:#0d0d0d; border-radius:6px; padding:0.8em; font-family:'DM Mono',monospace; font-size:0.6em;">
+        <div style="color:#888; margin-bottom:0.4em;">Request timeline:</div>
+        <div style="display:flex; align-items:center; gap:4px; margin-bottom:4px;">
+          <span style="color:#aaa; min-width:40px;">User 1</span>
+          <div style="height:14px; width:140px; background:var(--magenta); border-radius:3px; display:flex; align-items:center; padding-left:5px; color:white; font-size:0.9em;">generating...</div>
+          <span style="color:var(--green); margin-left:2px;">✓</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:4px; margin-bottom:4px;">
+          <span style="color:#aaa; min-width:40px;">User 2</span>
+          <div style="height:14px; width:140px; background:#222; border-radius:3px; display:flex; align-items:center; padding-left:5px; color:#666; font-size:0.9em;">⏳ waiting...</div>
+          <div style="height:14px; width:120px; background:var(--magenta); border-radius:3px; margin-left:2px;"></div>
+        </div>
+        <div style="display:flex; align-items:center; gap:4px;">
+          <span style="color:#aaa; min-width:40px;">User 3</span>
+          <div style="height:14px; width:270px; background:#222; border-radius:3px; display:flex; align-items:center; padding-left:5px; color:#666; font-size:0.9em;">⏳ waiting even longer...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card card-red">
+      <div style="display:flex; gap:0.6em; align-items:center; margin-bottom:0.7em;">
+        <span class="icon icon-lg icon-red"><i data-lucide="trending-down"></i></span>
+        <strong>Always-On Cost</strong>
+      </div>
+      <p style="font-size:0.78em; margin:0 0 0.8em;">VM runs 24/7 regardless of traffic. A demo with sporadic usage still pays for idle GPU time.</p>
+      <div style="display:flex; gap:0.6em; flex-wrap:wrap;">
+        <div style="text-align:center; background:#0d0d0d; border-radius:8px; padding:0.5em 0.8em;">
+          <div class="big-num" style="color:var(--red); font-size:1.6em;">~$623</div>
+          <div class="label">per month</div>
+        </div>
+        <div style="text-align:center; background:#0d0d0d; border-radius:8px; padding:0.5em 0.8em;">
+          <div class="big-num" style="color:var(--red); font-size:1.6em;">100%</div>
+          <div class="label">idle billing</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card card-red">
+      <div style="display:flex; gap:0.6em; align-items:center; margin-bottom:0.5em;">
+        <span class="icon icon-lg icon-red"><i data-lucide="wrench"></i></span>
+        <strong>Manual Deployments</strong>
+      </div>
+      <p style="font-size:0.78em; margin:0;">Every code change requires SSH → git pull → restart. No CI/CD, no rollback, no audit trail.</p>
+    </div>
+
+    <div class="card card-red">
+      <div style="display:flex; gap:0.6em; align-items:center; margin-bottom:0.5em;">
+        <span class="icon icon-lg icon-red"><i data-lucide="alert-triangle"></i></span>
+        <strong>Single Point of Failure</strong>
+      </div>
+      <p style="font-size:0.78em; margin:0;">One VM = one instance. Hardware failure, OOM, or crash takes the whole service down with no auto-recovery.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════
+     SECTION DIVIDER — vLLM
+════════════════════════════════════════════════════════ -->
+<section class="section-divider">
+  <div class="section-num">02</div>
+  <h2 class="section-title">Enter <span class="accent">vLLM</span></h2>
+  <p style="color:var(--muted); text-align:center;">Continuous batching · PagedAttention · OpenAI-compatible API</p>
+</section>
+
+<!-- ════════════════════════════════════════════════════════
+     SLIDE 5 — Why vLLM
+════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Why vLLM?</h2>
+  <div class="cols cols-2" style="gap:1.5em; align-items:start;">
+    <div>
+      <h3>The problem with HuggingFace <span class="mono" style="font-size:0.9em;">generate()</span></h3>
+      <div style="background:#0d0d0d; border-radius:8px; padding:1em; margin-bottom:1.2em; font-size:0.68em; font-family:'DM Mono',monospace;">
+        <div style="color:#888; margin-bottom:6px;">Sequential batching: requests queue up</div>
+        <div style="margin-bottom:3px;">
+          <span style="color:#48C0D9;">Req 1</span>
+          <span style="display:inline-block; height:12px; width:180px; background:var(--magenta); border-radius:2px; vertical-align:middle; margin:0 4px;"></span>
+          <span style="color:var(--green);">done</span>
+        </div>
+        <div style="margin-bottom:3px;">
+          <span style="color:#48C0D9;">Req 2</span>
+          <span style="display:inline-block; height:12px; width:180px; background:#1e1e1e; border-radius:2px; vertical-align:middle; margin:0 4px; border:1px dashed #333;"></span>
+          <span style="display:inline-block; height:12px; width:160px; background:var(--magenta); border-radius:2px; vertical-align:middle; margin:0 4px;"></span>
+        </div>
+        <div>
+          <span style="color:#48C0D9;">Req 3</span>
+          <span style="display:inline-block; height:12px; width:360px; background:#1e1e1e; border-radius:2px; vertical-align:middle; margin:0 4px; border:1px dashed #333;"></span>
+        </div>
+      </div>
+      <h3>Continuous batching (vLLM)</h3>
+      <div style="background:#0d0d0d; border-radius:8px; padding:1em; font-size:0.68em; font-family:'DM Mono',monospace;">
+        <div style="color:#888; margin-bottom:6px;">Continuous batching: GPU never idles</div>
+        <div style="margin-bottom:3px;">
+          <span style="color:#48C0D9;">Req 1</span>
+          <span style="display:inline-block; height:12px; width:160px; background:var(--magenta); border-radius:2px; vertical-align:middle; margin:0 4px;"></span>
+          <span style="color:var(--green);">done</span>
+        </div>
+        <div style="margin-bottom:3px;">
+          <span style="color:#48C0D9;">Req 2</span>
+          <span style="display:inline-block; height:12px; width:8px; background:#1e1e1e; border-radius:2px; vertical-align:middle; margin:0 2px;"></span>
+          <span style="display:inline-block; height:12px; width:180px; background:var(--cobalt); border-radius:2px; vertical-align:middle; margin:0 2px;"></span>
+          <span style="color:var(--green);">done</span>
+        </div>
+        <div>
+          <span style="color:#48C0D9;">Req 3</span>
+          <span style="display:inline-block; height:12px; width:8px; background:#1e1e1e; border-radius:2px; vertical-align:middle; margin:0 2px;"></span>
+          <span style="display:inline-block; height:12px; width:140px; background:var(--violet); border-radius:2px; vertical-align:middle; margin:0 2px;"></span>
+          <span style="color:var(--green);">done</span>
+        </div>
+        <div style="margin-top:10px; border-top:1px solid #222; padding-top:8px;">
+          <div style="color:#888; margin-bottom:5px;">GPU utilization</div>
+          <div style="margin-bottom:3px; display:flex; align-items:center; gap:4px;">
+            <span style="color:#666; min-width:72px;">sequential</span>
+            <span style="position:relative; display:inline-flex; align-items:center; justify-content:center; height:14px; width:52px; background:var(--magenta); border-radius:2px;"><span style="font-size:7px; color:rgba(255,255,255,0.8); font-family:DM Mono; letter-spacing:0;">R1</span></span>
+            <span style="position:relative; display:inline-flex; align-items:center; justify-content:center; height:14px; width:26px; background:#1e1e1e; border-radius:2px; border:1px dashed #444;"><span style="font-size:7px; color:#444; font-family:DM Mono;">idle</span></span>
+            <span style="position:relative; display:inline-flex; align-items:center; justify-content:center; height:14px; width:48px; background:var(--magenta); border-radius:2px; opacity:0.75;"><span style="font-size:7px; color:rgba(255,255,255,0.8); font-family:DM Mono;">R2</span></span>
+            <span style="position:relative; display:inline-flex; align-items:center; justify-content:center; height:14px; width:26px; background:#1e1e1e; border-radius:2px; border:1px dashed #444;"><span style="font-size:7px; color:#444; font-family:DM Mono;">idle</span></span>
+            <span style="position:relative; display:inline-flex; align-items:center; justify-content:center; height:14px; width:44px; background:var(--magenta); border-radius:2px; opacity:0.55;"><span style="font-size:7px; color:rgba(255,255,255,0.8); font-family:DM Mono;">R3</span></span>
+            <span style="color:#888; margin-left:4px;">~40%</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:4px;">
+            <span style="color:var(--green); min-width:72px;">vLLM</span>
+            <span style="position:relative; display:inline-flex; align-items:center; justify-content:center; height:14px; width:52px; background:var(--magenta); border-radius:2px;"><span style="font-size:7px; color:rgba(255,255,255,0.8); font-family:DM Mono;">R1</span></span>
+            <span style="position:relative; display:inline-flex; align-items:center; justify-content:center; height:14px; width:44px; background:var(--cobalt); border-radius:2px;"><span style="font-size:7px; color:rgba(255,255,255,0.8); font-family:DM Mono;">R2</span></span>
+            <span style="position:relative; display:inline-flex; align-items:center; justify-content:center; height:14px; width:40px; background:var(--violet); border-radius:2px;"><span style="font-size:7px; color:rgba(255,255,255,0.8); font-family:DM Mono;">R3</span></span>
+            <span style="position:relative; display:inline-flex; align-items:center; justify-content:center; height:14px; width:48px; background:var(--magenta); border-radius:2px; opacity:0.75;"><span style="font-size:7px; color:rgba(255,255,255,0.8); font-family:DM Mono;">R1</span></span>
+            <span style="position:relative; display:inline-flex; align-items:center; justify-content:center; height:14px; width:32px; background:var(--cobalt); border-radius:2px; opacity:0.8;"><span style="font-size:7px; color:rgba(255,255,255,0.8); font-family:DM Mono;">R2</span></span>
+            <span style="color:var(--green); margin-left:4px;">~100%</span>
+          </div>
+          <div style="margin-top:6px; color:var(--green);">→ same GPU time, 3× the requests served</div>
+        </div>
+      </div>
+
+    </div>
+    <div>
+      <div class="card card-cobalt" style="margin-bottom:1em;">
+        <div class="label">PagedAttention</div>
+        <div style="font-size:0.68em; font-family:'DM Mono',monospace; margin-top:0.6em;">
+          <div style="color:#888; margin-bottom:5px;">Naive: pre-allocated contiguous block</div>
+          <div style="margin-bottom:3px; display:flex; align-items:center; gap:3px;">
+            <span style="color:#48C0D9; min-width:32px;">Seq 1</span>
+            <span style="display:inline-block; height:11px; width:80px; background:var(--magenta); border-radius:2px 0 0 2px; vertical-align:middle;"></span><span style="display:inline-block; height:11px; width:50px; background:#2a1a2a; border-radius:0 2px 2px 0; border:1px dashed #663355; vertical-align:middle;"></span>
+            <span style="color:#664466; font-size:0.9em;">wasted</span>
+          </div>
+          <div style="margin-bottom:8px; display:flex; align-items:center; gap:3px;">
+            <span style="color:#48C0D9; min-width:32px;">Seq 2</span>
+            <span style="display:inline-block; height:11px; width:45px; background:var(--cobalt); border-radius:2px 0 0 2px; vertical-align:middle;"></span><span style="display:inline-block; height:11px; width:85px; background:#1a1a2a; border-radius:0 2px 2px 0; border:1px dashed #333366; vertical-align:middle;"></span>
+            <span style="color:#444466; font-size:0.9em;">wasted</span>
+          </div>
+          <div style="color:#888; margin-bottom:5px;">PagedAttention: VRAM physical layout</div>
+          <div style="display:flex; gap:2px; flex-wrap:nowrap; margin-bottom:4px;">
+            <span style="display:inline-block; width:18px; height:18px; background:var(--magenta); border-radius:2px;" title="Seq1 page"></span>
+            <span style="display:inline-block; width:18px; height:18px; background:var(--cobalt); border-radius:2px;" title="Seq2 page"></span>
+            <span style="display:inline-block; width:18px; height:18px; background:#1e1e1e; border-radius:2px; border:1px solid #333;" title="free"></span>
+            <span style="display:inline-block; width:18px; height:18px; background:var(--magenta); border-radius:2px; opacity:0.75;"></span>
+            <span style="display:inline-block; width:18px; height:18px; background:var(--cobalt); border-radius:2px; opacity:0.75;"></span>
+            <span style="display:inline-block; width:18px; height:18px; background:var(--magenta); border-radius:2px; opacity:0.5;"></span>
+            <span style="display:inline-block; width:18px; height:18px; background:#1e1e1e; border-radius:2px; border:1px solid #333;" title="free"></span>
+            <span style="display:inline-block; width:18px; height:18px; background:var(--cobalt); border-radius:2px; opacity:0.5;"></span>
+            <span style="display:inline-block; width:18px; height:18px; background:var(--magenta); border-radius:2px; opacity:0.3;"></span>
+            <span style="display:inline-block; width:18px; height:18px; background:#1e1e1e; border-radius:2px; border:1px solid #333;" title="free"></span>
+            <span style="display:inline-block; width:18px; height:18px; background:var(--cobalt); border-radius:2px; opacity:0.3;"></span>
+            <span style="display:inline-block; width:18px; height:18px; background:#1e1e1e; border-radius:2px; border:1px solid #333;" title="free"></span>
+          </div>
+          <div style="display:flex; gap:10px; margin-bottom:5px;">
+            <span><span style="display:inline-block; width:9px; height:9px; background:var(--magenta); border-radius:1px; vertical-align:middle; margin-right:3px;"></span><span style="color:#ccc;">Seq 1</span></span>
+            <span><span style="display:inline-block; width:9px; height:9px; background:var(--cobalt); border-radius:1px; vertical-align:middle; margin-right:3px;"></span><span style="color:#ccc;">Seq 2</span></span>
+            <span><span style="display:inline-block; width:9px; height:9px; background:#1e1e1e; border:1px solid #333; border-radius:1px; vertical-align:middle; margin-right:3px;"></span><span style="color:#555;">free</span></span>
+          </div>
+          <div style="color:var(--green);">→ pages interleave freely, no wasted gaps</div>
+        </div>
+      </div>
+      <div class="card card-turquoise" style="margin-bottom:1em;">
+        <div class="label">OpenAI-compatible API</div>
+        <p style="font-size:0.78em; margin-top:0.4em;"><span class="mono">POST /v1/chat/completions</span>: a drop-in replacement for OpenAI. Our demo app just points an <span class="mono">openai.OpenAI</span> client at the vLLM URL.</p>
+      </div>
+      <div class="card card-magenta">
+        <div class="label">Streaming</div>
+        <p style="font-size:0.78em; margin-top:0.4em;">vLLM natively streams via SSE. Our demo <span class="mono">/analyze/stream</span> endpoint just proxies the token stream: same UX, zero extra code.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════
+     SECTION DIVIDER — Cloud Run
+════════════════════════════════════════════════════════ -->
+<section class="section-divider">
+  <div class="section-num">03</div>
+  <h2 class="section-title">Cloud Run GPU</h2>
+  <p style="color:var(--muted); text-align:center;">Split architecture · CI/CD · The bumps along the way</p>
+</section>
+
+<!-- ════════════════════════════════════════════════════════
+     SLIDE 6 — New Architecture
+════════════════════════════════════════════════════════ -->
+<section>
+  <h2>New Architecture: Two Services</h2>
+  <!-- Full-width SVG diagram -->
+  <svg viewBox="0 0 860 340" xmlns="http://www.w3.org/2000/svg" style="width:100%; max-height:540px;">
+    <defs>
+      <marker id="arr" markerWidth="8" markerHeight="6" refX="6" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#EB088A"/>
+      </marker>
+      <marker id="arrB" markerWidth="8" markerHeight="6" refX="6" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#48C0D9"/>
+      </marker>
+      <marker id="arrG" markerWidth="8" markerHeight="6" refX="6" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#313CFF"/>
+      </marker>
+    </defs>
+
+    <!-- GitHub -->
+    <rect x="10" y="130" width="110" height="60" rx="8" fill="#141414" stroke="#555" stroke-width="1.2"/>
+    <text x="65" y="155" text-anchor="middle" fill="#aaa" font-size="10" font-family="DM Mono">GitHub</text>
+    <text x="65" y="170" text-anchor="middle" fill="#888" font-size="8.5" font-family="DM Mono">push to main</text>
+    <text x="65" y="183" text-anchor="middle" fill="#888" font-size="8.5" font-family="DM Mono">or deploy</text>
+
+    <!-- Arrow to GHA -->
+    <line x1="120" y1="160" x2="155" y2="160" stroke="#EB088A" stroke-width="1.5" marker-end="url(#arr)"/>
+
+    <!-- GHA -->
+    <rect x="157" y="115" width="120" height="90" rx="8" fill="#141414" stroke="#EB088A" stroke-width="1.2"/>
+    <text x="217" y="138" text-anchor="middle" fill="#EB088A" font-size="10" font-family="Open Sans" font-weight="700">GitHub Actions</text>
+    <text x="217" y="154" text-anchor="middle" fill="#888" font-size="8" font-family="DM Mono">detect changes</text>
+    <text x="217" y="167" text-anchor="middle" fill="#888" font-size="8" font-family="DM Mono">build images</text>
+    <text x="217" y="180" text-anchor="middle" fill="#888" font-size="8" font-family="DM Mono">push to GAR</text>
+    <text x="217" y="194" text-anchor="middle" fill="#888" font-size="8" font-family="DM Mono">deploy services</text>
+
+    <!-- Arrow to GAR -->
+    <line x1="277" y1="160" x2="312" y2="160" stroke="#EB088A" stroke-width="1.5" marker-end="url(#arr)"/>
+
+    <!-- GAR -->
+    <rect x="314" y="130" width="110" height="60" rx="8" fill="#141414" stroke="#555" stroke-width="1.2"/>
+    <text x="369" y="155" text-anchor="middle" fill="#aaa" font-size="10" font-family="DM Mono">Artifact</text>
+    <text x="369" y="169" text-anchor="middle" fill="#aaa" font-size="10" font-family="DM Mono">Registry</text>
+    <text x="369" y="183" text-anchor="middle" fill="#666" font-size="8" font-family="DM Mono">us-east4</text>
+
+    <!-- GCP box -->
+    <rect x="440" y="20" width="410" height="300" rx="12" fill="#0d0d14" stroke="#333" stroke-width="1.2"/>
+    <text x="645" y="42" text-anchor="middle" fill="#555" font-size="9" font-family="DM Mono" letter-spacing="1">GCP · us-east4</text>
+
+    <!-- Arrow to Demo -->
+    <line x1="424" y1="130" x2="460" y2="100" stroke="#48C0D9" stroke-width="1.5" marker-end="url(#arrB)"/>
+
+    <!-- Arrow to vLLM -->
+    <line x1="424" y1="185" x2="460" y2="215" stroke="#8A25C9" stroke-width="1.5" marker-end="url(#arr)"/>
+
+    <!-- Demo App box -->
+    <rect x="460" y="50" width="180" height="100" rx="8" fill="#141414" stroke="#48C0D9" stroke-width="1.5"/>
+    <text x="550" y="73" text-anchor="middle" fill="#48C0D9" font-size="10.5" font-family="Open Sans" font-weight="700">Demo App</text>
+    <text x="550" y="89" text-anchor="middle" fill="#888" font-size="8.5" font-family="DM Mono">Cloud Run CPU</text>
+    <text x="550" y="102" text-anchor="middle" fill="#666" font-size="8" font-family="DM Mono">python:3.11-slim</text>
+    <text x="550" y="115" text-anchor="middle" fill="#666" font-size="8" font-family="DM Mono">2 vCPU · 2 GiB · scales 0-10</text>
+    <text x="550" y="128" text-anchor="middle" fill="#666" font-size="8" font-family="DM Mono">FastAPI proxy → VLLM_BASE_URL</text>
+    <text x="550" y="142" text-anchor="middle" fill="#EB088A" font-size="8" font-family="DM Mono">~$5-20/mo idle</text>
+
+    <!-- vLLM box -->
+    <rect x="460" y="180" width="180" height="120" rx="8" fill="#141414" stroke="#8A25C9" stroke-width="1.5"/>
+    <text x="550" y="203" text-anchor="middle" fill="#b06ee0" font-size="10.5" font-family="Open Sans" font-weight="700">vLLM Server</text>
+    <text x="550" y="219" text-anchor="middle" fill="#888" font-size="8.5" font-family="DM Mono">Cloud Run GPU</text>
+    <text x="550" y="232" text-anchor="middle" fill="#666" font-size="8" font-family="DM Mono">NVIDIA L4 · 8 vCPU · 32 GiB</text>
+    <text x="550" y="245" text-anchor="middle" fill="#666" font-size="8" font-family="DM Mono">vllm serve Qwen3-8B</text>
+    <text x="550" y="258" text-anchor="middle" fill="#666" font-size="8" font-family="DM Mono">continuous batching · concurrency=4</text>
+    <text x="550" y="272" text-anchor="middle" fill="#666" font-size="8" font-family="DM Mono">HF_HOME=/hf-cache</text>
+    <text x="550" y="286" text-anchor="middle" fill="#EB088A" font-size="8" font-family="DM Mono">scales 0-3 instances</text>
+
+    <!-- Arrow Demo → vLLM -->
+    <line x1="640" y1="130" x2="700" y2="130" stroke="#48C0D9" stroke-width="1" stroke-dasharray="4,3"/>
+    <line x1="700" y1="130" x2="700" y2="210" stroke="#48C0D9" stroke-width="1" stroke-dasharray="4,3"/>
+    <line x1="700" y1="210" x2="642" y2="210" stroke="#48C0D9" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrB)"/>
+    <text x="705" y="168" fill="#48C0D9" font-size="7.5" font-family="DM Mono">VLLM_BASE_URL</text>
+    <text x="705" y="178" fill="#48C0D9" font-size="7.5" font-family="DM Mono">/v1/chat/completions</text>
+
+    <!-- GCS bucket -->
+    <rect x="680" y="215" width="150" height="70" rx="8" fill="#141414" stroke="#48C0D9" stroke-width="1"/>
+    <text x="755" y="238" text-anchor="middle" fill="#48C0D9" font-size="10" font-family="Open Sans" font-weight="700">GCS Bucket</text>
+    <text x="755" y="253" text-anchor="middle" fill="#888" font-size="8" font-family="DM Mono">unbias-plus-model-cache</text>
+    <text x="755" y="266" text-anchor="middle" fill="#666" font-size="8" font-family="DM Mono">Qwen3-8B weights ~16 GB</text>
+    <text x="755" y="279" text-anchor="middle" fill="#666" font-size="8" font-family="DM Mono">mounted at /hf-cache (GCS FUSE)</text>
+
+    <!-- Arrow vLLM → GCS -->
+    <line x1="640" y1="245" x2="678" y2="245" stroke="#48C0D9" stroke-width="1.2" marker-end="url(#arrB)"/>
+
+    <!-- User arrow -->
+    <rect x="10" y="60" width="110" height="45" rx="8" fill="#141414" stroke="#313CFF" stroke-width="1.2"/>
+    <text x="65" y="80" text-anchor="middle" fill="#7b84ff" font-size="10" font-family="DM Mono">Browser</text>
+    <text x="65" y="96" text-anchor="middle" fill="#888" font-size="8.5" font-family="DM Mono">unbias-plus-demo</text>
+    <line x1="120" y1="82" x2="420" y2="82" stroke="#313CFF" stroke-width="1" stroke-dasharray="4,3"/>
+    <line x1="420" y1="82" x2="462" y2="82" stroke="#313CFF" stroke-width="1.2" marker-end="url(#arrG)"/>
+  </svg>
+
+  <div class="cols cols-3" style="gap:0.8em; margin-top:0.6em;">
+    <div class="card" style="font-size:0.72em; border-color:#333; text-align:center;">
+      <div class="label">Demo App</div>
+      <div style="color:var(--turquoise); font-weight:700; margin-top:0.3em;">CPU only · scales to zero</div>
+      <div class="muted">No GPU cost when idle</div>
+    </div>
+    <div class="card" style="font-size:0.72em; border-color:#333; text-align:center;">
+      <div class="label">vLLM Server</div>
+      <div style="color:var(--violet); font-weight:700; margin-top:0.3em;">GPU · NVIDIA L4</div>
+      <div class="muted">Independent scaling</div>
+    </div>
+    <div class="card" style="font-size:0.72em; border-color:#333; text-align:center;">
+      <div class="label">GCS Cache</div>
+      <div style="color:var(--turquoise); font-weight:700; margin-top:0.3em;">Persistent model weights</div>
+      <div class="muted">Warm starts in ~7 min</div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════
+     SLIDE 7 — CI/CD Pipeline
+════════════════════════════════════════════════════════ -->
+<section>
+  <h2>GitHub Actions CI/CD Pipeline</h2>
+  <p style="font-size:0.8em; color:var(--muted); margin-bottom:1em;">Every push to <span class="mono" style="color:var(--magenta);">main</span> or <span class="mono" style="color:var(--magenta);">deploy</span> triggers a smart, path-filtered build.</p>
+
+  <!-- Pipeline flow diagram -->
+  <svg viewBox="0 0 820 160" xmlns="http://www.w3.org/2000/svg" style="width:100%; max-height:265px; margin-bottom:0.6em;">
+    <defs>
+      <marker id="pa" markerWidth="7" markerHeight="5" refX="5" refY="2.5" orient="auto">
+        <polygon points="0 0, 7 2.5, 0 5" fill="#EB088A"/>
+      </marker>
+    </defs>
+
+    <!-- Push -->
+    <rect x="5" y="55" width="90" height="50" rx="7" fill="#141414" stroke="#555" stroke-width="1"/>
+    <text x="50" y="77" text-anchor="middle" fill="#aaa" font-size="9" font-family="DM Mono">git push</text>
+    <text x="50" y="91" text-anchor="middle" fill="#888" font-size="8" font-family="DM Mono">main / deploy</text>
+    <text x="50" y="100" text-anchor="middle" fill="#888" font-size="7.5" font-family="DM Mono">or dispatch</text>
+
+    <line x1="95" y1="80" x2="115" y2="80" stroke="#EB088A" stroke-width="1.5" marker-end="url(#pa)"/>
+
+    <!-- Changes -->
+    <rect x="117" y="45" width="110" height="70" rx="7" fill="#141414" stroke="#EB088A" stroke-width="1.2"/>
+    <text x="172" y="65" text-anchor="middle" fill="#EB088A" font-size="9" font-family="Open Sans" font-weight="700">Detect Changes</text>
+    <text x="172" y="80" text-anchor="middle" fill="#888" font-size="8" font-family="DM Mono">paths-filter</text>
+    <text x="172" y="93" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">demo: src/**, Dockerfile</text>
+    <text x="172" y="106" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">vllm: Dockerfile.vllm</text>
+
+    <!-- Fork arrows -->
+    <line x1="227" y1="65" x2="255" y2="40" stroke="#48C0D9" stroke-width="1.2" marker-end="url(#pa)"/>
+    <line x1="227" y1="95" x2="255" y2="120" stroke="#8A25C9" stroke-width="1.2" marker-end="url(#pa)"/>
+
+    <!-- Build Demo -->
+    <rect x="257" y="15" width="120" height="50" rx="7" fill="#141414" stroke="#48C0D9" stroke-width="1.2"/>
+    <text x="317" y="35" text-anchor="middle" fill="#48C0D9" font-size="9" font-family="Open Sans" font-weight="700">Build Demo</text>
+    <text x="317" y="49" text-anchor="middle" fill="#888" font-size="8" font-family="DM Mono">python:3.11-slim</text>
+    <text x="317" y="59" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">push to GAR · GHA cache</text>
+
+    <!-- Build vLLM -->
+    <rect x="257" y="95" width="120" height="50" rx="7" fill="#141414" stroke="#8A25C9" stroke-width="1.2"/>
+    <text x="317" y="115" text-anchor="middle" fill="#b06ee0" font-size="9" font-family="Open Sans" font-weight="700">Build vLLM</text>
+    <text x="317" y="129" text-anchor="middle" fill="#888" font-size="8" font-family="DM Mono">vllm/vllm-openai</text>
+    <text x="317" y="139" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">push to GAR · GHA cache</text>
+
+    <!-- Arrows right -->
+    <line x1="377" y1="40" x2="405" y2="40" stroke="#48C0D9" stroke-width="1.2" marker-end="url(#pa)"/>
+    <line x1="377" y1="120" x2="405" y2="120" stroke="#8A25C9" stroke-width="1.2" marker-end="url(#pa)"/>
+
+    <!-- Deploy vLLM -->
+    <rect x="407" y="95" width="120" height="50" rx="7" fill="#141414" stroke="#8A25C9" stroke-width="1.2"/>
+    <text x="467" y="115" text-anchor="middle" fill="#b06ee0" font-size="9" font-family="Open Sans" font-weight="700">Deploy vLLM</text>
+    <text x="467" y="129" text-anchor="middle" fill="#888" font-size="8" font-family="DM Mono">Cloud Run GPU</text>
+    <text x="467" y="139" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">us-east4 · L4 · startup probe</text>
+
+    <!-- Deploy vLLM done → Deploy Demo dependency -->
+    <line x1="527" y1="40" x2="555" y2="40" stroke="#48C0D9" stroke-width="1.2" marker-end="url(#pa)"/>
+    <line x1="527" y1="120" x2="540" y2="120" stroke="#8A25C9" stroke-width="1" stroke-dasharray="3,2"/>
+    <line x1="540" y1="120" x2="540" y2="65" stroke="#8A25C9" stroke-width="1" stroke-dasharray="3,2"/>
+    <line x1="540" y1="65" x2="555" y2="65" stroke="#8A25C9" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#pa)"/>
+    <text x="543" y="95" fill="#555" font-size="7" font-family="DM Mono">if success</text>
+    <text x="543" y="104" fill="#555" font-size="7" font-family="DM Mono">or skipped</text>
+
+    <!-- Deploy Demo -->
+    <rect x="557" y="15" width="120" height="90" rx="7" fill="#141414" stroke="#48C0D9" stroke-width="1.2"/>
+    <text x="617" y="37" text-anchor="middle" fill="#48C0D9" font-size="9" font-family="Open Sans" font-weight="700">Deploy Demo</text>
+    <text x="617" y="51" text-anchor="middle" fill="#888" font-size="8" font-family="DM Mono">Cloud Run CPU</text>
+    <text x="617" y="64" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">fetch vLLM URL</text>
+    <text x="617" y="77" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">inject VLLM_BASE_URL</text>
+    <text x="617" y="90" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">health check</text>
+    <text x="617" y="100" text-anchor="middle" fill="#22c55e" font-size="7.5" font-family="DM Mono">→ summary</text>
+
+    <line x1="677" y1="60" x2="707" y2="60" stroke="#48C0D9" stroke-width="1.2" marker-end="url(#pa)"/>
+
+    <!-- Live -->
+    <rect x="709" y="40" width="105" height="40" rx="7" fill="#141414" stroke="#22c55e" stroke-width="1.2"/>
+    <text x="761" y="57" text-anchor="middle" fill="#22c55e" font-size="9" font-family="Open Sans" font-weight="700">✓ Live</text>
+    <text x="761" y="72" text-anchor="middle" fill="#888" font-size="8" font-family="DM Mono">both services</text>
+
+    <!-- WIF auth note -->
+    <rect x="407" y="15" width="120" height="50" rx="7" fill="#141414" stroke="#48C0D9" stroke-width="1.2"/>
+    <text x="467" y="35" text-anchor="middle" fill="#48C0D9" font-size="9" font-family="Open Sans" font-weight="700">Deploy Demo</text>
+    <text x="467" y="49" text-anchor="middle" fill="#888" font-size="8" font-family="DM Mono">Cloud Run CPU</text>
+    <text x="467" y="59" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">health check</text>
+  </svg>
+
+  <div class="cols cols-2" style="gap:1em;">
+    <div class="card" style="font-size:0.73em;">
+      <div class="label">Smart path filtering</div>
+      <p style="margin-top:0.4em;">Changing only <span class="mono">src/**</span> skips the vLLM rebuild. Changing only <span class="mono">Dockerfile.vllm</span> skips the demo rebuild. <strong>Each service redeploys only when its own files change.</strong></p>
+    </div>
+    <div class="card" style="font-size:0.73em;">
+      <div class="label">Keyless auth via WIF</div>
+      <p style="margin-top:0.4em;">No long-lived keys in secrets. GitHub OIDC token is exchanged for a short-lived GCP access token via <strong>Workload Identity Federation</strong>. Bound to <span class="mono">VectorInstitute/unbias-plus</span> repo only.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════
+     SECTION DIVIDER — Scale to Zero
+════════════════════════════════════════════════════════ -->
+<section class="section-divider">
+  <div class="section-num">04</div>
+  <h2 class="section-title">Scale to Zero<br><span class="accent">+ GCS Model Cache</span></h2>
+  <p style="color:var(--muted); text-align:center;">The $1,100/month problem · Cold starts · Warm weights from GCS</p>
+</section>
+
+<!-- ════════════════════════════════════════════════════════
+     SLIDE 9 — The Cost Problem
+════════════════════════════════════════════════════════ -->
+<section>
+  <h2>The Cost Problem: min-instances=1</h2>
+  <div class="cols cols-2" style="gap:1.5em; align-items:start;">
+    <div>
+      <p style="font-size:0.8em; margin-bottom:1em;">With <span class="mono">--min-instances=1</span>, the GPU instance <strong>never shuts down</strong>. You pay 24/7 even with zero users.</p>
+      <div style="background:#0d0d0d; border-radius:10px; padding:1em; margin-bottom:1em;">
+        <div class="label" style="margin-bottom:0.6em;">Monthly cost breakdown (1 always-on instance)</div>
+        <div style="display:flex; flex-direction:column; gap:0.5em;">
+          <div>
+            <div style="display:flex; justify-content:space-between; font-size:0.72em; margin-bottom:2px;">
+              <span class="muted">NVIDIA L4 GPU</span><span style="color:var(--red);">~$490</span>
+            </div>
+            <div style="height:10px; background:var(--red); border-radius:3px; width:47%;"></div>
+          </div>
+          <div>
+            <div style="display:flex; justify-content:space-between; font-size:0.72em; margin-bottom:2px;">
+              <span class="muted">8 vCPU (--no-cpu-throttling)</span><span style="color:var(--orange);">~$378</span>
+            </div>
+            <div style="height:10px; background:var(--orange); border-radius:3px; width:36%;"></div>
+          </div>
+          <div>
+            <div style="display:flex; justify-content:space-between; font-size:0.72em; margin-bottom:2px;">
+              <span class="muted">32 GiB memory</span><span style="color:var(--orange); opacity:0.7;">~$168</span>
+            </div>
+            <div style="height:10px; background:var(--orange); border-radius:3px; opacity:0.6; width:16%;"></div>
+          </div>
+          <div style="border-top:1px solid #333; padding-top:0.5em; display:flex; justify-content:space-between;">
+            <span style="font-size:0.78em; font-weight:700;">Total (1 instance)</span>
+            <span style="color:var(--red); font-weight:800; font-size:1em;">~$1,036/mo</span>
+          </div>
+        </div>
+      </div>
+      <div class="card card-red" style="font-size:0.75em;">
+        <strong>Up to 3 instances</strong> under load = <span style="color:var(--red); font-weight:800;">~$3,400/mo</span><br>
+        <span class="muted">For a research demo with sporadic traffic? Way too much.</span>
+      </div>
+    </div>
+    <div>
+      <canvas id="costChart" style="max-height:280px;"></canvas>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════
+     SLIDE 10 — Scale to Zero Explained
+════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Scale to Zero: How It Works</h2>
+  <div class="cols cols-60-40" style="gap:1.5em; align-items:start;">
+    <div>
+      <!-- Traffic lifecycle diagram -->
+      <svg viewBox="0 0 480 300" xmlns="http://www.w3.org/2000/svg" style="width:100%; max-height:420px;">
+        <defs>
+          <marker id="a2m" markerWidth="7" markerHeight="5" refX="5" refY="2.5" orient="auto">
+            <polygon points="0 0, 7 2.5, 0 5" fill="#EB088A"/>
+          </marker>
+          <marker id="a2o" markerWidth="7" markerHeight="5" refX="5" refY="2.5" orient="auto">
+            <polygon points="0 0, 7 2.5, 0 5" fill="#f59e0b"/>
+          </marker>
+          <marker id="a2g" markerWidth="7" markerHeight="5" refX="5" refY="2.5" orient="auto">
+            <polygon points="0 0, 7 2.5, 0 5" fill="#22c55e"/>
+          </marker>
+          <marker id="a2s" markerWidth="7" markerHeight="5" refX="5" refY="2.5" orient="auto">
+            <polygon points="0 0, 7 2.5, 0 5" fill="#555"/>
+          </marker>
+        </defs>
+
+        <!-- ZERO -->
+        <rect x="10" y="108" width="115" height="72" rx="10" fill="#141414" stroke="#555" stroke-width="1.5"/>
+        <text x="67" y="133" text-anchor="middle" fill="#aaa" font-size="12" font-family="DM Mono" font-weight="600">ZERO</text>
+        <text x="67" y="152" text-anchor="middle" fill="#666" font-size="10" font-family="DM Mono">$0.00/hr</text>
+        <text x="67" y="168" text-anchor="middle" fill="#555" font-size="10" font-family="DM Mono">no instances</text>
+
+        <!-- COLD START -->
+        <rect x="178" y="48" width="124" height="90" rx="10" fill="#141414" stroke="#f59e0b" stroke-width="1.5"/>
+        <text x="240" y="74" text-anchor="middle" fill="#f59e0b" font-size="12" font-family="DM Mono" font-weight="600">COLD START</text>
+        <text x="240" y="92" text-anchor="middle" fill="#888" font-size="10" font-family="DM Mono">~7 min</text>
+        <text x="240" y="109" text-anchor="middle" fill="#888" font-size="10" font-family="DM Mono">loading model</text>
+        <text x="240" y="126" text-anchor="middle" fill="#888" font-size="10" font-family="DM Mono">from GCS</text>
+
+        <!-- WARM -->
+        <rect x="178" y="192" width="124" height="70" rx="10" fill="#141414" stroke="#22c55e" stroke-width="2"/>
+        <text x="240" y="218" text-anchor="middle" fill="#22c55e" font-size="12" font-family="DM Mono" font-weight="600">WARM</text>
+        <text x="240" y="236" text-anchor="middle" fill="#888" font-size="10" font-family="DM Mono">serving traffic</text>
+        <text x="240" y="252" text-anchor="middle" fill="#888" font-size="10" font-family="DM Mono">fast responses</text>
+
+        <!-- SCALE OUT -->
+        <rect x="350" y="108" width="122" height="72" rx="10" fill="#141414" stroke="#EB088A" stroke-width="1.5"/>
+        <text x="411" y="133" text-anchor="middle" fill="#EB088A" font-size="12" font-family="DM Mono" font-weight="600">SCALE OUT</text>
+        <text x="411" y="152" text-anchor="middle" fill="#888" font-size="10" font-family="DM Mono">2-3 instances</text>
+        <text x="411" y="168" text-anchor="middle" fill="#888" font-size="10" font-family="DM Mono">high traffic</text>
+
+        <!-- ZERO → COLD START -->
+        <path d="M 125 128 Q 148 88, 176 84" stroke="#f59e0b" stroke-width="1.5" fill="none" marker-end="url(#a2o)"/>
+        <text x="128" y="103" fill="#f59e0b" font-size="9" font-family="DM Mono">first req</text>
+
+        <!-- COLD START → WARM -->
+        <path d="M 240 138 L 240 190" stroke="#22c55e" stroke-width="1.5" fill="none" marker-end="url(#a2g)"/>
+        <text x="247" y="168" fill="#22c55e" font-size="9" font-family="DM Mono">ready</text>
+
+        <!-- WARM → SCALE OUT -->
+        <path d="M 302 218 Q 340 202, 348 172" stroke="#EB088A" stroke-width="1.5" fill="none" marker-end="url(#a2m)"/>
+        <text x="318" y="198" fill="#EB088A" font-size="9" font-family="DM Mono">high load</text>
+
+        <!-- SCALE OUT → WARM (dashed) -->
+        <path d="M 348 158 Q 328 188, 304 210" stroke="#555" stroke-width="1.2" fill="none" stroke-dasharray="4,3" marker-end="url(#a2s)"/>
+        <text x="308" y="175" fill="#555" font-size="9" font-family="DM Mono">load drops</text>
+
+        <!-- WARM → ZERO (dashed) -->
+        <path d="M 178 228 Q 100 268, 72 182" stroke="#555" stroke-width="1.2" fill="none" stroke-dasharray="4,3" marker-end="url(#a2s)"/>
+        <text x="62" y="258" fill="#555" font-size="9" font-family="DM Mono">15 min</text>
+        <text x="62" y="272" fill="#555" font-size="9" font-family="DM Mono">no traffic</text>
+
+        <!-- Cost label -->
+        <text x="240" y="292" text-anchor="middle" fill="#444" font-size="9.5" font-family="DM Mono">Billed only when instances are running</text>
+      </svg>
+    </div>
+    <div>
+      <h3>What is a "cold start"?</h3>
+      <p style="font-size:0.78em;">When the service is at zero and the first request arrives, Cloud Run must start a fresh container. For vLLM, this means loading model weights into GPU memory before it can serve anything.</p>
+
+      <div style="margin:1em 0;">
+        <div class="label" style="margin-bottom:0.6em;">Cold start timeline comparison</div>
+
+        <div style="margin-bottom:0.5em;">
+          <div style="font-size:0.65em; color:var(--muted); margin-bottom:3px;">Without GCS cache (download from HuggingFace)</div>
+          <div style="display:flex; gap:3px; align-items:center;">
+            <div class="cold-bar" style="width:55%; background:var(--red);">⬇ HF download ~10 min</div>
+            <div class="cold-bar" style="width:12%; background:#7c2d12;">GPU load</div>
+            <div style="font-size:0.65em; color:var(--red); white-space:nowrap; margin-left:4px; font-family:'DM Mono',monospace;">~12-15 min</div>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size:0.65em; color:var(--muted); margin-bottom:3px;">With GCS cache (load from mounted bucket)</div>
+          <div style="display:flex; gap:3px; align-items:center;">
+            <div class="cold-bar" style="width:10%; background:#14532d; font-size:0.55em;">mount</div>
+            <div class="cold-bar" style="width:22%; background:var(--green);">GCS load ~4.5 min</div>
+            <div class="cold-bar" style="width:7%; background:#166534; font-size:0.55em;">compile</div>
+            <div style="font-size:0.65em; color:var(--green); white-space:nowrap; margin-left:4px; font-family:'DM Mono',monospace;">~7 min ✓</div>
+          </div>
+          <div style="font-size:0.58em; color:#666; margin-top:3px; font-family:'DM Mono',monospace;">compile cache persisted via VLLM_CACHE_ROOT → saves ~40s on repeat cold starts</div>
+        </div>
+      </div>
+
+      <div class="card card-green" style="font-size:0.75em; margin-top:0.8em;">
+        <strong>After the first ever cold start</strong>, all subsequent starts are fast: the model is already in GCS. The first deployment is the only slow one.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════
+     SLIDE 11 — GCS Model Cache Deep Dive
+════════════════════════════════════════════════════════ -->
+<section>
+  <h2>GCS Model Cache: How It Works</h2>
+  <div class="cols cols-60-40" style="gap:1.5em; align-items:start;">
+    <div>
+      <svg viewBox="0 0 560 358" xmlns="http://www.w3.org/2000/svg" style="width:100%; max-height:500px;">
+        <defs>
+          <marker id="a3" markerWidth="7" markerHeight="5" refX="5" refY="2.5" orient="auto">
+            <polygon points="0 0, 7 2.5, 0 5" fill="#EB088A"/>
+          </marker>
+          <marker id="a3g" markerWidth="7" markerHeight="5" refX="5" refY="2.5" orient="auto">
+            <polygon points="0 0, 7 2.5, 0 5" fill="#22c55e"/>
+          </marker>
+          <marker id="a3o" markerWidth="7" markerHeight="5" refX="5" refY="2.5" orient="auto">
+            <polygon points="0 0, 7 2.5, 0 5" fill="#f59e0b"/>
+          </marker>
+        </defs>
+
+        <!-- Section: First cold start -->
+        <text x="280" y="16" text-anchor="middle" fill="#666" font-size="11" font-family="DM Mono">First cold start (one time only)</text>
+
+        <!-- vLLM container (first) -->
+        <rect x="10" y="26" width="170" height="90" rx="8" fill="#141414" stroke="#8A25C9" stroke-width="1.5"/>
+        <text x="95" y="50" text-anchor="middle" fill="#b06ee0" font-size="11" font-family="Open Sans" font-weight="700">vLLM Container</text>
+        <text x="95" y="67" text-anchor="middle" fill="#888" font-size="9.5" font-family="DM Mono">HF_HOME=/hf-cache</text>
+        <text x="95" y="82" text-anchor="middle" fill="#888" font-size="9.5" font-family="DM Mono">/hf-cache → GCS FUSE</text>
+        <text x="95" y="107" text-anchor="middle" fill="#666" font-size="9" font-family="DM Mono">model not in cache yet</text>
+
+        <!-- Fetch arrow -->
+        <line x1="180" y1="71" x2="225" y2="71" stroke="#EB088A" stroke-width="1.5" marker-end="url(#a3)"/>
+        <text x="188" y="65" fill="#EB088A" font-size="9" font-family="DM Mono">fetch</text>
+
+        <!-- HuggingFace -->
+        <rect x="228" y="26" width="130" height="90" rx="8" fill="#141414" stroke="#555" stroke-width="1.2"/>
+        <text x="293" y="52" text-anchor="middle" fill="#aaa" font-size="11" font-family="Open Sans" font-weight="700">HuggingFace</text>
+        <text x="293" y="69" text-anchor="middle" fill="#888" font-size="9.5" font-family="DM Mono">Hub API</text>
+        <text x="293" y="106" text-anchor="middle" fill="#666" font-size="9" font-family="DM Mono">Qwen3-8B ~16 GB</text>
+
+        <!-- Arrow to GCS -->
+        <line x1="293" y1="116" x2="293" y2="148" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#a3o)"/>
+        <text x="304" y="133" fill="#f59e0b" font-size="9" font-family="DM Mono">write via GCS FUSE</text>
+
+        <!-- GCS Bucket -->
+        <rect x="155" y="150" width="310" height="72" rx="8" fill="#141414" stroke="#48C0D9" stroke-width="1.8"/>
+        <text x="310" y="174" text-anchor="middle" fill="#48C0D9" font-size="11" font-family="Open Sans" font-weight="700">GCS Bucket: unbias-plus-model-cache</text>
+        <text x="310" y="191" text-anchor="middle" fill="#888" font-size="9.5" font-family="DM Mono">hub/models--vector-institute--Qwen3-8B .../</text>
+        <text x="310" y="208" text-anchor="middle" fill="#666" font-size="9" font-family="DM Mono">*.safetensors · config.json · tokenizer.json</text>
+
+        <!-- Divider -->
+        <line x1="10" y1="238" x2="550" y2="238" stroke="#2a2a2a" stroke-width="1" stroke-dasharray="4,3"/>
+        <text x="280" y="253" text-anchor="middle" fill="#666" font-size="11" font-family="DM Mono">All subsequent cold starts</text>
+
+        <!-- vLLM container (subsequent) -->
+        <rect x="10" y="262" width="170" height="62" rx="8" fill="#141414" stroke="#22c55e" stroke-width="1.8"/>
+        <text x="95" y="283" text-anchor="middle" fill="#22c55e" font-size="11" font-family="Open Sans" font-weight="700">vLLM Container</text>
+        <text x="95" y="299" text-anchor="middle" fill="#888" font-size="9.5" font-family="DM Mono">HF_HOME=/hf-cache</text>
+        <text x="95" y="316" text-anchor="middle" fill="#22c55e" font-size="9" font-family="DM Mono">reads directly from GCS ↗</text>
+
+        <!-- Arrow to GCS (subsequent) -->
+        <line x1="180" y1="282" x2="228" y2="235" stroke="#22c55e" stroke-width="1.5" marker-end="url(#a3g)"/>
+        <text x="95" y="336" text-anchor="middle" fill="#22c55e" font-size="9" font-family="DM Mono">~7 min load</text>
+        <text x="95" y="349" text-anchor="middle" fill="#666" font-size="8.5" font-family="DM Mono">(267s weights + 40s compile)</text>
+
+        <!-- Config note -->
+        <rect x="360" y="262" width="190" height="62" rx="7" fill="#0d0d0d" stroke="#333" stroke-width="1"/>
+        <text x="455" y="280" text-anchor="middle" fill="#48C0D9" font-size="9.5" font-family="DM Mono">--add-volume=</text>
+        <text x="455" y="295" text-anchor="middle" fill="#888" font-size="9" font-family="DM Mono">name=hf-cache,</text>
+        <text x="455" y="309" text-anchor="middle" fill="#888" font-size="9" font-family="DM Mono">type=cloud-storage,</text>
+        <text x="455" y="323" text-anchor="middle" fill="#888" font-size="9" font-family="DM Mono">bucket=unbias-plus-model-cache</text>
+      </svg>
+    </div>
+    <div>
+      <div class="card card-turquoise" style="margin-bottom:0.7em; padding:0.6em 0.8em;">
+        <div class="label">GCS FUSE mount</div>
+        <p style="font-size:0.7em; margin-top:0.3em;">Cloud Run gen2 mounts GCS buckets as a filesystem via GCS FUSE. The vLLM container sees <span class="mono">/hf-cache</span> as a regular directory, no special download code needed.</p>
+      </div>
+      <div class="card card-green" style="margin-bottom:0.7em; padding:0.6em 0.8em;">
+        <div class="label">HuggingFace cache compatibility</div>
+        <p style="font-size:0.7em; margin-top:0.3em;">Setting <span class="mono">HF_HOME=/hf-cache</span> means the HF downloader writes its cache structure to GCS. Subsequent loads find the model via the exact same cache key, fully transparent.</p>
+      </div>
+      <div class="card card-cobalt" style="padding:0.6em 0.8em;">
+        <div class="label">Startup probe config</div>
+        <pre style="margin:0.3em 0 0; padding:0.4em; font-size:0.62em; background:transparent; border:none; color:#e2e8f0;">--startup-probe=
+  httpGet.path=/health,
+  failureThreshold=80,
+  periodSeconds=15,
+  timeoutSeconds=5
+<span style="color:#888;">// 80 × 15s = 20 min window</span>
+<span style="color:#888;">// covers cached load (~6min)</span>
+<span style="color:#888;">// and first-ever HF download</span></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════
+     SLIDE 12 — Cost Comparison
+════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Cost Comparison: The Full Picture</h2>
+
+  <!-- Comparison table — full width -->
+  <table class="cmp-table" style="margin-bottom:1em;">
+    <thead>
+      <tr>
+        <th>Deployment</th>
+        <th>Idle cost/mo</th>
+        <th>Peak cost/mo (3 instances)</th>
+        <th>Cold start</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>GCE VM</strong> <span class="muted" style="font-size:0.85em;">· always on, L40</span></td>
+        <td class="bad">~$1,400</td>
+        <td class="bad">~$1,400 <span class="muted" style="font-size:0.8em;">(no scaling)</span></td>
+        <td class="best">0s — always warm</td>
+      </tr>
+      <tr>
+        <td><strong>Cloud Run GPU</strong> <span class="muted" style="font-size:0.85em;">· min=1, L4</span></td>
+        <td class="bad">~$1,036</td>
+        <td class="bad">~$3,108 <span class="muted" style="font-size:0.8em;">(3 × $1,036)</span></td>
+        <td class="best">0s — always warm</td>
+      </tr>
+      <tr class="col-hl">
+        <td><strong style="color:var(--magenta);">Cloud Run GPU</strong> <span class="muted" style="font-size:0.85em;">· min=0 + GCS cache, L4</span></td>
+        <td class="best">~$0</td>
+        <td class="ok">~$3,108 <span class="muted" style="font-size:0.8em;">(3 × $1,036, only while serving)</span></td>
+        <td class="ok">~7 min from GCS</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="cols cols-2" style="gap:1.5em; align-items:start;">
+    <div>
+      <!-- Cost breakdown -->
+      <div class="label" style="margin-bottom:0.5em;">Where does $1,036/mo come from?</div>
+      <div style="font-size:0.68em; background:#0d0d0d; border-radius:8px; padding:0.7em 1em; font-family:'DM Mono',monospace;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:0.4em;">
+          <span style="color:#888;">8 vCPU (always-on rate)</span>
+          <span style="color:#aaa;">~$378/mo</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:0.4em;">
+          <span style="color:#888;">32 GiB memory</span>
+          <span style="color:#aaa;">~$168/mo</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:0.6em;">
+          <span style="color:#888;">1× NVIDIA L4 GPU</span>
+          <span style="color:#aaa;">~$490/mo</span>
+        </div>
+        <div style="border-top:1px solid #222; padding-top:0.5em; display:flex; justify-content:space-between;">
+          <span style="color:#666;">1 instance running 24/7</span>
+          <span style="color:var(--magenta); font-weight:700;">~$1,036/mo</span>
+        </div>
+      </div>
+      <p style="font-size:0.65em; color:var(--muted); margin-top:0.5em;">
+        At constant 24/7 load on all 3 instances, cost would be 3 × $1,036 = <strong style="color:var(--red);">~$3,108/mo</strong>. With min=0, you only pay while requests are actively served — at a few hours of use per day, real cost is <strong style="color:var(--green);">~$50–150/mo</strong>.
+      </p>
+      <p style="font-size:0.65em; color:var(--muted); margin-top:0.4em;">
+        <strong style="color:#aaa;">vs g2-standard-8 VM ($623/mo always-on):</strong> Per single instance, Cloud Run costs more per hour (~$1.42/hr vs ~$0.85/hr) and breaks even at <strong style="color:var(--cobalt);">~60% utilization</strong>; below that, scale-to-zero wins. But the comparison isn't equal: a VM is fixed at 1 GPU with no auto-scaling. Matching Cloud Run's 0→3 burst requires 3 VMs at <strong style="color:var(--red);">$1,869/mo always-on</strong>, vs Cloud Run's $0 at idle.
+      </p>
+    </div>
+    <div>
+      <canvas id="costBar" style="max-height:260px;"></canvas>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════
+     SLIDE 13 — Final Architecture (Full)
+════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Final Architecture</h2>
+  <svg viewBox="0 0 930 360" xmlns="http://www.w3.org/2000/svg" style="width:100%; max-height:565px;">
+    <defs>
+      <marker id="af" markerWidth="7" markerHeight="5" refX="5" refY="2.5" orient="auto">
+        <polygon points="0 0, 7 2.5, 0 5" fill="#EB088A"/>
+      </marker>
+      <marker id="afb" markerWidth="7" markerHeight="5" refX="5" refY="2.5" orient="auto">
+        <polygon points="0 0, 7 2.5, 0 5" fill="#48C0D9"/>
+      </marker>
+      <marker id="afg" markerWidth="7" markerHeight="5" refX="5" refY="2.5" orient="auto">
+        <polygon points="0 0, 7 2.5, 0 5" fill="#22c55e"/>
+      </marker>
+    </defs>
+
+    <!-- CI/CD lane (top) -->
+    <rect x="5" y="8" width="410" height="110" rx="8" fill="#0d0d0d" stroke="#333" stroke-width="1"/>
+    <text x="210" y="25" text-anchor="middle" fill="#444" font-size="8.5" font-family="DM Mono" letter-spacing="1">CI/CD PIPELINE</text>
+
+    <rect x="15" y="32" width="75" height="78" rx="6" fill="#141414" stroke="#555" stroke-width="1"/>
+    <text x="52" y="52" text-anchor="middle" fill="#aaa" font-size="8.5" font-family="DM Mono">GitHub</text>
+    <text x="52" y="65" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">push →</text>
+    <text x="52" y="77" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">main/deploy</text>
+    <text x="52" y="89" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">WIF keyless</text>
+    <text x="52" y="101" text-anchor="middle" fill="#EB088A" font-size="7.5" font-family="DM Mono">auth</text>
+
+    <line x1="90" y1="71" x2="108" y2="71" stroke="#EB088A" stroke-width="1.2" marker-end="url(#af)"/>
+
+    <rect x="110" y="32" width="80" height="78" rx="6" fill="#141414" stroke="#EB088A" stroke-width="1"/>
+    <text x="150" y="52" text-anchor="middle" fill="#EB088A" font-size="8.5" font-family="DM Mono">GH Actions</text>
+    <text x="150" y="66" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">path-filter</text>
+    <text x="150" y="78" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">build images</text>
+    <text x="150" y="90" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">docker buildx</text>
+    <text x="150" y="102" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">GHA cache</text>
+
+    <line x1="190" y1="71" x2="208" y2="71" stroke="#EB088A" stroke-width="1.2" marker-end="url(#af)"/>
+
+    <rect x="210" y="32" width="80" height="78" rx="6" fill="#141414" stroke="#555" stroke-width="1"/>
+    <text x="250" y="52" text-anchor="middle" fill="#aaa" font-size="8.5" font-family="DM Mono">Artifact</text>
+    <text x="250" y="65" text-anchor="middle" fill="#aaa" font-size="8.5" font-family="DM Mono">Registry</text>
+    <text x="250" y="78" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">us-east4</text>
+    <text x="250" y="91" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">demo:sha</text>
+    <text x="250" y="104" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">vllm:sha</text>
+
+    <line x1="290" y1="71" x2="308" y2="71" stroke="#EB088A" stroke-width="1.2" marker-end="url(#af)"/>
+
+    <rect x="310" y="32" width="95" height="78" rx="6" fill="#141414" stroke="#22c55e" stroke-width="1"/>
+    <text x="357" y="52" text-anchor="middle" fill="#22c55e" font-size="8.5" font-family="DM Mono">gcloud deploy</text>
+    <text x="357" y="66" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">deploy-vllm</text>
+    <text x="357" y="79" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">deploy-demo</text>
+    <text x="357" y="92" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">startup probe</text>
+    <text x="357" y="105" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">health check</text>
+
+    <!-- Arrow from CI to GCP -->
+    <line x1="405" y1="71" x2="440" y2="71" stroke="#22c55e" stroke-width="1.5" marker-end="url(#afg)"/>
+
+    <!-- GCP box -->
+    <rect x="440" y="8" width="485" height="345" rx="10" fill="#0a0a12" stroke="#333" stroke-width="1.2"/>
+    <text x="682" y="25" text-anchor="middle" fill="#444" font-size="8.5" font-family="DM Mono" letter-spacing="1">GCP · us-east4</text>
+
+    <!-- User -->
+    <rect x="5" y="160" width="100" height="55" rx="8" fill="#141414" stroke="#313CFF" stroke-width="1.2"/>
+    <text x="55" y="181" text-anchor="middle" fill="#7b84ff" font-size="9" font-family="DM Mono">Browser</text>
+    <text x="55" y="195" text-anchor="middle" fill="#888" font-size="7.5" font-family="DM Mono">/analyze/stream</text>
+    <text x="55" y="207" text-anchor="middle" fill="#888" font-size="7.5" font-family="DM Mono">SSE ← tokens</text>
+
+    <line x1="105" y1="187" x2="438" y2="187" stroke="#313CFF" stroke-width="1.2" marker-end="url(#af)"/>
+
+    <!-- Demo App -->
+    <rect x="450" y="155" width="155" height="100" rx="8" fill="#141414" stroke="#48C0D9" stroke-width="1.5"/>
+    <text x="527" y="177" text-anchor="middle" fill="#48C0D9" font-size="10" font-family="Open Sans" font-weight="700">Demo App</text>
+    <text x="527" y="192" text-anchor="middle" fill="#888" font-size="8" font-family="DM Mono">Cloud Run CPU</text>
+    <text x="527" y="205" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">2 vCPU · 2 GiB</text>
+    <text x="527" y="218" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">min=0 · max=10</text>
+    <text x="527" y="231" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">FastAPI + demo UI</text>
+    <text x="527" y="244" text-anchor="middle" fill="#22c55e" font-size="7.5" font-family="DM Mono">scales to zero ✓</text>
+
+    <!-- Arrow Demo → vLLM (now 115px gap: 605 → 720) -->
+    <line x1="605" y1="205" x2="718" y2="205" stroke="#48C0D9" stroke-width="1.2" marker-end="url(#afb)"/>
+    <text x="662" y="197" text-anchor="middle" fill="#48C0D9" font-size="7.5" font-family="DM Mono">OpenAI client</text>
+    <text x="662" y="208" text-anchor="middle" fill="#48C0D9" font-size="7.5" font-family="DM Mono">VLLM_BASE_URL</text>
+
+    <!-- vLLM (shifted +70: x=720) -->
+    <rect x="720" y="120" width="190" height="130" rx="8" fill="#141414" stroke="#8A25C9" stroke-width="1.5"/>
+    <text x="815" y="143" text-anchor="middle" fill="#b06ee0" font-size="10" font-family="Open Sans" font-weight="700">vLLM Server</text>
+    <text x="815" y="158" text-anchor="middle" fill="#888" font-size="8" font-family="DM Mono">Cloud Run GPU</text>
+    <text x="815" y="171" text-anchor="middle" fill="#888" font-size="7.5" font-family="DM Mono">NVIDIA L4 · 8 vCPU · 32 GiB</text>
+    <text x="815" y="184" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">vllm serve Qwen3-8B</text>
+    <text x="815" y="197" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">continuous batching · concur=4</text>
+    <text x="815" y="210" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">HF_HOME=/hf-cache</text>
+    <text x="815" y="223" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">--no-gpu-zonal-redundancy</text>
+    <text x="815" y="236" text-anchor="middle" fill="#22c55e" font-size="7.5" font-family="DM Mono">min=0 · max=3 ✓</text>
+
+    <!-- GCS (shifted +70: x=720) -->
+    <rect x="720" y="270" width="190" height="70" rx="8" fill="#141414" stroke="#48C0D9" stroke-width="1.2"/>
+    <text x="815" y="292" text-anchor="middle" fill="#48C0D9" font-size="10" font-family="Open Sans" font-weight="700">GCS Model Cache</text>
+    <text x="815" y="307" text-anchor="middle" fill="#888" font-size="8" font-family="DM Mono">unbias-plus-model-cache</text>
+    <text x="815" y="320" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">Qwen3-8B weights ~16 GB</text>
+    <text x="815" y="333" text-anchor="middle" fill="#666" font-size="7.5" font-family="DM Mono">GCS FUSE · Compute SA objectAdmin</text>
+
+    <!-- vLLM → GCS -->
+    <line x1="815" y1="250" x2="815" y2="268" stroke="#48C0D9" stroke-width="1.5" marker-end="url(#afb)"/>
+    <text x="752" y="263" fill="#48C0D9" font-size="7" font-family="DM Mono">mount /hf-cache</text>
+  </svg>
+</section>
+
+<!-- ════════════════════════════════════════════════════════
+     SLIDE 14 — Summary
+════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Summary: What We Built</h2>
+  <div class="cols cols-2" style="gap:1.5em; align-items:start;">
+    <div>
+      <div class="timeline">
+        <div class="tl-item">
+          <div class="tl-dot"></div>
+          <div>
+            <strong>MVP: GCE VM (L40)</strong>
+            <p style="font-size:0.75em; color:var(--muted); margin:0.2em 0 0;">Fast to set up. Added SSE streaming for live UX. Hit walls: no concurrency, $1,400/mo, manual deploys.</p>
+          </div>
+        </div>
+        <div class="tl-item cobalt">
+          <div class="tl-dot"></div>
+          <div>
+            <strong>Switched to vLLM</strong>
+            <p style="font-size:0.75em; color:var(--muted); margin:0.2em 0 0;">Continuous batching + PagedAttention solves concurrency. OpenAI-compatible API made the proxy trivial.</p>
+          </div>
+        </div>
+        <div class="tl-item violet">
+          <div class="tl-dot"></div>
+          <div>
+            <strong>Split into two Cloud Run services</strong>
+            <p style="font-size:0.75em; color:var(--muted); margin:0.2em 0 0;">CPU demo app + GPU vLLM server. Each scales independently. CI/CD via GitHub Actions + WIF.</p>
+          </div>
+        </div>
+        <div class="tl-item green">
+          <div class="tl-dot"></div>
+          <div>
+            <strong>Scale to zero + GCS model cache</strong>
+            <p style="font-size:0.75em; color:var(--muted); margin:0.2em 0 0;">min-instances=0. GCS FUSE mount serves weights in ~7 min. ~10× cost reduction at idle.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <h3>Key Principles</h3>
+      <ul style="margin-bottom:1em;">
+        <li style="font-size:0.78em; margin-bottom:0.4em;"><strong>Separate concerns:</strong> inference and serving are independent services</li>
+        <li style="font-size:0.78em; margin-bottom:0.4em;"><strong>Cost follows usage:</strong> pay for GPU only when someone is actually using it</li>
+        <li style="font-size:0.78em; margin-bottom:0.4em;"><strong>Warm starts, not always-on:</strong> cache model weights on GCS, not the compute</li>
+        <li style="font-size:0.78em; margin-bottom:0.4em;"><strong>UX first:</strong> SSE streaming makes a 20s inference feel interactive</li>
+        <li style="font-size:0.78em;"><strong>Automate everything:</strong> every push deploys, path filtering keeps it fast</li>
+      </ul>
+
+      <div style="background:#0d0d0d; border:1px solid #2a2a2a; border-radius:8px; padding:0.7em 1em; margin-bottom:1em; font-size:0.75em;">
+        <div class="label" style="margin-bottom:0.4em; color:var(--muted);">Still to do</div>
+        <div style="color:var(--muted); margin-bottom:0.25em;">No auth or rate limiting — GPU quota (3 instances) is the natural circuit breaker</div>
+        <div style="color:var(--muted);">No quantization yet — pre-quantizing to FP8/AWQ would halve GCS load time and VRAM usage</div>
+      </div>
+
+      <div style="display:flex; gap:0.6em; flex-wrap:wrap;">
+        <div style="text-align:center; background:var(--card); border-radius:8px; padding:0.6em 1em; border:1px solid var(--border);">
+          <div class="big-num" style="color:var(--green); font-size:1.8em;">~$0</div>
+          <div class="label">idle cost</div>
+        </div>
+        <div style="text-align:center; background:var(--card); border-radius:8px; padding:0.6em 1em; border:1px solid var(--border);">
+          <div class="big-num" style="color:var(--turquoise); font-size:1.8em;">~7 min</div>
+          <div class="label">cold start</div>
+        </div>
+        <div style="text-align:center; background:var(--card); border-radius:8px; padding:0.6em 1em; border:1px solid var(--border);">
+          <div class="big-num" style="color:var(--magenta); font-size:1.8em;">∞</div>
+          <div class="label">concurrency (vLLM)</div>
+        </div>
+        <div style="text-align:center; background:var(--card); border-radius:8px; padding:0.6em 1em; border:1px solid var(--border);">
+          <div class="big-num" style="color:var(--cobalt); font-size:1.8em;">CI/CD</div>
+          <div class="label">on every push</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</div><!-- .slides -->
+</div><!-- .reveal -->
+
+<script>
+Reveal.initialize({
+  hash: true,
+  slideNumber: 'c/t',
+  transition: 'fade',
+  transitionSpeed: 'fast',
+  controls: true,
+  progress: true,
+  center: false,
+  width: 1440,
+  height: 810,
+  margin: 0.04,
+  minScale: 0.2,
+  maxScale: 1.5,
+  plugins: []
+});
+
+// ── Cost charts
+function initCostCharts(idx) {
+  if (idx === 9 && !window._costChartDone) {
+    window._costChartDone = true;
+    const ctx = document.getElementById('costChart');
+    if (!ctx) return;
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['NVIDIA L4 GPU', '8 vCPU', '32 GiB Memory'],
+        datasets: [{
+          data: [490, 378, 168],
+          backgroundColor: ['#ef4444cc', '#f59e0bcc', '#f59e0b66'],
+          borderColor: ['#ef4444', '#f59e0b', '#f59e0b'],
+          borderWidth: 2,
+          hoverOffset: 8
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { color: '#888', font: { family: 'DM Mono', size: 11 }, padding: 14 }
+          },
+          title: {
+            display: true,
+            text: 'Monthly cost: 1 always-on L4 instance (~$1,036)',
+            color: '#aaa',
+            font: { family: 'Open Sans', size: 12, weight: '600' },
+            padding: { bottom: 12 }
+          },
+          tooltip: {
+            callbacks: {
+              label: ctx => ` $${ctx.parsed}/mo`
+            }
+          }
+        }
+      }
+    });
+  }
+
+  if (idx === 11 && !window._costBarDone) {
+    window._costBarDone = true;
+    const ctx2 = document.getElementById('costBar');
+
+    if (!ctx2) return;
+    new Chart(ctx2, {
+      type: 'bar',
+      data: {
+        labels: ['GCE VM\n(always on)', 'Cloud Run GPU\nmin=1', 'Cloud Run GPU\nmin=0 + GCS'],
+        datasets: [
+          {
+            label: 'Min cost — idle ($/mo)',
+            data: [623, 1036, 0],
+            backgroundColor: ['#ef444488', '#ef444488', '#22c55e88'],
+            borderColor: ['#ef4444', '#ef4444', '#22c55e'],
+            borderWidth: 2,
+            borderRadius: 6
+          },
+          {
+            label: 'Max cost — 100% utilization ($/mo)',
+            data: [623, 1036, 1036],
+            backgroundColor: ['#ef444433', '#ef444433', '#22c55e33'],
+            borderColor: ['#ef4444', '#ef4444', '#22c55e'],
+            borderWidth: 1,
+            borderRadius: 6
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            labels: { color: '#888', font: { family: 'DM Mono', size: 10 } }
+          },
+          title: {
+            display: true,
+            text: 'Monthly cost comparison',
+            color: '#aaa',
+            font: { family: 'Open Sans', size: 12, weight: '600' }
+          }
+        },
+        scales: {
+          x: { ticks: { color: '#888', font: { family: 'DM Mono', size: 9 } }, grid: { color: '#1a1a1a' } },
+          y: {
+            ticks: {
+              color: '#888',
+              font: { family: 'DM Mono', size: 9 },
+              callback: v => '$' + v
+            },
+            grid: { color: '#1a1a1a' }
+          }
+        }
+      }
+    });
+  }
+}
+
+Reveal.on('slidechanged', e => initCostCharts(e.indexh));
+Reveal.on('ready', e => initCostCharts(e.indexh));
+
+lucide.createIcons();
+</script>
+</body>
+</html>
