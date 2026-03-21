@@ -55,6 +55,7 @@ dependencies = [
     # API server
     "fastapi>=0.110.0",
     "uvicorn>=0.29.0",
+    "slowapi>=0.1.9",
     # OpenAI-compatible client for vLLM remote inference
     "openai>=2.28.0",
 ]
@@ -117,9 +118,18 @@ extra-index-url = ["https://download.pytorch.org/whl/cu124"]
 index-strategy = "unsafe-best-match"
 
 [tool.uv.sources]
-torch = { index = "pytorch-cu124" }
-torchvision = { index = "pytorch-cu124" }
-torchaudio = { index = "pytorch-cu124" }
+torch = [
+    { index = "pytorch-cu124", marker = "sys_platform == 'linux'" },
+    { index = "pypi", marker = "sys_platform != 'linux'" },
+]
+torchvision = [
+    { index = "pytorch-cu124", marker = "sys_platform == 'linux'" },
+    { index = "pypi", marker = "sys_platform != 'linux'" },
+]
+torchaudio = [
+    { index = "pytorch-cu124", marker = "sys_platform == 'linux'" },
+    { index = "pypi", marker = "sys_platform != 'linux'" },
+]
 cmake = { index = "pypi" }
 markupsafe = { index = "pypi" }
 unsloth = { git = "https://github.com/unslothai/unsloth.git", tag = "February-2026" }

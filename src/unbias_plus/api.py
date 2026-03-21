@@ -12,6 +12,9 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
 from pydantic import BaseModel
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from unbias_plus.model import DEFAULT_MODEL
 from unbias_plus.parser import parse_llm_output
@@ -28,6 +31,20 @@ DEMO_DIR = Path(__file__).parent / "demo"
 VLLM_BASE_URL = os.environ.get("VLLM_BASE_URL")
 VLLM_MODEL_NAME = os.environ.get("VLLM_MODEL_NAME", "unbias-plus")
 MAX_INPUT_CHARS = int(os.environ.get("MAX_INPUT_CHARS", "1000"))
+# Tune via RATE_LIMIT env var, e.g. "20/minute", "100/hour"
+RATE_LIMIT = os.environ.get("RATE_LIMIT", "10/minute")
+
+
+def _get_client_ip(request: Request) -> str:
+    """Return the real client IP, respecting Cloud Run's X-Forwarded-For header."""
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        # Cloud Run prepends the real client IP as the first entry
+        return forwarded_for.split(",")[0].strip()
+    return get_remote_address(request)
+
+
+limiter = Limiter(key_func=_get_client_ip)
 
 
 class AnalyzeRequest(BaseModel):
@@ -105,6 +122,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+
 # Serve demo static files if demo directory exists
 if (DEMO_DIR / "static").exists():
     app.mount("/static", StaticFiles(directory=DEMO_DIR / "static"), name="static")
@@ -153,6 +173,7 @@ def health(request: Request) -> HealthResponse:
 
 
 @app.post("/analyze", response_model=BiasResult)
+@limiter.limit(RATE_LIMIT)
 def analyze(request: Request, body: AnalyzeRequest) -> BiasResult:
     """Analyze input text for bias.
 
@@ -211,6 +232,7 @@ def analyze(request: Request, body: AnalyzeRequest) -> BiasResult:
 
 
 @app.post("/analyze/stream")
+@limiter.limit(RATE_LIMIT)
 def analyze_stream(request: Request, body: AnalyzeRequest) -> StreamingResponse:
     """Stream bias analysis tokens via SSE, then emit the final parsed result.
 
