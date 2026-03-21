@@ -18,6 +18,17 @@
    const tooltip      = document.getElementById("tooltip");
 
    const MAX_CHARS = 1000;
+  const MAX_COLD_START_RETRIES = 10; // 10 × 5 s = 50 s window for uvicorn to start
+  let coldStartRetries = 0;
+
+  const errorBannerEl = document.getElementById("error-banner");
+
+  function showInlineError(msg) {
+    if (!errorBannerEl) return;
+    errorBannerEl.textContent = msg;
+    errorBannerEl.classList.remove("hidden");
+    setTimeout(() => errorBannerEl.classList.add("hidden"), 8000);
+  }
 
    // ============================================================
    // EXAMPLE CHIPS
@@ -99,7 +110,9 @@
        if (!res.ok) {
          let detail = "Server error (" + res.status + ")";
          try { detail = (await res.json()).detail || detail; } catch {}
-         throw new Error(detail);
+         const httpErr = new Error(detail);
+         httpErr.status = res.status;
+         throw httpErr;
        }
 
        const reader = res.body.getReader();
@@ -145,21 +158,45 @@
 
      } catch (err) {
        clearInterval(timerInterval);
-       analyzeBtn.disabled = false;
        const elapsed = Math.floor((Date.now() - startTime) / 1000);
-       const isColdStart = elapsed > 8 && !firstTokenReceived;
-       if (isColdStart) {
+
+       // 502/503 with no tokens = uvicorn still starting behind nginx (CPU cold start ~30s).
+       // Auto-retry with a live countdown instead of showing an error popup.
+       const isCpuColdStart = !firstTokenReceived && (err.status === 502 || err.status === 503);
+       if (isCpuColdStart && coldStartRetries < MAX_COLD_START_RETRIES) {
+         coldStartRetries++;
+         let retryIn = 5;
+         if (labelEl) labelEl.innerHTML =
+           "Server is starting up \u2014 retrying in <b id='retry-cd'>" + retryIn + "</b>s"
+           + "\u00a0\u00a0<span style='font-size:0.85em;opacity:0.6;'>(attempt " + coldStartRetries + "/" + MAX_COLD_START_RETRIES + ")</span>";
+         const tick = setInterval(() => {
+           retryIn--;
+           const cd = document.getElementById("retry-cd");
+           if (cd) cd.textContent = retryIn;
+           if (retryIn <= 0) { clearInterval(tick); runAnalysis(); }
+         }, 1000);
+         return; // keep button disabled, retry automatically
+       }
+
+       // GPU cold start: long wait with no tokens received.
+       const isGpuColdStart = elapsed > 8 && !firstTokenReceived;
+
+       analyzeBtn.disabled = false;
+       coldStartRetries = 0;
+
+       if (isGpuColdStart) {
          if (labelEl) labelEl.innerHTML =
            "Connection dropped after " + elapsed + "s — model is still loading.<br>"
            + "<span style='font-size:0.85em;opacity:0.6;'>GPU is warming up (~7 min total). Click Analyze again to reconnect.</span>";
        } else {
          loadingEl.classList.add("hidden");
          if (labelEl) labelEl.textContent = "Analyzing bias patterns...";
-         alert("Analysis failed: " + err.message);
+         showInlineError(err.message);
        }
        return;
      }
      clearInterval(timerInterval);
+     coldStartRetries = 0;
      analyzeBtn.disabled = false;
      loadingEl.classList.add("hidden");
      if (labelEl) labelEl.textContent = "Analyzing bias patterns...";
