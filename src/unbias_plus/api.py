@@ -206,7 +206,7 @@ def analyze_stream(request: Request, body: AnalyzeRequest) -> StreamingResponse:
             )
             yield (
                 "data: "
-                + json.dumps({"result": json.loads(final.model_dump_json())})
+                + json.dumps({"result": final.model_dump(mode="json")})
                 + "\n\n"
             )
 
