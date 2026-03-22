@@ -67,20 +67,26 @@ def parse_llm_output(raw_output: str) -> BiasResult:
 
     cleaned = _extract_json(text)
 
+    # Step 2: Strip thinking block from the extracted text.
+    # Safe to call on any model — no-op if no thinking block present.
+    # Runs after extraction so a <think> tag hallucinated after the JSON
+    # never causes _strip_thinking_block to incorrectly empty the string.
+    text = _strip_thinking_block(cleaned)
+
     # Strategy 1: Direct parse
-    data = _try_parse(cleaned)
+    data = _try_parse(text)
 
     # Strategy 2: Fix truncated JSON (most common LLM failure)
     if data is None:
-        data = _try_parse(_fix_truncated_json(cleaned))
+        data = _try_parse(_fix_truncated_json(text))
 
     # Strategy 3: Fix missing commas
     if data is None:
-        data = _try_parse(_fix_missing_commas(cleaned))
+        data = _try_parse(_fix_missing_commas(text))
 
     # Strategy 4: Fix truncated + missing commas combined
     if data is None:
-        data = _try_parse(_fix_missing_commas(_fix_truncated_json(cleaned)))
+        data = _try_parse(_fix_missing_commas(_fix_truncated_json(text)))
 
     # Strategy 5: Regex-based field extraction (last resort)
     if data is None:
@@ -263,6 +269,8 @@ def _extract_json(raw_output: str) -> str:
     """Extract a JSON block from raw LLM output.
 
     Handles markdown code fences and leading/trailing prose.
+    Uses brace counting to stop exactly at the closing } of the
+    root JSON object — any text after is excluded.
 
     Parameters
     ----------
