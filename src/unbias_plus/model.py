@@ -217,10 +217,15 @@ class UnBiasModel:
             "streamer": streamer,
         }
 
-        thread = threading.Thread(target=self.model.generate, kwargs=generate_kwargs)
+        thread = threading.Thread(
+            target=self.model.generate,
+            kwargs=generate_kwargs,
+            daemon=True,
+        )
         thread.start()
 
-        for token_text in streamer:
-            yield token_text
-
-        thread.join()
+        try:
+            for token_text in streamer:
+                yield token_text
+        finally:
+            thread.join()
