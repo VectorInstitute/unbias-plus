@@ -1,23 +1,48 @@
 /* ============================================================
    UnBias — Frontend Logic
-   Handles: API call, highlighting, tooltip, breakdown cards
+   Handles: streaming API, highlighting, tooltip, breakdown cards,
+            example chips, file upload (.txt / .pdf)
    ============================================================ */
 
-   const inputEl      = document.getElementById("input-text");
-   const charCountEl  = document.getElementById("char-count");
-   const analyzeBtn   = document.getElementById("analyze-btn");
-   const loadingEl    = document.getElementById("loading");
-   const resultsEl    = document.getElementById("results");
-   const highlightEl  = document.getElementById("highlighted-text");
-   const unbiasedEl   = document.getElementById("unbiased-text");
-   const segCountEl   = document.getElementById("segment-count");
-   const pillsEl      = document.getElementById("severity-pills");
-   const segListEl    = document.getElementById("segment-list");
-   const noBiasEl     = document.getElementById("no-bias");
-   const copyBtn      = document.getElementById("copy-btn");
-   const tooltip      = document.getElementById("tooltip");
+   const inputEl       = document.getElementById("input-text");
+   const charCountEl   = document.getElementById("char-count");
+   const analyzeBtn    = document.getElementById("analyze-btn");
+   const loadingEl     = document.getElementById("loading");
+   const resultsEl     = document.getElementById("results");
+   const highlightEl   = document.getElementById("highlighted-text");
+   const unbiasedEl    = document.getElementById("unbiased-text");
+   const segCountEl    = document.getElementById("segment-count");
+   const pillsEl       = document.getElementById("severity-pills");
+   const segListEl     = document.getElementById("segment-list");
+   const noBiasEl      = document.getElementById("no-bias");
+   const copyBtn       = document.getElementById("copy-btn");
+   const tooltip       = document.getElementById("tooltip");
+   const errorBannerEl = document.getElementById("error-banner");
 
    const MAX_CHARS = 5000;
+
+   // ============================================================
+   // INLINE ERROR BANNER
+   // ============================================================
+
+   function showInlineError(msg) {
+     if (!errorBannerEl) return;
+     errorBannerEl.textContent = msg;
+     errorBannerEl.classList.remove("hidden");
+     setTimeout(() => errorBannerEl.classList.add("hidden"), 8000);
+   }
+
+   // ============================================================
+   // EXAMPLE CHIPS
+   // ============================================================
+
+   document.querySelectorAll(".example-chip").forEach(chip => {
+     chip.addEventListener("click", () => {
+       inputEl.value = chip.dataset.text;
+       inputEl.dispatchEvent(new Event("input"));
+       inputEl.focus();
+     });
+   });
 
    // ============================================================
    // CHAR COUNTER
@@ -32,7 +57,89 @@
    });
 
    // ============================================================
-   // ANALYZE
+   // FILE UPLOAD — .txt and text-based .pdf, fully client-side
+   // ============================================================
+
+   const uploadBtn      = document.getElementById("upload-btn");
+   const fileInput      = document.getElementById("file-input");
+   const uploadFilename = document.getElementById("upload-filename");
+
+   uploadBtn.addEventListener("click", () => fileInput.click());
+
+   fileInput.addEventListener("change", async () => {
+     const file = fileInput.files[0];
+     if (!file) return;
+
+     const ext = file.name.split(".").pop().toLowerCase();
+     let text = "";
+
+     try {
+       if (ext === "txt") {
+         text = await _readAsText(file);
+       } else if (ext === "pdf") {
+         text = await _extractPdfText(file);
+       } else {
+         showInlineError("Unsupported file type. Please upload a .txt or .pdf file.");
+         return;
+       }
+     } catch (err) {
+       showInlineError("Could not read file: " + err.message);
+       fileInput.value = "";
+       return;
+     }
+
+     text = text.trim();
+
+     if (!text) {
+       showInlineError("This PDF appears to be scanned or image-based. Please paste the text manually.");
+       fileInput.value = "";
+       return;
+     }
+
+     if (text.length > MAX_CHARS) {
+       text = text.slice(0, MAX_CHARS);
+       showInlineError(`File truncated to ${MAX_CHARS.toLocaleString()} characters.`);
+     }
+
+     inputEl.value = text;
+     inputEl.dispatchEvent(new Event("input"));
+     inputEl.focus();
+
+     uploadFilename.textContent = file.name;
+     uploadFilename.classList.remove("hidden");
+     fileInput.value = "";
+   });
+
+   function _readAsText(file) {
+     return new Promise((resolve, reject) => {
+       const reader = new FileReader();
+       reader.onload  = e => resolve(e.target.result);
+       reader.onerror = () => reject(new Error("Failed to read file"));
+       reader.readAsText(file, "utf-8");
+     });
+   }
+
+   async function _extractPdfText(file) {
+     if (typeof pdfjsLib === "undefined") {
+       throw new Error("PDF library not loaded. Please refresh and try again.");
+     }
+     pdfjsLib.GlobalWorkerOptions.workerSrc =
+       "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+     const arrayBuffer = await file.arrayBuffer();
+     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+     const pages = [];
+     for (let i = 1; i <= pdf.numPages; i++) {
+       const page    = await pdf.getPage(i);
+       const content = await page.getTextContent();
+       pages.push(content.items.map(item => item.str).join(" "));
+     }
+     return pages.join("\n\n");
+   }
+
+   // ============================================================
+   // ANALYZE — /analyze/stream (SSE)
    // ============================================================
 
    analyzeBtn.addEventListener("click", runAnalysis);
@@ -45,44 +152,150 @@
      const text = inputEl.value.trim();
      if (!text) return;
      if (text.length > MAX_CHARS) {
-       alert("Text too long. Please keep it under 5000 characters.");
+       showInlineError(`Text too long. Please keep it under ${MAX_CHARS.toLocaleString()} characters.`);
        return;
      }
 
      analyzeBtn.disabled = true;
      resultsEl.classList.add("hidden");
      loadingEl.classList.remove("hidden");
+     unbiasedEl.innerHTML = "";
+
+     const labelEl = document.querySelector(".loading-label");
+     let tokenCount = 0;
+     let accumulated = "";
+     let streamingSegments = [];
+
+     if (labelEl) labelEl.textContent = "Analyzing bias patterns...";
 
      try {
-       const res = await fetch("/analyze", {
+       const res = await fetch("/analyze/stream", {
          method: "POST",
          headers: { "Content-Type": "application/json" },
          body: JSON.stringify({ text }),
        });
 
-       const data = await res.json();
-
-       if (!res.ok || data.detail) {
-         throw new Error(data.detail || "Server error");
+       if (!res.ok) {
+         let detail = `Server error (${res.status})`;
+         try { detail = (await res.json()).detail || detail; } catch {}
+         throw new Error(detail);
        }
 
-       renderResults(data);
+       const reader  = res.body.getReader();
+       const decoder = new TextDecoder();
+       let buffer = "";
+
+       while (true) {
+         const { done, value } = await reader.read();
+         if (done) break;
+
+         buffer += decoder.decode(value, { stream: true });
+         const lines = buffer.split("\n");
+         buffer = lines.pop();
+
+         for (const line of lines) {
+           if (!line.startsWith("data: ")) continue;
+           let payload;
+           try { payload = JSON.parse(line.slice(6)); } catch { continue; }
+
+           if (payload.t !== undefined) {
+             tokenCount++;
+             accumulated += payload.t;
+             if (labelEl) labelEl.textContent = `Analyzing... (${tokenCount} tokens)`;
+
+             const newSegs = parseNewSegments(accumulated, streamingSegments.length, text);
+             if (newSegs.length > 0) {
+               streamingSegments = streamingSegments.concat(newSegs);
+               renderStreamingPartial(text, streamingSegments);
+             }
+
+           } else if (payload.result !== undefined) {
+             renderResults(payload.result);
+
+           } else if (payload.error !== undefined) {
+             throw new Error(payload.error);
+           }
+         }
+       }
 
      } catch (err) {
-       alert(`Analysis failed: ${err.message}`);
+       showInlineError(err.message);
      } finally {
        analyzeBtn.disabled = false;
        loadingEl.classList.add("hidden");
+       if (labelEl) labelEl.textContent = "Analyzing bias patterns...";
      }
    }
 
    // ============================================================
-   // RENDER RESULTS
+   // PROGRESSIVE SEGMENT PARSER
+   // Walks accumulated raw JSON text, extracts complete segment
+   // objects from the biased_segments array using brace counting,
+   // skips already-rendered ones, computes offsets client-side.
+   // ============================================================
+
+   function parseNewSegments(raw, alreadyParsed, inputText) {
+     const markerIdx = raw.indexOf('"biased_segments"');
+     if (markerIdx === -1) return [];
+
+     const bracketIdx = raw.indexOf('[', markerIdx);
+     if (bracketIdx === -1) return [];
+
+     const newSegs = [];
+     let depth    = 0;
+     let objStart = -1;
+     let segIdx   = 0;
+
+     for (let i = bracketIdx + 1; i < raw.length; i++) {
+       const ch = raw[i];
+       if (ch === '{') {
+         if (depth === 0) objStart = i;
+         depth++;
+       } else if (ch === '}') {
+         depth--;
+         if (depth === 0 && objStart !== -1) {
+           if (segIdx >= alreadyParsed) {
+             try {
+               const seg = JSON.parse(raw.slice(objStart, i + 1));
+               const idx = inputText.indexOf(seg.original);
+               seg.start = idx === -1 ? null : idx;
+               seg.end   = idx === -1 ? null : idx + (seg.original || "").length;
+               newSegs.push(seg);
+             } catch {}
+           }
+           segIdx++;
+           objStart = -1;
+         }
+       } else if (ch === ']' && depth === 0) {
+         break;
+       }
+     }
+
+     return newSegs;
+   }
+
+   // ============================================================
+   // PARTIAL RENDER (called as each streaming segment arrives)
+   // ============================================================
+
+   function renderStreamingPartial(inputText, segments) {
+     resultsEl.classList.remove("hidden");
+     document.querySelector(".summary-bar").classList.remove("hidden");
+     document.querySelector(".panels").classList.remove("hidden");
+     document.querySelector(".breakdown-section").classList.remove("hidden");
+     noBiasEl.classList.add("hidden");
+
+     renderSummary(segments);
+     highlightEl.innerHTML = buildHighlightedHTML(inputText, segments);
+     attachMarkTooltips(segments);
+     renderSegmentCards(segments);
+   }
+
+   // ============================================================
+   // RENDER RESULTS (final — called on result event)
    // ============================================================
 
    function renderResults(data) {
-     // API returns: binary_label, severity, bias_found, biased_segments,
-     // unbiased_text, original_text
      const { original_text, unbiased_text, bias_found, biased_segments } = data;
 
      resultsEl.classList.remove("hidden");
@@ -104,7 +317,7 @@
      renderSummary(biased_segments);
      highlightEl.innerHTML = buildHighlightedHTML(original_text, biased_segments);
      attachMarkTooltips(biased_segments);
-     unbiasedEl.innerHTML = buildUnbiasedHTML(original_text, unbiased_text, biased_segments);
+     unbiasedEl.innerHTML  = buildUnbiasedHTML(original_text, unbiased_text, biased_segments);
      renderSegmentCards(biased_segments);
    }
 
@@ -131,34 +344,25 @@
 
    // ============================================================
    // HIGHLIGHTED HTML BUILDER
-   // Uses start/end offsets computed server-side by pipeline.py
    // ============================================================
 
    function buildHighlightedHTML(text, segments) {
-     // Filter segments that have valid offsets and sort by start
      const sorted = segments
        .filter(s => s.start != null && s.end != null)
        .sort((a, b) => a.start - b.start);
 
-     let html = "";
+     let html   = "";
      let cursor = 0;
 
      sorted.forEach((seg, idx) => {
        const { start, end, severity } = seg;
-       if (start < cursor) return; // skip overlapping
-
-       if (start > cursor) {
-         html += escapeHtml(text.slice(cursor, start));
-       }
-
+       if (start < cursor) return;
+       if (start > cursor) html += escapeHtml(text.slice(cursor, start));
        html += `<mark class="severity-${severity}" data-seg-idx="${idx}" tabindex="0">${escapeHtml(text.slice(start, end))}</mark>`;
        cursor = end;
      });
 
-     if (cursor < text.length) {
-       html += escapeHtml(text.slice(cursor));
-     }
-
+     if (cursor < text.length) html += escapeHtml(text.slice(cursor));
      return html;
    }
 
@@ -180,9 +384,9 @@
      marks.forEach(mark => {
        mark.addEventListener("mouseenter", (e) => showTooltip(e, mark, segments));
        mark.addEventListener("mouseleave", hideTooltip);
-       mark.addEventListener("mousemove", repositionTooltip);
-       mark.addEventListener("focus", (e) => showTooltip(e, mark, segments));
-       mark.addEventListener("blur", hideTooltip);
+       mark.addEventListener("mousemove",  repositionTooltip);
+       mark.addEventListener("focus",      (e) => showTooltip(e, mark, segments));
+       mark.addEventListener("blur",       hideTooltip);
      });
    }
 
@@ -193,30 +397,28 @@
 
      const sevEl = document.getElementById("tooltip-severity");
      sevEl.textContent = seg.severity.toUpperCase();
-     sevEl.className = `tooltip-severity sev-${seg.severity}`;
+     sevEl.className   = `tooltip-severity sev-${seg.severity}`;
 
-     document.getElementById("tooltip-type").textContent = seg.bias_type || "";
-     document.getElementById("tooltip-reasoning").textContent = seg.reasoning || "";
+     document.getElementById("tooltip-type").textContent        = seg.bias_type   || "";
+     document.getElementById("tooltip-reasoning").textContent   = seg.reasoning   || "";
      document.getElementById("tooltip-replacement").textContent = seg.replacement || "";
 
      tooltip.classList.remove("hidden");
      repositionTooltip(e);
    }
 
-   function hideTooltip() {
-     tooltip.classList.add("hidden");
-   }
+   function hideTooltip() { tooltip.classList.add("hidden"); }
 
    function repositionTooltip(e) {
      const pad = 16;
-     const tw = tooltip.offsetWidth;
-     const th = tooltip.offsetHeight;
+     const tw  = tooltip.offsetWidth;
+     const th  = tooltip.offsetHeight;
 
      let x = e.clientX + pad;
      let y = e.clientY - th / 2;
 
-     if (x + tw > window.innerWidth - pad) x = e.clientX - tw - pad;
-     if (y < pad) y = pad;
+     if (x + tw > window.innerWidth  - pad) x = e.clientX - tw - pad;
+     if (y < pad)                           y = pad;
      if (y + th > window.innerHeight - pad) y = window.innerHeight - th - pad;
 
      tooltip.style.left = `${x}px`;
@@ -229,7 +431,6 @@
 
    function renderSegmentCards(segments) {
      segListEl.innerHTML = "";
-
      segments.forEach((seg) => {
        const card = document.createElement("div");
        card.className = `segment-card sev-${seg.severity}`;
@@ -264,7 +465,6 @@
    copyBtn.addEventListener("click", () => {
      const text = unbiasedEl.textContent;
      if (!text) return;
-
      navigator.clipboard.writeText(text).then(() => {
        const original = copyBtn.innerHTML;
        copyBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Copied!`;
@@ -275,18 +475,14 @@
    // ============================================================
    // UNBIASED HTML BUILDER
    // ============================================================
+
    function buildUnbiasedHTML(original, unbiased, segments) {
-    // Collect all original biased phrases
-    const originals = segments.map(s => s.original).filter(Boolean);
-    const replacements = segments.map(s => s.replacement).filter(Boolean);
-
-    let html = escapeHtmlText(unbiased);
-
-    replacements.forEach((rep) => {
-      if (!rep) return;
-      const escaped = escapeHtmlText(rep);
-      html = html.replace(escaped, `<mark class="replaced-green">${escaped}</mark>`);
-    });
-
-    return html;
-  }
+     const replacements = segments.map(s => s.replacement).filter(Boolean);
+     let html = escapeHtmlText(unbiased);
+     replacements.forEach((rep) => {
+       if (!rep) return;
+       const escaped = escapeHtmlText(rep);
+       html = html.replace(escaped, `<mark class="replaced-green">${escaped}</mark>`);
+     });
+     return html;
+   }
