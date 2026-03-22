@@ -95,6 +95,7 @@ def parse_llm_output(raw_output: str) -> BiasResult:
     # Deduplicate segments with the same original phrase before schema validation
     if "biased_segments" in data and isinstance(data["biased_segments"], list):
         data["biased_segments"] = _deduplicate_segments(data["biased_segments"])
+        data["biased_segments"] = _remove_contained_segments(data["biased_segments"])
 
     try:
         return BiasResult(**data)
@@ -191,6 +192,55 @@ def _deduplicate_segments(segments: list[dict]) -> list[dict]:
                 merged["severity"] = seg["severity"]
 
     return list(seen.values())
+
+
+def _remove_contained_segments(segments: list[dict]) -> list[dict]:
+    """Remove segments whose original text is fully contained within another segment.
+
+    After deduplication, the model sometimes returns both a longer phrase
+    and a shorter sub-phrase that is entirely contained within it. The longer
+    segment already captures the bias — the shorter one is redundant and
+    produces overlapping highlights in the frontend.
+
+    Strategy: sort by length descending so longer segments are kept
+    preferentially. For each remaining segment, drop any other segment
+    whose original text appears as a substring of it.
+
+    Parameters
+    ----------
+    segments : list[dict]
+        Deduplicated list of segment dicts.
+
+    Returns
+    -------
+    list[dict]
+        Filtered list with contained sub-segments removed.
+
+    """
+    if len(segments) <= 1:
+        return segments
+
+    # Sort longest original first so we always prefer the broader segment
+    sorted_segs = sorted(
+        segments, key=lambda s: len(s.get("original", "")), reverse=True
+    )
+
+    kept: list[dict] = []
+    kept_originals: list[str] = []
+
+    for seg in sorted_segs:
+        original = seg.get("original", "").strip()
+        if not original:
+            continue
+
+        # Check if this segment's text is a substring of any already-kept segment
+        is_contained = any(original in kept_orig for kept_orig in kept_originals)
+
+        if not is_contained:
+            kept.append(seg)
+            kept_originals.append(original)
+
+    return kept
 
 
 def _try_parse_json(text: str) -> Any | None:

@@ -3,19 +3,20 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>UnBias</title>
+  <title>UnBias+ | Vector Institute</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300;0,400;0,600;0,700;0,800;1,300;1,400&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-
   <div class="noise"></div>
-
   <header>
-    <div class="logo">
-      <span class="logo-un">Un</span><span class="logo-bias">Bias</span><span class="logo-plus"> Plus</span>
+    <div class="header-left">
+      <div class="logo">
+        <span class="logo-un">Un</span><span class="logo-bias">Bias</span><span class="logo-plus"> Plus</span>
+      </div>
+      <span class="logo-tagline">Detect and neutralize bias in text</span>
     </div>
     <img
       src="/static/Vector-Logo-FullColour_Horizontal.png"
@@ -24,13 +25,34 @@
     />
   </header>
   <main>
-
-
     <!-- INPUT SECTION -->
     <section class="input-section">
       <div class="section-label">
         <span class="label-num">01</span>
         <span class="label-text">Paste your text</span>
+      </div>
+      <!-- EXAMPLE CHIPS -->
+      <div class="examples">
+        <span class="examples-label">Try an example</span>
+        <button class="example-chip" data-text="Women are too emotional to lead effectively in high-pressure corporate environments where tough decisions need to be made quickly.">Gender bias</button>
+        <button class="example-chip" data-text="Asian students naturally excel at math and science because of their cultural background and inherent work ethic. Meanwhile, other groups tend to perform worse in STEM fields due to cultural factors.">Racial stereotypes</button>
+        <button class="example-chip" data-text="We are seeking a young, energetic candidate to join our fast-paced startup. The ideal hire will be a native English speaker who can keep up with our dynamic team. Older applicants may find the pace challenging.">Hiring language</button>
+        <button class="example-chip" data-text="The aggressive expansion strategy championed by our male executives has driven record profits. The female board members, ever cautious and risk-averse, had reservations, but ultimately the bold vision prevailed.">Workplace framing</button>
+      </div>
+      <!-- FILE UPLOAD -->
+      <div class="upload-row">
+        <span class="upload-or">or</span>
+        <button class="upload-btn" id="upload-btn">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          Upload file
+        </button>
+        <span class="upload-hint">.txt or .pdf</span>
+        <span class="upload-filename hidden" id="upload-filename"></span>
+        <input type="file" id="file-input" accept=".txt,.pdf" style="display:none" />
       </div>
       <textarea
         id="input-text"
@@ -39,14 +61,15 @@
       ></textarea>
       <div class="input-footer">
         <span id="char-count" class="char-count">0 / 5000</span>
-        <span class="disclaimer-inline">⚠ Results may not always be as expected</span>
+        <span class="disclaimer-inline">⚠ Because bias is a subjective and context-dependent concept, results should be interpreted as indicative rather than definitive.</span>
         <button id="analyze-btn" class="analyze-btn">
           <span class="btn-text">Analyze for Bias</span>
           <span class="btn-arrow">→</span>
         </button>
       </div>
     </section>
-
+    <!-- INLINE ERROR -->
+    <div id="error-banner" class="error-banner hidden"></div>
     <!-- LOADING STATE -->
     <div id="loading" class="loading hidden">
       <div class="loading-bar">
@@ -54,10 +77,8 @@
       </div>
       <p class="loading-label">Analyzing bias patterns...</p>
     </div>
-
     <!-- RESULTS -->
     <div id="results" class="results hidden">
-
       <!-- BIAS SUMMARY BAR -->
       <div class="summary-bar">
         <div class="summary-left">
@@ -66,10 +87,8 @@
         </div>
         <div class="severity-pills" id="severity-pills"></div>
       </div>
-
       <!-- TWO PANEL VIEW -->
       <div class="panels">
-
         <!-- LEFT: ORIGINAL WITH HIGHLIGHTS -->
         <div class="panel panel-original">
           <div class="panel-header">
@@ -78,7 +97,6 @@
           </div>
           <div id="highlighted-text" class="panel-body"></div>
         </div>
-
         <!-- RIGHT: UNBIASED REWRITE -->
         <div class="panel panel-unbiased">
           <div class="panel-header">
@@ -91,9 +109,7 @@
             Copy
           </button>
         </div>
-
       </div>
-
       <!-- SEGMENT BREAKDOWN -->
       <div class="breakdown-section">
         <div class="section-label">
@@ -102,18 +118,14 @@
         </div>
         <div id="segment-list" class="segment-list"></div>
       </div>
-
       <!-- NO BIAS STATE -->
       <div id="no-bias" class="no-bias hidden">
         <div class="no-bias-icon">✓</div>
         <p class="no-bias-title">No bias detected</p>
         <p class="no-bias-sub">This text appears to use neutral, balanced language.</p>
       </div>
-
     </div>
-
   </main>
-
   <!-- TOOLTIP -->
   <div id="tooltip" class="tooltip hidden">
     <div class="tooltip-severity" id="tooltip-severity"></div>
@@ -125,6 +137,7 @@
     </div>
   </div>
   <footer class="site-footer">Copyright © 2026, Vector AI Engineering</footer>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="/static/script.js"></script>
 </body>
 </html>

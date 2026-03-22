@@ -18,14 +18,14 @@ wheels/
 .coverage
 
 # Experimental files
-archive/
+archive/**
 **.txt
 **.xml
 
 
 # Pre-commit & virtualenv caches
 .cache/
-
+unsloth_compiled_cache/
 # Vscode
 .vscode
 

@@ -1,18 +1,21 @@
 """FastAPI server for unbias-plus."""
 
+import json
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import AsyncGenerator, cast
+from typing import AsyncGenerator, Generator, cast
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from unbias_plus.model import DEFAULT_MODEL
+from unbias_plus.parser import parse_llm_output
 from unbias_plus.pipeline import UnBiasPlus
-from unbias_plus.schema import BiasResult
+from unbias_plus.prompt import build_messages
+from unbias_plus.schema import BiasResult, compute_offsets
 
 
 DEMO_DIR = Path(__file__).parent / "demo"
@@ -57,7 +60,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     Yields
     ------
     None
-
     """
     model_path = getattr(app.state, "model_name_or_path", DEFAULT_MODEL)
     load_in_4bit = getattr(app.state, "load_in_4bit", False)
@@ -94,7 +96,6 @@ def index() -> str:
     ------
     HTTPException
         404 if the demo directory is not found.
-
     """
     html_file = DEMO_DIR / "templates" / "index.html"
     if not html_file.exists():
@@ -110,7 +111,6 @@ def health(request: Request) -> HealthResponse:
     -------
     HealthResponse
         Server status and loaded model name.
-
     """
     pipe = getattr(request.app.state, "pipe", None)
     return HealthResponse(
@@ -141,7 +141,6 @@ def analyze(request: Request, body: AnalyzeRequest) -> BiasResult:
         500 if the model is not loaded or inference fails.
     HTTPException
         422 if the model output cannot be parsed.
-
     """
     pipe = getattr(request.app.state, "pipe", None)
     if pipe is None:
@@ -150,6 +149,80 @@ def analyze(request: Request, body: AnalyzeRequest) -> BiasResult:
         return cast(BiasResult, pipe.analyze(body.text))
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.post("/analyze/stream")
+def analyze_stream(request: Request, body: AnalyzeRequest) -> StreamingResponse:
+    """Stream bias analysis tokens via SSE, then emit the final parsed result.
+
+    Runs model generation in a background thread via TextIteratorStreamer.
+    Each SSE event is a JSON object:
+
+    - ``{"t": "<token>"}``     — one chunk per model generation step.
+    - ``{"result": {...}}``    — final event with the full BiasResult.
+    - ``{"error": "<msg>"}``   — emitted if inference or parsing fails.
+
+    Parameters
+    ----------
+    request : Request
+        FastAPI request (for app state).
+    body : AnalyzeRequest
+        Request body containing the text to analyze.
+
+    Returns
+    -------
+    StreamingResponse
+        Server-sent events stream with Content-Type text/event-stream.
+
+    Raises
+    ------
+    HTTPException
+        500 if the model is not loaded.
+    """
+    pipe = getattr(request.app.state, "pipe", None)
+    if pipe is None:
+        raise HTTPException(status_code=500, detail="Model not loaded.")
+
+    text = body.text
+
+    def event_stream() -> Generator[str, None, None]:
+        try:
+            messages = build_messages(text)
+            raw_output = ""
+
+            # Stream tokens from the background generation thread
+            for token in pipe._model.generate_stream(messages):
+                raw_output += token
+                yield "data: " + json.dumps({"t": token}) + "\n\n"
+
+            # Full output accumulated — parse and compute offsets
+            result = parse_llm_output(raw_output)
+            segments = compute_offsets(text, result.biased_segments)
+            final = result.model_copy(
+                update={
+                    "biased_segments": segments,
+                    "original_text": text,
+                }
+            )
+            yield (
+                "data: "
+                + json.dumps({"result": json.loads(final.model_dump_json())})
+                + "\n\n"
+            )
+
+        except ValueError as e:
+            yield "data: " + json.dumps({"error": str(e)}) + "\n\n"
+        except Exception as e:
+            yield "data: " + json.dumps({"error": str(e)}) + "\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # disable nginx buffering for SSE
+        },
+    )
 
 
 def serve(
@@ -182,8 +255,6 @@ def serve(
     --------
     >>> from unbias_plus.api import serve
     >>> serve("Qwen/Qwen3-4B", port=8000)  # doctest: +SKIP
-
-
     """
     app.state.model_name_or_path = str(model_name_or_path)
     app.state.load_in_4bit = load_in_4bit
