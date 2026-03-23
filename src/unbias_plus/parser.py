@@ -19,13 +19,11 @@ def parse_llm_output(raw_output: str) -> BiasResult:
     then validates it against the BiasResult schema.
 
     Strategies (in order):
-    1. Extract JSON by brace counting — stops at closing } so any
-       hallucinated text after the JSON block is ignored entirely.
-    2. Strip thinking block from extracted text if present.
-    3. Direct JSON parse of extracted block.
-    4. Fix truncated strings (LLM cut off mid-output).
-    5. Fix missing commas between JSON items.
-    6. Aggressive key-by-key extraction as last resort.
+    1. Strip thinking block if present (Qwen3 with enable_thinking=True)
+    2. Direct JSON parse of extracted block
+    3. Fix truncated strings (LLM cut off mid-output)
+    4. Fix missing commas between JSON items
+    5. Aggressive key-by-key extraction as last resort
 
     Parameters
     ----------
@@ -61,11 +59,13 @@ def parse_llm_output(raw_output: str) -> BiasResult:
     'biased'
 
     """
-    # Step 1: Extract JSON by brace counting first.
-    # This stops at the closing } of the root JSON object so any
-    # hallucinated text appended after (e.g. "assistant\n<think>\nuser\n...")
-    # is ignored entirely before any other processing.
-    cleaned = _extract_json(raw_output)
+    # Strip thinking block before any JSON extraction.
+    # Works for all cases:
+    #   - Qwen3 with thinking: removes <think>...</think>, leaves JSON
+    #   - Qwen3 without thinking / any other model: no-op
+    text = _strip_thinking_block(raw_output)
+
+    cleaned = _extract_json(text)
 
     # Step 2: Strip thinking block from the extracted text.
     # Safe to call on any model — no-op if no thinking block present.
@@ -101,6 +101,7 @@ def parse_llm_output(raw_output: str) -> BiasResult:
     # Deduplicate segments with the same original phrase before schema validation
     if "biased_segments" in data and isinstance(data["biased_segments"], list):
         data["biased_segments"] = _deduplicate_segments(data["biased_segments"])
+        data["biased_segments"] = _remove_contained_segments(data["biased_segments"])
 
     try:
         return BiasResult(**data)
@@ -197,6 +198,55 @@ def _deduplicate_segments(segments: list[dict]) -> list[dict]:
                 merged["severity"] = seg["severity"]
 
     return list(seen.values())
+
+
+def _remove_contained_segments(segments: list[dict]) -> list[dict]:
+    """Remove segments whose original text is fully contained within another segment.
+
+    After deduplication, the model sometimes returns both a longer phrase
+    and a shorter sub-phrase that is entirely contained within it. The longer
+    segment already captures the bias — the shorter one is redundant and
+    produces overlapping highlights in the frontend.
+
+    Strategy: sort by length descending so longer segments are kept
+    preferentially. For each remaining segment, drop any other segment
+    whose original text appears as a substring of it.
+
+    Parameters
+    ----------
+    segments : list[dict]
+        Deduplicated list of segment dicts.
+
+    Returns
+    -------
+    list[dict]
+        Filtered list with contained sub-segments removed.
+
+    """
+    if len(segments) <= 1:
+        return segments
+
+    # Sort longest original first so we always prefer the broader segment
+    sorted_segs = sorted(
+        segments, key=lambda s: len(s.get("original", "")), reverse=True
+    )
+
+    kept: list[dict] = []
+    kept_originals: list[str] = []
+
+    for seg in sorted_segs:
+        original = seg.get("original", "").strip()
+        if not original:
+            continue
+
+        # Check if this segment's text is a substring of any already-kept segment
+        is_contained = any(original in kept_orig for kept_orig in kept_originals)
+
+        if not is_contained:
+            kept.append(seg)
+            kept_originals.append(original)
+
+    return kept
 
 
 def _try_parse_json(text: str) -> Any | None:
