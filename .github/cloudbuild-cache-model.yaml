@@ -34,7 +34,7 @@ steps:
   - -c
   - |
     set -euo pipefail
-    # Use lowercase variable names — Cloud Build only substitutes ${UPPERCASE} patterns.
+    # Use lowercase variable names — Cloud Build substitutes any all-caps brace patterns.
     model_dir="hub/models--$(echo '${_MODEL}' | tr '/' '--')"
     local_dir="/workspace/hf-cache/${model_dir}"
     dest="gs://${_BUCKET}/${model_dir}"
