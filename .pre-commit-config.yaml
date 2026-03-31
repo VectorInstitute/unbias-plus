@@ -19,10 +19,13 @@ repos:
       args: [--unsafe]
     - id: check-toml
 
-  - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.10.3
+  - repo: local
     hooks:
-      - id: uv-lock
+    - id: uv-lock
+      name: uv-lock
+      entry: uv lock --check
+      language: system
+      pass_filenames: false
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: 'v0.15.1'

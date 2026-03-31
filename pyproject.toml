@@ -112,7 +112,6 @@ artifacts = ["src/unbias_plus/demo/**"]
 [tool.uv]
 default-groups = ["dev", "docs"]
 index-url = "https://pypi.org/simple"
-extra-build-dependencies = { flash-attn = ["torch"] }
 extra-index-url = ["https://download.pytorch.org/whl/cu124"]
 index-strategy = "unsafe-best-match"
 
@@ -190,6 +189,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["E402", "F401", "F403", "F811"]
 "tests/*" = ["D103", "D105", "D107"]
+"src/unbias_plus/api.py" = ["PLC0415"]  # lazy imports for optional cloud deps
 
 [tool.ruff.lint.pep8-naming]
 ignore-names = ["X*", "setUp"]

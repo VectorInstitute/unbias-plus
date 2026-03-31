@@ -20,6 +20,8 @@
    const errorBannerEl = document.getElementById("error-banner");
 
    const MAX_CHARS = 5000;
+   const MAX_COLD_START_RETRIES = 10; // 10 × 5 s = 50 s window for uvicorn to start
+   let coldStartRetries = 0;
 
    // ============================================================
    // INLINE ERROR BANNER
@@ -163,10 +165,26 @@
 
      const labelEl = document.querySelector(".loading-label");
      let tokenCount = 0;
+     let firstTokenReceived = false;
      let accumulated = "";
      let streamingSegments = [];
 
-     if (labelEl) labelEl.textContent = "Analyzing bias patterns...";
+     // Elapsed timer — updates label every second until first token arrives.
+     // After 8 s of silence, shows a cold-start warning with a live counter.
+     const startTime = Date.now();
+     const timerInterval = setInterval(() => {
+       if (firstTokenReceived) return;
+       const elapsed = Math.floor((Date.now() - startTime) / 1000);
+       if (!labelEl) return;
+       if (elapsed < 8) {
+         labelEl.textContent = "Analyzing bias patterns...";
+       } else {
+         labelEl.innerHTML =
+           "Cold start: loading model from GCS\u00a0\u00a0"
+           + "<span style='font-variant-numeric:tabular-nums;'>" + elapsed + "s</span>"
+           + "<br><span style='font-size:0.85em;opacity:0.6;'>First request after idle takes ~7 min. Hang tight.</span>";
+       }
+     }, 1000);
 
      try {
        const res = await fetch("/analyze/stream", {
@@ -178,7 +196,9 @@
        if (!res.ok) {
          let detail = `Server error (${res.status})`;
          try { detail = (await res.json()).detail || detail; } catch {}
-         throw new Error(detail);
+         const httpErr = new Error(detail);
+         httpErr.status = res.status;
+         throw httpErr;
        }
 
        const reader  = res.body.getReader();
@@ -199,6 +219,10 @@
            try { payload = JSON.parse(line.slice(6)); } catch { continue; }
 
            if (payload.t !== undefined) {
+             if (!firstTokenReceived) {
+               firstTokenReceived = true;
+               clearInterval(timerInterval);
+             }
              tokenCount++;
              accumulated += payload.t;
              if (labelEl) labelEl.textContent = `Analyzing... (${tokenCount} tokens)`;
@@ -219,12 +243,50 @@
        }
 
      } catch (err) {
-       showInlineError(err.message);
-     } finally {
+       clearInterval(timerInterval);
+       const elapsed = Math.floor((Date.now() - startTime) / 1000);
+
+       // 502/503 with no tokens = uvicorn still starting behind nginx (CPU cold start ~30s).
+       // Auto-retry with a live countdown instead of showing an error popup.
+       const isCpuColdStart = !firstTokenReceived && (err.status === 502 || err.status === 503);
+       if (isCpuColdStart && coldStartRetries < MAX_COLD_START_RETRIES) {
+         coldStartRetries++;
+         let retryIn = 5;
+         if (labelEl) labelEl.innerHTML =
+           "Server is starting up \u2014 retrying in <b id='retry-cd'>" + retryIn + "</b>s"
+           + "\u00a0\u00a0<span style='font-size:0.85em;opacity:0.6;'>(attempt " + coldStartRetries + "/" + MAX_COLD_START_RETRIES + ")</span>";
+         const tick = setInterval(() => {
+           retryIn--;
+           const cd = document.getElementById("retry-cd");
+           if (cd) cd.textContent = retryIn;
+           if (retryIn <= 0) { clearInterval(tick); runAnalysis(); }
+         }, 1000);
+         return; // keep button disabled, retry automatically
+       }
+
+       // GPU cold start: long wait with no tokens received.
+       const isGpuColdStart = elapsed > 8 && !firstTokenReceived;
+
        analyzeBtn.disabled = false;
-       loadingEl.classList.add("hidden");
-       if (labelEl) labelEl.textContent = "Analyzing bias patterns...";
+       coldStartRetries = 0;
+
+       if (isGpuColdStart) {
+         if (labelEl) labelEl.innerHTML =
+           "Connection dropped after " + elapsed + "s — model is still loading.<br>"
+           + "<span style='font-size:0.85em;opacity:0.6;'>GPU is warming up (~7 min total). Click Analyze again to reconnect.</span>";
+       } else {
+         loadingEl.classList.add("hidden");
+         if (labelEl) labelEl.textContent = "Analyzing bias patterns...";
+         showInlineError(err.message);
+       }
+       return;
      }
+
+     clearInterval(timerInterval);
+     coldStartRetries = 0;
+     analyzeBtn.disabled = false;
+     loadingEl.classList.add("hidden");
+     if (labelEl) labelEl.textContent = "Analyzing bias patterns...";
    }
 
    // ============================================================
@@ -235,43 +297,52 @@
    // ============================================================
 
    function parseNewSegments(raw, alreadyParsed, inputText) {
-     const markerIdx = raw.indexOf('"biased_segments"');
+     const marker = '"biased_segments"';
+     const markerIdx = raw.indexOf(marker);
      if (markerIdx === -1) return [];
 
-     const bracketIdx = raw.indexOf('[', markerIdx);
-     if (bracketIdx === -1) return [];
+     const arrStart = raw.indexOf("[", markerIdx);
+     if (arrStart === -1) return [];
 
-     const newSegs = [];
-     let depth    = 0;
-     let objStart = -1;
-     let segIdx   = 0;
+     const segments = [];
+     let i = arrStart + 1;
+     let segsParsed = 0;
 
-     for (let i = bracketIdx + 1; i < raw.length; i++) {
-       const ch = raw[i];
-       if (ch === '{') {
-         if (depth === 0) objStart = i;
-         depth++;
-       } else if (ch === '}') {
-         depth--;
-         if (depth === 0 && objStart !== -1) {
-           if (segIdx >= alreadyParsed) {
-             try {
-               const seg = JSON.parse(raw.slice(objStart, i + 1));
-               const idx = inputText.indexOf(seg.original);
-               seg.start = idx === -1 ? null : idx;
-               seg.end   = idx === -1 ? null : idx + (seg.original || "").length;
-               newSegs.push(seg);
-             } catch {}
-           }
-           segIdx++;
-           objStart = -1;
-         }
-       } else if (ch === ']' && depth === 0) {
-         break;
+     while (i < raw.length) {
+       // Skip whitespace
+       while (i < raw.length && /\s/.test(raw[i])) i++;
+       if (i >= raw.length || raw[i] === "]") break;
+       if (raw[i] !== "{") { i++; continue; }
+
+       // Find the matching closing brace
+       let depth = 0;
+       let j = i;
+       while (j < raw.length) {
+         if (raw[j] === "{") depth++;
+         else if (raw[j] === "}") { depth--; if (depth === 0) break; }
+         j++;
        }
+       if (depth !== 0) break; // incomplete object, wait for more tokens
+
+       const objStr = raw.slice(i, j + 1);
+       try {
+         const seg = JSON.parse(objStr);
+         if (segsParsed >= alreadyParsed) {
+           // Compute client-side offsets
+           const start = inputText.indexOf(seg.original);
+           seg.start = start >= 0 ? start : null;
+           seg.end   = start >= 0 ? start + seg.original.length : null;
+           segments.push(seg);
+         }
+         segsParsed++;
+       } catch { /* incomplete JSON, stop */ break; }
+
+       i = j + 1;
+       // Skip comma between objects
+       while (i < raw.length && /[\s,]/.test(raw[i])) i++;
      }
 
-     return newSegs;
+     return segments;
    }
 
    // ============================================================
