@@ -15,6 +15,7 @@ steps:
   entrypoint: bash
   env:
   - '_MODEL=${_MODEL}'
+  - 'HF_HUB_DISABLE_XET=1'
   args:
   - -c
   - |
@@ -26,6 +27,8 @@ steps:
     snapshot_download(model, cache_dir='/workspace/hf-cache')
     print('Download complete.')
     "
+    echo '=== Cache structure after download ==='
+    find /workspace/hf-cache -maxdepth 5 | sort | head -60
 
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
   id: 'upload'
