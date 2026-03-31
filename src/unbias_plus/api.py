@@ -102,7 +102,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     Yields
     ------
     None
-
     """
     if VLLM_BASE_URL:
         # Remote vLLM — no local model load needed.
@@ -165,7 +164,6 @@ def index() -> str:
     ------
     HTTPException
         404 if the demo directory is not found.
-
     """
     html_file = DEMO_DIR / "templates" / "index.html"
     if not html_file.exists():
@@ -181,7 +179,6 @@ def health(request: Request) -> HealthResponse:
     -------
     HealthResponse
         Server status and loaded model name.
-
     """
     vllm_client = getattr(request.app.state, "vllm_client", None)
     pipe = getattr(request.app.state, "pipe", None)
@@ -335,6 +332,80 @@ def analyze_stream(request: Request, body: AnalyzeRequest) -> StreamingResponse:
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.post("/analyze/stream")
+def analyze_stream(request: Request, body: AnalyzeRequest) -> StreamingResponse:
+    """Stream bias analysis tokens via SSE, then emit the final parsed result.
+
+    Runs model generation in a background thread via TextIteratorStreamer.
+    Each SSE event is a JSON object:
+
+    - ``{"t": "<token>"}``     — one chunk per model generation step.
+    - ``{"result": {...}}``    — final event with the full BiasResult.
+    - ``{"error": "<msg>"}``   — emitted if inference or parsing fails.
+
+    Parameters
+    ----------
+    request : Request
+        FastAPI request (for app state).
+    body : AnalyzeRequest
+        Request body containing the text to analyze.
+
+    Returns
+    -------
+    StreamingResponse
+        Server-sent events stream with Content-Type text/event-stream.
+
+    Raises
+    ------
+    HTTPException
+        500 if the model is not loaded.
+    """
+    pipe = getattr(request.app.state, "pipe", None)
+    if pipe is None:
+        raise HTTPException(status_code=500, detail="Model not loaded.")
+
+    text = body.text
+
+    def event_stream() -> Generator[str, None, None]:
+        try:
+            messages = build_messages(text)
+            raw_output = ""
+
+            # Stream tokens from the background generation thread
+            for token in pipe._model.generate_stream(messages):
+                raw_output += token
+                yield "data: " + json.dumps({"t": token}) + "\n\n"
+
+            # Full output accumulated — parse and compute offsets
+            result = parse_llm_output(raw_output)
+            segments = compute_offsets(text, result.biased_segments)
+            final = result.model_copy(
+                update={
+                    "biased_segments": segments,
+                    "original_text": text,
+                }
+            )
+            yield (
+                "data: "
+                + json.dumps({"result": final.model_dump(mode="json")})
+                + "\n\n"
+            )
+
+        except ValueError as e:
+            yield "data: " + json.dumps({"error": str(e)}) + "\n\n"
+        except Exception as e:
+            yield "data: " + json.dumps({"error": str(e)}) + "\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # disable nginx buffering for SSE
         },
     )
 

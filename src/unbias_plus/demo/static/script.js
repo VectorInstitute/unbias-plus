@@ -47,6 +47,29 @@
    });
 
    // ============================================================
+   // INLINE ERROR BANNER
+   // ============================================================
+
+   function showInlineError(msg) {
+     if (!errorBannerEl) return;
+     errorBannerEl.textContent = msg;
+     errorBannerEl.classList.remove("hidden");
+     setTimeout(() => errorBannerEl.classList.add("hidden"), 8000);
+   }
+
+   // ============================================================
+   // EXAMPLE CHIPS
+   // ============================================================
+
+   document.querySelectorAll(".example-chip").forEach(chip => {
+     chip.addEventListener("click", () => {
+       inputEl.value = chip.dataset.text;
+       inputEl.dispatchEvent(new Event("input"));
+       inputEl.focus();
+     });
+   });
+
+   // ============================================================
    // CHAR COUNTER
    // ============================================================
 
