@@ -34,37 +34,38 @@ steps:
   - -c
   - |
     set -euo pipefail
-    MODEL_DIR="hub/models--$(echo '${_MODEL}' | tr '/' '--')"
-    LOCAL="/workspace/hf-cache/${MODEL_DIR}"
-    DEST="gs://${_BUCKET}/${MODEL_DIR}"
+    # Use lowercase variable names — Cloud Build only substitutes ${UPPERCASE} patterns.
+    model_dir="hub/models--$(echo '${_MODEL}' | tr '/' '--')"
+    local_dir="/workspace/hf-cache/${model_dir}"
+    dest="gs://${_BUCKET}/${model_dir}"
 
     echo "=== Uploading blobs ==="
-    gsutil -m cp "${LOCAL}/blobs/"* "${DEST}/blobs/"
+    gsutil -m cp "${local_dir}/blobs/"* "${dest}/blobs/"
 
     # Recreate snapshot symlinks as GCS FUSE symlink objects (0-byte with
     # gcsfuse_symlink_target metadata), matching the structure GCS FUSE expects.
     echo "=== Writing snapshot symlinks ==="
-    for SNAP_DIR in "${LOCAL}/snapshots"/*/; do
-      COMMIT=$(basename "${SNAP_DIR}")
-      for F in "${SNAP_DIR}"*; do
-        [ -e "${F}" ] || continue
-        FNAME=$(basename "${F}")
-        if [ -L "${F}" ]; then
-          TARGET=$(readlink "${F}")
-          echo "  ${FNAME} -> ${TARGET}"
+    for snap_dir in "${local_dir}/snapshots"/*/; do
+      commit=$(basename "${snap_dir}")
+      for f in "${snap_dir}"*; do
+        [ -e "${f}" ] || continue
+        fname=$(basename "${f}")
+        if [ -L "${f}" ]; then
+          target=$(readlink "${f}")
+          echo "  ${fname} -> ${target}"
           echo -n | gsutil \
             -h "Content-Type:text/plain; charset=utf-8" \
-            -h "x-goog-meta-gcsfuse_symlink_target:${TARGET}" \
-            cp - "${DEST}/snapshots/${COMMIT}/${FNAME}"
+            -h "x-goog-meta-gcsfuse_symlink_target:${target}" \
+            cp - "${dest}/snapshots/${commit}/${fname}"
         fi
       done
     done
 
     echo "=== Uploading refs ==="
-    gsutil -m cp "${LOCAL}/refs/"* "${DEST}/refs/"
+    gsutil -m cp "${local_dir}/refs/"* "${dest}/refs/"
 
     echo "=== Done ==="
-    gsutil du -sh "${DEST}/"
+    gsutil du -sh "${dest}/"
 
 timeout: '3600s'
 options:
