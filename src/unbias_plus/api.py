@@ -144,7 +144,7 @@ if VLLM_BASE_URL:
     from slowapi.errors import RateLimitExceeded  # noqa: PLC0415
 
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
 # Serve demo static files if demo directory exists
 if (DEMO_DIR / "static").exists():
