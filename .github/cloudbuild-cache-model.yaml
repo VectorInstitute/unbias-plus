@@ -27,8 +27,6 @@ steps:
     snapshot_download(model, cache_dir='/workspace/hf-cache')
     print('Download complete.')
     "
-    echo '=== Cache structure after download ==='
-    find /workspace/hf-cache -maxdepth 5 | sort | head -60
 
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
   id: 'upload'
@@ -38,9 +36,11 @@ steps:
   - |
     set -euo pipefail
     # Use lowercase variable names — Cloud Build substitutes any all-caps brace patterns.
-    model_dir="hub/models--$(echo '${_MODEL}' | sed 's|/|--|g')"
-    local_dir="/workspace/hf-cache/${model_dir}"
-    dest="gs://${_BUCKET}/${model_dir}"
+    # snapshot_download(cache_dir=X) puts files at X/models--...  (no hub/ subdir).
+    # GCS must use hub/models--... to match HF_HOME=/hf-cache on Cloud Run.
+    model_slug="models--$(echo '${_MODEL}' | sed 's|/|--|g')"
+    local_dir="/workspace/hf-cache/${model_slug}"
+    dest="gs://${_BUCKET}/hub/${model_slug}"
 
     echo "=== Uploading blobs ==="
     gsutil -m cp "${local_dir}/blobs/"* "${dest}/blobs/"
