@@ -10,6 +10,7 @@ on:
       - 'Dockerfile.vllm'
       - 'pyproject.toml'
       - '.github/workflows/deploy-demo.yml'
+      - '.github/cloudbuild-cache-model.yaml'
   workflow_dispatch:
 
 # Prevent concurrent deployments on the same branch.
@@ -169,6 +170,62 @@ jobs:
           cache-from: type=gha,scope=vllm
           cache-to: type=gha,mode=max,scope=vllm
 
+  # ── Pre-cache model weights in GCS ─────────────────────────────────────────
+  #
+  # Runs a Cloud Build job to download the model from HuggingFace and upload
+  # the weight blobs + GCS FUSE symlink objects directly — bypassing FUSE so
+  # huggingface_hub's append-mode writes never touch the mount.  Skips if large
+  # blobs (>100 MB) are already present in the bucket for this model.
+  cache-model:
+    name: Pre-cache model weights in GCS
+    needs: [changes]
+    if: needs.changes.outputs.vllm == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Extract model ID from Dockerfile.vllm
+        id: model
+        run: |
+          MODEL=$(grep -oP '"vector-institute/[^"]+' Dockerfile.vllm | head -1 | tr -d '"')
+          echo "id=$MODEL" >> $GITHUB_OUTPUT
+          echo "Model: $MODEL"
+
+      - name: Check if model weights already cached
+        id: cache-check
+        run: |
+          MODEL_DIR="hub/models--$(echo '${{ steps.model.outputs.id }}' | tr '/' '--')"
+          LARGE=$(gsutil ls -l "gs://${{ env.MODEL_CACHE_BUCKET }}/${MODEL_DIR}/blobs/" 2>/dev/null \
+            | awk '$1 > 104857600 { count++ } END { print count+0 }')
+          echo "large_blobs=$LARGE" >> $GITHUB_OUTPUT
+          if [ "$LARGE" -gt 0 ]; then
+            echo "✓ Model already cached ($LARGE large blob(s)). Skipping Cloud Build."
+          else
+            echo "✗ No large blobs found — will download and cache via Cloud Build."
+          fi
+
+      - name: Cache model weights via Cloud Build
+        if: steps.cache-check.outputs.large_blobs == '0'
+        run: |
+          MODEL="${{ steps.model.outputs.id }}"
+          gcloud builds submit --no-source \
+            --project=${{ env.PROJECT_ID }} \
+            --substitutions="_MODEL=${MODEL},_BUCKET=${{ env.MODEL_CACHE_BUCKET }}" \
+            --config=.github/cloudbuild-cache-model.yaml
+
   # ── Deploy vLLM to Cloud Run (GPU) ─────────────────────────────────────────
   #
   # Uses a Cloud Run GPU service (NVIDIA L4) with min-instances=0 (scales to
@@ -180,8 +237,10 @@ jobs:
   #   - L4 GPU quota without zonal redundancy in us-east4
   deploy-vllm:
     name: Deploy vLLM (Cloud Run GPU)
-    needs: [build-vllm]
-    if: needs.build-vllm.result == 'success'
+    needs: [build-vllm, cache-model]
+    if: |
+      needs.build-vllm.result == 'success' &&
+      (needs.cache-model.result == 'success' || needs.cache-model.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -358,7 +417,7 @@ jobs:
           | **Demo UI** | ${{ steps.deploy.outputs.url }} | Cloud Run CPU, scales to zero |
           | **vLLM API** | ${{ steps.vllm-url.outputs.url }}/v1 | Cloud Run GPU (L4), scales to zero, GCS model cache |
           | **Health** | ${{ steps.deploy.outputs.url }}/health | |
-          | **Model** | vector-institute/Qwen3-8B-UnBias-Plus-SFT | served via vLLM |
+          | **Model** | vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct | served via vLLM |
 
           ---
           *Deployed at $(date -u +"%Y-%m-%d %H:%M:%S UTC")*
