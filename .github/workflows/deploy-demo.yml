@@ -374,7 +374,7 @@ jobs:
             --timeout=900 \
             --no-cpu-throttling \
             --allow-unauthenticated \
-            --set-env-vars="VLLM_BASE_URL=${{ steps.vllm-url.outputs.url }}/v1,VLLM_MODEL_NAME=unbias-plus,MAX_INPUT_CHARS=1000,TOKENIZERS_PARALLELISM=false" \
+            --set-env-vars="VLLM_BASE_URL=${{ steps.vllm-url.outputs.url }}/v1,VLLM_MODEL_NAME=unbias-plus,MAX_INPUT_CHARS=5000,TOKENIZERS_PARALLELISM=false" \
             --quiet
 
           URL=$(gcloud run services describe ${{ env.DEMO_SERVICE }} \

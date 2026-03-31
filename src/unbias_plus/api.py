@@ -22,7 +22,6 @@ from unbias_plus.schema import BiasResult, compute_offsets
 DEMO_DIR = Path(__file__).parent / "demo"
 
 # When set, the demo app acts as a thin proxy to a remote vLLM endpoint
-
 # (OpenAI-compatible API). No local model is loaded.
 # Example: https://unbias-plus-vllm-xxxx.us-central1.run.app/v1
 VLLM_BASE_URL = os.environ.get("VLLM_BASE_URL")
