@@ -32,3 +32,4 @@ unsloth_compiled_cache/
 # macos
 *.DS_Store
 site/
+logs/

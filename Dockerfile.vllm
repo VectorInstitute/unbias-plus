@@ -1,0 +1,44 @@
+# ============================================================
+# UnBias Plus vLLM Inference Server — GPU Cloud Run Service
+# Base: vllm/vllm-openai (OpenAI-compatible API server)
+# Model: vector-institute/Qwen3-8B-UnBias-Plus-SFT
+# GPU: NVIDIA L4 (23 GB VRAM — fits Qwen3-8B in BF16 ~18 GB)
+#
+# Exposes an OpenAI-compatible API at /v1 (chat/completions,
+# models, health). The demo app calls this via VLLM_BASE_URL.
+# vLLM provides continuous batching + PagedAttention for high
+# throughput under concurrent load.
+# ============================================================
+FROM vllm/vllm-openai:latest
+
+ENV HF_HOME=/hf-cache
+# Redirect the entire vLLM cache root (torch.compile cache, etc.) to the
+# GCS FUSE mount so compiled artifacts survive across cold starts.
+# VLLM_COMPILE_CACHE_DIR is not recognised by vLLM 0.17.1 — VLLM_CACHE_ROOT is.
+ENV VLLM_CACHE_ROOT=/hf-cache/vllm_cache
+ENV TOKENIZERS_PARALLELISM=false
+ENV VLLM_WORKER_MULTIPROC_METHOD=spawn
+
+# Cloud Run injects $PORT (default 8080)
+ENV PORT=8080
+EXPOSE 8080
+
+# vllm/vllm-openai ENTRYPOINT is: vllm serve
+# Model is the first positional argument; remaining are flags.
+# Port hardcoded to 8080 (Cloud Run standard — ENV PORT=8080 set above).
+#
+# Key flags:
+#   --max-model-len 8192          match the training context window
+#   --max-num-seqs 16             max concurrent sequences (L4 sweet spot)
+#   --dtype bfloat16              native Qwen3 dtype; faster than fp16 on L4
+#   --enable-chunked-prefill      improves throughput for long prompts
+CMD [ \
+    "vector-institute/Qwen3-8B-UnBias-Plus-SFT", \
+    "--served-model-name", "unbias-plus", \
+    "--port", "8080", \
+    "--host", "0.0.0.0", \
+    "--max-model-len", "8192", \
+    "--max-num-seqs", "16", \
+    "--dtype", "bfloat16", \
+    "--enable-chunked-prefill" \
+]
