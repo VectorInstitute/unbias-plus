@@ -47,29 +47,6 @@
    });
 
    // ============================================================
-   // INLINE ERROR BANNER
-   // ============================================================
-
-   function showInlineError(msg) {
-     if (!errorBannerEl) return;
-     errorBannerEl.textContent = msg;
-     errorBannerEl.classList.remove("hidden");
-     setTimeout(() => errorBannerEl.classList.add("hidden"), 8000);
-   }
-
-   // ============================================================
-   // EXAMPLE CHIPS
-   // ============================================================
-
-   document.querySelectorAll(".example-chip").forEach(chip => {
-     chip.addEventListener("click", () => {
-       inputEl.value = chip.dataset.text;
-       inputEl.dispatchEvent(new Event("input"));
-       inputEl.focus();
-     });
-   });
-
-   // ============================================================
    // CHAR COUNTER
    // ============================================================
 
@@ -191,6 +168,7 @@
      let firstTokenReceived = false;
      let accumulated = "";
      let streamingSegments = [];
+     let resultRendered = false;
 
      // Elapsed timer — updates label every second until first token arrives.
      // After 8 s of silence, shows a cold-start warning with a live counter.
@@ -230,7 +208,20 @@
 
        while (true) {
          const { done, value } = await reader.read();
-         if (done) break;
+
+
+         if (done) {
+           if (accumulated && !resultRendered) {
+             try {
+               const jsonMatch = accumulated.match(/\{[\s\S]*\}/);
+               if (jsonMatch) {
+                 const parsed = JSON.parse(jsonMatch[0]);
+                 renderResults({ ...parsed, original_text: text });
+               }
+             } catch {}
+           }
+           break;
+         }
 
          buffer += decoder.decode(value, { stream: true });
          const lines = buffer.split("\n");
@@ -257,6 +248,7 @@
              }
 
            } else if (payload.result !== undefined) {
+             resultRendered = true;
              renderResults(payload.result);
 
            } else if (payload.error !== undefined) {
