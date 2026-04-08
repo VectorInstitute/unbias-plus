@@ -172,7 +172,7 @@
        const reader  = res.body.getReader();
        const decoder = new TextDecoder();
        let buffer = "";
-       //Parse one SSE `data: ...` line (chunk boundaries and EOF flush). 
+       //Parse one SSE `data: ...` line (chunk boundaries and EOF flush).
        function consumeDataLine(line) {
          const trimmed = line.replace(/\r$/, "").trim();
          if (!trimmed.startsWith("data: ")) return;
