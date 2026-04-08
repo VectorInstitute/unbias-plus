@@ -73,6 +73,11 @@ class UnBiasModel:
             self.tokenizer.pad_token = self.tokenizer.eos_token
             self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
         self.tokenizer.padding_side = "left"
+        self.eos_token_ids = list({
+            self.tokenizer.eos_token_id,
+            self.tokenizer.convert_tokens_to_ids("<|im_end|>"),
+            self.tokenizer.convert_tokens_to_ids("<|endoftext|>"),
+        })
 
         # --- Quantization config ---
         # 4-bit quantization is opt-in via --load-in-4bit flag only.
@@ -155,7 +160,7 @@ class UnBiasModel:
                 temperature=None,  # must be None when do_sample=False
                 top_p=None,  # must be None when do_sample=False
                 pad_token_id=self.tokenizer.pad_token_id,
-                eos_token_id=self.tokenizer.eos_token_id,
+                eos_token_id=self.eos_token_ids,
             )
 
         # Decode only the new tokens — strip the input prompt.
@@ -213,7 +218,7 @@ class UnBiasModel:
             "temperature": None,
             "top_p": None,
             "pad_token_id": self.tokenizer.pad_token_id,
-            "eos_token_id": self.tokenizer.eos_token_id,
+            "eos_token_id": self.eos_token_ids,
             "streamer": streamer,
         }
 

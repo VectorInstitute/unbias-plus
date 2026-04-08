@@ -294,7 +294,11 @@ def analyze_stream(request: Request, body: AnalyzeRequest) -> StreamingResponse:
                     max_tokens=4096,
                     temperature=0,
                     stream=True,
-                    extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+                    stop=["<|im_end|>", "<|endoftext|>"],
+                    extra_body={
+                        "chat_template_kwargs": {"enable_thinking": False},
+                        "stop_token_ids": [151645, 151643],  # token ID fallback
+                    },
                 )
                 for chunk in stream:
                     token = chunk.choices[0].delta.content or ""
