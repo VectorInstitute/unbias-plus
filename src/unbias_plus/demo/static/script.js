@@ -211,17 +211,39 @@
 
 
          if (done) {
-           if (accumulated && !resultRendered) {
-             try {
-               const jsonMatch = accumulated.match(/\{[\s\S]*\}/);
-               if (jsonMatch) {
-                 const parsed = JSON.parse(jsonMatch[0]);
-                 renderResults({ ...parsed, original_text: text });
-               }
-             } catch {}
-           }
-           break;
-         }
+          // Fallback: if stream ended without a result event, parse accumulated
+          // tokens directly. Handles <think> blocks, markdown fences, and
+          // truncated JSON — mirrors the same logic as backend parser.py.
+          if (accumulated && !resultRendered) {
+            try {
+              let raw = accumulated;
+              // Step 1: strip <think>...</think>
+              if (raw.includes("</think>")) {
+                raw = raw.split("</think>").pop().trim();
+              } else if (raw.includes("<think>")) {
+                raw = "";
+              }
+              // Step 2: strip markdown fences
+              const fenced = raw.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+              if (fenced) {
+                raw = fenced[1].trim();
+              } else {
+                // Step 3: extract outermost { ... }
+                const start = raw.indexOf("{");
+                const end = raw.lastIndexOf("}");
+                if (start !== -1 && end !== -1) {
+                  raw = raw.slice(start, end + 1);
+                }
+              }
+              if (raw) {
+                const parsed = JSON.parse(raw);
+                renderResults({ ...parsed, original_text: text });
+              }
+            } catch {}
+          }
+          break;
+        }
+
 
          buffer += decoder.decode(value, { stream: true });
          const lines = buffer.split("\n");
