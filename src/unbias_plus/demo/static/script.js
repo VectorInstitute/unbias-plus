@@ -141,6 +141,7 @@
      let streamingSegments = [];
      let lastStreamedUnbiased = "";
      let resultRendered = false;
+     let streamLoadingDismissed = false;
      // Elapsed timer — updates label every second until first token arrives.
      // After 8 s of silence, shows a cold-start warning with a live counter.
      const startTime = Date.now();
@@ -200,11 +201,26 @@
            // after the full stream ends — extract the string from partial JSON so the
            // UnBiased panel fills as it streams instead of staying empty until max_tokens.
            const ub = parseUnbiasedTextField(accumulated);
-           if (ub && ub.text.length > 0 && ub.text !== lastStreamedUnbiased) {
+           const unbiasedGrew = ub && ub.text.length > 0 && ub.text !== lastStreamedUnbiased;
+           const segmentsJustAdded = newSegs.length > 0;
+           if (ub && ub.text.length > 0 && (unbiasedGrew || segmentsJustAdded)) {
              lastStreamedUnbiased = ub.text;
              resultsEl.classList.remove("hidden");
              document.querySelector(".panels")?.classList.remove("hidden");
-             unbiasedEl.innerHTML = escapeHtml(ub.text);
+             // Same green replacement marks as final renderResults — not plain escapeHtml,
+             // or highlights would only appear after the stream ends.
+             unbiasedEl.innerHTML =
+               streamingSegments.length > 0
+                 ? buildUnbiasedHTML(text, ub.text, streamingSegments)
+                 : escapeHtml(ub.text);
+           }
+           // Neutral rewrite JSON string is closed — hide spinner even if bytes
+           // still drain (server should stop early too). Button stays disabled
+           // until the stream ends or ``result`` arrives.
+           if (ub && ub.closed && !streamLoadingDismissed) {
+             streamLoadingDismissed = true;
+             clearInterval(timerInterval);
+             loadingEl.classList.add("hidden");
            }
          } else if (payload.result !== undefined) {
            resultRendered = true;
@@ -301,7 +317,7 @@
      clearInterval(timerInterval);
      coldStartRetries = 0;
      analyzeBtn.disabled = false;
-     loadingEl.classList.add("hidden");
+     if (!streamLoadingDismissed) loadingEl.classList.add("hidden");
      if (labelEl) labelEl.textContent = "Analyzing bias patterns...";
    }
    // ============================================================

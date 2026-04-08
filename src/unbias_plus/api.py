@@ -248,6 +248,31 @@ def analyze(request: Request, body: AnalyzeRequest) -> BiasResult:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+def _sse_result_line_or_none(raw_output: str, original_text: str) -> str | None:
+    """Return the final SSE ``data: {"result":...}`` line if *raw_output* is complete.
+
+    Cheap guard first (trailing ``}``), then :func:`parse_llm_output`. Used to stop
+    streaming as soon as the model has finished the JSON instead of consuming tokens
+    until ``max_tokens``.
+    """
+    if not raw_output.rstrip().endswith("}"):
+        return None
+    try:
+        result = parse_llm_output(raw_output)
+    except ValueError:
+        return None
+    segments_with_offsets = compute_offsets(original_text, result.biased_segments)
+    final = result.model_copy(
+        update={
+            "biased_segments": segments_with_offsets,
+            "original_text": original_text,
+        }
+    )
+    return (
+        "data: " + json.dumps({"result": json.loads(final.model_dump_json())}) + "\n\n"
+    )
+
+
 @app.post("/analyze/stream")
 @limiter.limit(RATE_LIMIT)
 def analyze_stream(request: Request, body: AnalyzeRequest) -> StreamingResponse:
@@ -266,6 +291,9 @@ def analyze_stream(request: Request, body: AnalyzeRequest) -> StreamingResponse:
         Server-sent events stream. Each event is a JSON object:
         - ``{"t": "<token>"}`` for each generated token.
         - ``{"result": {...}}`` as the final event with the full BiasResult.
+          Emitted as soon as the accumulated output parses as a full result
+          (typically right after the closing ``}`` of the JSON), so the stream
+          can end before ``max_tokens`` if the model finishes the object.
         - ``{"error": "<message>"}`` if inference fails.
 
     """
@@ -305,12 +333,20 @@ def analyze_stream(request: Request, body: AnalyzeRequest) -> StreamingResponse:
                     if token:
                         raw_output += token
                         yield "data: " + json.dumps({"t": token}) + "\n\n"
+                    early = _sse_result_line_or_none(raw_output, text)
+                    if early is not None:
+                        yield early
+                        return
             else:
                 # Local model streaming via HuggingFace TextIteratorStreamer.
                 assert pipe is not None
                 for token in pipe._model.generate_stream(messages):
                     raw_output += token
                     yield "data: " + json.dumps({"t": token}) + "\n\n"
+                    early = _sse_result_line_or_none(raw_output, text)
+                    if early is not None:
+                        yield early
+                        return
 
             result = parse_llm_output(raw_output)
             segments_with_offsets = compute_offsets(text, result.biased_segments)
