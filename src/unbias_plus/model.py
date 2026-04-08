@@ -73,11 +73,13 @@ class UnBiasModel:
             self.tokenizer.pad_token = self.tokenizer.eos_token
             self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
         self.tokenizer.padding_side = "left"
-        self.eos_token_ids = list({
-            self.tokenizer.eos_token_id,
-            self.tokenizer.convert_tokens_to_ids("<|im_end|>"),
-            self.tokenizer.convert_tokens_to_ids("<|endoftext|>"),
-        })
+        self.eos_token_ids = list(
+            {
+                self.tokenizer.eos_token_id,
+                self.tokenizer.convert_tokens_to_ids("<|im_end|>"),
+                self.tokenizer.convert_tokens_to_ids("<|endoftext|>"),
+            }
+        )
 
         # --- Quantization config ---
         # 4-bit quantization is opt-in via --load-in-4bit flag only.
