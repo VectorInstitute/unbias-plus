@@ -139,6 +139,7 @@
      let firstTokenReceived = false;
      let accumulated = "";
      let streamingSegments = [];
+     let lastStreamedUnbiased = "";
      let resultRendered = false;
      // Elapsed timer — updates label every second until first token arrives.
      // After 8 s of silence, shows a cold-start warning with a live counter.
@@ -194,6 +195,16 @@
            if (newSegs.length > 0) {
              streamingSegments = streamingSegments.concat(newSegs);
              renderStreamingPartial(text, streamingSegments);
+           }
+           // unbiased_text is last in the schema; the server only sends {"result":...}
+           // after the full stream ends — extract the string from partial JSON so the
+           // UnBiased panel fills as it streams instead of staying empty until max_tokens.
+           const ub = parseUnbiasedTextField(accumulated);
+           if (ub && ub.text.length > 0 && ub.text !== lastStreamedUnbiased) {
+             lastStreamedUnbiased = ub.text;
+             resultsEl.classList.remove("hidden");
+             document.querySelector(".panels")?.classList.remove("hidden");
+             unbiasedEl.innerHTML = escapeHtml(ub.text);
            }
          } else if (payload.result !== undefined) {
            resultRendered = true;
@@ -292,6 +303,61 @@
      analyzeBtn.disabled = false;
      loadingEl.classList.add("hidden");
      if (labelEl) labelEl.textContent = "Analyzing bias patterns...";
+   }
+   // ============================================================
+   // PARTIAL unbiased_text (streaming JSON string value)
+   // ============================================================
+   /**
+    * Read the JSON string value for the top-level "unbiased_text" key from partial
+    * model output. Supports \\n, \\r, \\t, \\", \\\\, and \\uXXXX inside the string.
+    *
+    * @param {string} raw
+    * @returns {{ text: string, closed: boolean } | null}
+    */
+   function parseUnbiasedTextField(raw) {
+     const key = '"unbiased_text"';
+     const k = raw.indexOf(key);
+     if (k === -1) return null;
+     let i = k + key.length;
+     while (i < raw.length && /\s/.test(raw[i])) i++;
+     if (i >= raw.length || raw[i] !== ":") return null;
+     i++;
+     while (i < raw.length && /\s/.test(raw[i])) i++;
+     if (i >= raw.length || raw[i] !== '"') return null;
+     i++;
+     let out = "";
+     while (i < raw.length) {
+       const c = raw[i];
+       if (c === '"') return { text: out, closed: true };
+       if (c === "\\") {
+         if (i + 1 >= raw.length) return { text: out, closed: false };
+         const n = raw[i + 1];
+         if (n === "u") {
+           if (i + 6 <= raw.length) {
+             const hex = raw.slice(i + 2, i + 6);
+             if (/^[0-9a-fA-F]{4}$/.test(hex)) {
+               out += String.fromCharCode(parseInt(hex, 16));
+               i += 6;
+               continue;
+             }
+           }
+           return { text: out, closed: false };
+         }
+         i += 2;
+         switch (n) {
+           case "n": out += "\n"; break;
+           case "r": out += "\r"; break;
+           case "t": out += "\t"; break;
+           case '"': out += '"'; break;
+           case "\\": out += "\\"; break;
+           default: out += n;
+         }
+         continue;
+       }
+       out += c;
+       i++;
+     }
+     return { text: out, closed: false };
    }
    // ============================================================
    // PROGRESSIVE SEGMENT PARSER
