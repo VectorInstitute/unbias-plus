@@ -172,9 +172,47 @@
        const reader  = res.body.getReader();
        const decoder = new TextDecoder();
        let buffer = "";
+       //Parse one SSE `data: ...` line (chunk boundaries and EOF flush). 
+       function consumeDataLine(line) {
+         const trimmed = line.replace(/\r$/, "").trim();
+         if (!trimmed.startsWith("data: ")) return;
+         let payload;
+         try {
+           payload = JSON.parse(trimmed.slice(6));
+         } catch {
+           return;
+         }
+         if (payload.t !== undefined) {
+           if (!firstTokenReceived) {
+             firstTokenReceived = true;
+             clearInterval(timerInterval);
+           }
+           tokenCount++;
+           accumulated += payload.t;
+           if (labelEl) labelEl.textContent = `Analyzing... (${tokenCount} tokens)`;
+           const newSegs = parseNewSegments(accumulated, streamingSegments.length, text);
+           if (newSegs.length > 0) {
+             streamingSegments = streamingSegments.concat(newSegs);
+             renderStreamingPartial(text, streamingSegments);
+           }
+         } else if (payload.result !== undefined) {
+           resultRendered = true;
+           renderResults(payload.result);
+         } else if (payload.error !== undefined) {
+           throw new Error(payload.error);
+         }
+       }
        while (true) {
          const { done, value } = await reader.read();
          if (done) {
+           // Last event may have no trailing newline and remain in `buffer`; parse it
+           // so the final `result` (unbiased_text) is not dropped.
+           if (buffer.trim()) {
+             for (const line of buffer.split("\n")) {
+               consumeDataLine(line);
+             }
+           }
+           buffer = "";
            // Fallback: if stream ended without a result event, parse accumulated
            // tokens directly. Handles <think> blocks, markdown fences, and
            // truncated JSON — mirrors the same logic as backend parser.py.
@@ -209,31 +247,9 @@
          }
          buffer += decoder.decode(value, { stream: true });
          const lines = buffer.split("\n");
-         buffer = lines.pop();
+         buffer = lines.pop() ?? "";
          for (const line of lines) {
-           if (!line.startsWith("data: ")) continue;
-           let payload;
-           try { payload = JSON.parse(line.slice(6)); } catch { continue; }
-           if (payload.t !== undefined) {
-             if (!firstTokenReceived) {
-               firstTokenReceived = true;
-               clearInterval(timerInterval);
-             }
-             tokenCount++;
-             accumulated += payload.t;
-             if (labelEl) labelEl.textContent = `Analyzing... (${tokenCount} tokens)`;
-             const newSegs = parseNewSegments(accumulated, streamingSegments.length, text);
-             if (newSegs.length > 0) {
-               streamingSegments = streamingSegments.concat(newSegs);
-               renderStreamingPartial(text, streamingSegments);
-             }
-           } else if (payload.result !== undefined) {
-             resultRendered = true;
-             renderResults(payload.result);
-             break; // stop reading stream immediately after result arrives
-           } else if (payload.error !== undefined) {
-             throw new Error(payload.error);
-           }
+           consumeDataLine(line);
          }
        }
      } catch (err) {
