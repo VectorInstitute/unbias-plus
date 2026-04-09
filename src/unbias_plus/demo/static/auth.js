@@ -101,11 +101,12 @@ async function getAuthHeaders() {
 }
 
 /* ============================================================
-   INIT — runs on index.html
+   INIT — runs only on /app (the authenticated shell)
    ============================================================ */
 
 document.addEventListener("DOMContentLoaded", async () => {
-  if (!IS_CLOUD) return; // local mode — nothing to do
+  if (!IS_CLOUD) return;                              // local mode — nothing to do
+  if (window.location.pathname !== "/app") return;   // only run on the app route
 
   // 1. Auth guard — redirect to /login if not signed in
   await requireAuth();
@@ -116,7 +117,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const headerAuth = document.getElementById("header-auth");
     const emailEl    = document.getElementById("header-user-email");
     if (headerAuth) headerAuth.classList.remove("hidden");
-    if (emailEl) emailEl.textContent = user.email.split('@')[0];
+    if (emailEl) emailEl.textContent = user.email.split("@")[0];
   }
 
   // 3. Sign out button
