@@ -142,7 +142,7 @@
       // ── Redirect if already logged in ───────────────────────
       if (client) {
         client.auth.getSession().then(({ data }) => {
-          if (data?.session) window.location.href = "/app";
+          if (data?.session) window.location.href = "/demo";
         });
       }
 
@@ -231,7 +231,7 @@
 
         signinAck.textContent = "Welcome back — let\u2019s get to work.";
         signinAck.classList.remove("hidden");
-        setTimeout(() => { window.location.href = "/app"; }, 1200);
+        setTimeout(() => { window.location.href = "/demo"; }, 1200);
       });
 
       // ── Sign Up ──────────────────────────────────────────────
@@ -259,7 +259,7 @@
         if (data.session) {
           signupAck.textContent = "Welcome to UnBias+ \u2014 your account is ready.";
           signupAck.classList.remove("hidden");
-          setTimeout(() => { window.location.href = "/app"; }, 1200);
+          setTimeout(() => { window.location.href = "/demo"; }, 1200);
         } else {
           signupAck.textContent = "Check your inbox to confirm your email before signing in.";
           signupAck.classList.remove("hidden");

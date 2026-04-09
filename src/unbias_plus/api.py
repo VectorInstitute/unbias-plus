@@ -17,7 +17,6 @@ from unbias_plus.parser import parse_llm_output
 from unbias_plus.pipeline import UnBiasPlus
 from unbias_plus.prompt import build_messages
 from unbias_plus.schema import BiasResult, compute_offsets
-from unbias_plus.supabase_client import get_supabase  # noqa: PLC0415
 
 
 DEMO_DIR = Path(__file__).parent / "demo"
@@ -164,32 +163,55 @@ if (DEMO_DIR / "static").exists():
 
 
 @app.get("/", response_class=HTMLResponse, response_model=None)
-def index() -> str:
-    """Serve the demo UI.
+def index() -> str | RedirectResponse:
+    """Cloud: redirect to /login. Local: serve index.html directly.
 
     Returns
     -------
-    str
-        HTML content of the demo page.
+    str | RedirectResponse
+        Redirect in cloud mode; raw HTML in local mode.
 
     Raises
     ------
     HTTPException
-        404 if the demo directory is not found.
+        404 if index.html is not found (local mode only).
     """
+    if VLLM_BASE_URL:
+        return RedirectResponse(url="/login")
+    html_file = DEMO_DIR / "templates" / "index.html"
+    if not html_file.exists():
+        raise HTTPException(status_code=404, detail="Demo UI not found.")
+    return html_file.read_text()
+
+
+@app.get("/demo", response_class=HTMLResponse, response_model=None)
+def demo_page() -> str | RedirectResponse:
+    """Serve the protected app page. Cloud only.
+
+    Returns
+    -------
+    str | RedirectResponse
+        index.html with injected Supabase config in cloud mode;
+        redirect to / in local mode.
+
+    Raises
+    ------
+    HTTPException
+        404 if index.html is not found.
+    """
+    if not VLLM_BASE_URL:
+        return RedirectResponse(url="/")
     html_file = DEMO_DIR / "templates" / "index.html"
     if not html_file.exists():
         raise HTTPException(status_code=404, detail="Demo UI not found.")
     html = html_file.read_text()
-    if VLLM_BASE_URL:
-        config_script = f"""<script>
+    config_script = f"""<script>
 window.__UNBIAS_CONFIG__ = {{
   supabaseUrl: "{os.environ.get("SUPABASE_URL", "")}",
   supabaseAnonKey: "{os.environ.get("SUPABASE_ANON_KEY", "")}"
 }};
 </script>"""
-        html = html.replace("</head>", config_script + "\n</head>")
-    return html
+    return html.replace("</head>", config_script + "\n</head>")
 
 
 @app.get("/login", response_class=HTMLResponse, response_model=None)
@@ -425,6 +447,8 @@ def submit_feedback(request: Request, body: FeedbackRequest) -> dict:
     """
     if not VLLM_BASE_URL:
         raise HTTPException(status_code=404, detail="Not available in local mode.")
+
+    from unbias_plus.supabase_client import get_supabase  # noqa: PLC0415
 
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):

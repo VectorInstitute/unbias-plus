@@ -101,12 +101,12 @@ async function getAuthHeaders() {
 }
 
 /* ============================================================
-   INIT — runs only on /app (the authenticated shell)
+   INIT — runs only on /demo (the protected app shell)
    ============================================================ */
 
 document.addEventListener("DOMContentLoaded", async () => {
-  if (!IS_CLOUD) return;                              // local mode — nothing to do
-  if (window.location.pathname !== "/app") return;   // only run on the app route
+  if (!IS_CLOUD) return;                             // local mode — nothing to do
+  if (window.location.pathname !== "/demo") return;  // only guard the app page
 
   // 1. Auth guard — redirect to /login if not signed in
   await requireAuth();
