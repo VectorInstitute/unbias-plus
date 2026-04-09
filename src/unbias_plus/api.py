@@ -8,7 +8,7 @@ from typing import Any, AsyncGenerator, Callable, Generator, cast
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -17,6 +17,7 @@ from unbias_plus.parser import parse_llm_output
 from unbias_plus.pipeline import UnBiasPlus
 from unbias_plus.prompt import build_messages
 from unbias_plus.schema import BiasResult, compute_offsets
+from unbias_plus.supabase_client import get_supabase  # noqa: PLC0415
 
 
 DEMO_DIR = Path(__file__).parent / "demo"
@@ -61,6 +62,17 @@ def _make_limiter() -> Any:
 
 
 limiter: Any = _make_limiter()
+
+
+class FeedbackRequest(BaseModel):
+    """Request body for the feedback endpoint."""
+
+    reaction: str  # "like" or "dislike" (required)
+    message: str = ""  # optional free-text comment
+    input_text: str = ""  # the text that was analyzed
+    rating: int | None = None  # 1–5 star rating
+    speed: str | None = None  # "too_slow" | "acceptable" | "fast"
+    accuracy: str | None = None  # "not_accurate" | "somewhat" | "very_accurate"
 
 
 class AnalyzeRequest(BaseModel):
@@ -151,7 +163,7 @@ if (DEMO_DIR / "static").exists():
     app.mount("/static", StaticFiles(directory=DEMO_DIR / "static"), name="static")
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/", response_class=HTMLResponse, response_model=None)
 def index() -> str:
     """Serve the demo UI.
 
@@ -168,7 +180,36 @@ def index() -> str:
     html_file = DEMO_DIR / "templates" / "index.html"
     if not html_file.exists():
         raise HTTPException(status_code=404, detail="Demo UI not found.")
-    return html_file.read_text()
+    html = html_file.read_text()
+    if VLLM_BASE_URL:
+        config_script = f"""<script>
+window.__UNBIAS_CONFIG__ = {{
+  supabaseUrl: "{os.environ.get("SUPABASE_URL", "")}",
+  supabaseAnonKey: "{os.environ.get("SUPABASE_ANON_KEY", "")}"
+}};
+</script>"""
+        html = html.replace("</head>", config_script + "\n</head>")
+    return html
+
+
+@app.get("/login", response_class=HTMLResponse, response_model=None)
+def login_page() -> str | RedirectResponse:
+    """Serve the login/signup page. Cloud only."""
+    if not VLLM_BASE_URL:
+        from fastapi.responses import RedirectResponse  # noqa: PLC0415
+
+        return RedirectResponse(url="/")
+    html_file = DEMO_DIR / "templates" / "login.html"
+    if not html_file.exists():
+        raise HTTPException(status_code=404, detail="Login page not found.")
+    html = html_file.read_text()
+    config_script = f"""<script>
+window.__UNBIAS_CONFIG__ = {{
+  supabaseUrl: "{os.environ.get("SUPABASE_URL", "")}",
+  supabaseAnonKey: "{os.environ.get("SUPABASE_ANON_KEY", "")}"
+}};
+</script>"""
+    return html.replace("</head>", config_script + "\n</head>")
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -374,6 +415,59 @@ def analyze_stream(request: Request, body: AnalyzeRequest) -> StreamingResponse:
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@app.post("/feedback")
+def submit_feedback(request: Request, body: FeedbackRequest) -> dict:
+    """Save user feedback (reaction + optional message) to Supabase.
+
+    Cloud only — protected by JWT auth.
+    """
+    if not VLLM_BASE_URL:
+        raise HTTPException(status_code=404, detail="Not available in local mode.")
+
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    token = auth_header.replace("Bearer ", "")
+
+    try:
+        supabase = get_supabase()
+        user_response = supabase.auth.get_user(token)
+        if user_response is None or user_response.user is None:
+            raise HTTPException(status_code=401, detail="Invalid or expired token.")
+        user_id = str(user_response.user.id)
+        email = user_response.user.email
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=401, detail="Invalid or expired token.") from e
+
+    if body.reaction not in ("like", "dislike"):
+        raise HTTPException(
+            status_code=422, detail="reaction must be 'like' or 'dislike'"
+        )
+
+    try:
+        supabase.table("feedback").insert(
+            {
+                "user_id": user_id,
+                "email": email,
+                "reaction": body.reaction,
+                "message": body.message or None,
+                "input_text": body.input_text[:500] if body.input_text else None,
+                "rating": body.rating,
+                "speed": body.speed or None,
+                "accuracy": body.accuracy or None,
+            }
+        ).execute()
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to save feedback: {e}"
+        ) from e
+
+    return {"ok": True}
 
 
 def serve(

@@ -39,6 +39,9 @@ RUN pip install --no-cache-dir \
     -e "." \
     && pip cache purge
 
+# Add these two packages for cloud auth (not in pyproject.toml intentionally)
+RUN pip install supabase PyJWT --no-cache-dir
+
 ENV HF_HOME=/app/.cache/huggingface
 ENV TOKENIZERS_PARALLELISM=false
 ENV TQDM_DISABLE=1

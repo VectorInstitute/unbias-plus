@@ -20,6 +20,7 @@
    const MAX_CHARS = 5000;
    const MAX_COLD_START_RETRIES = 10; // 10 × 5 s = 50 s window for uvicorn to start
    let coldStartRetries = 0;
+   let _activeAnalysisController = null; // AbortController for the in-flight stream
    // ============================================================
    // INLINE ERROR BANNER
    // ============================================================
@@ -130,6 +131,12 @@
        showInlineError(`Text too long. Please keep it under ${MAX_CHARS.toLocaleString()} characters.`);
        return;
      }
+     // Cancel any in-flight stream so its DOM writes don't race with this one.
+     if (_activeAnalysisController) {
+       _activeAnalysisController.abort();
+     }
+     _activeAnalysisController = new AbortController();
+     const signal = _activeAnalysisController.signal;
      analyzeBtn.disabled = true;
      resultsEl.classList.add("hidden");
      loadingEl.classList.remove("hidden");
@@ -159,11 +166,13 @@
        }
      }, 1000);
      try {
-       const res = await fetch("/analyze/stream", {
-         method: "POST",
-         headers: { "Content-Type": "application/json" },
-         body: JSON.stringify({ text }),
-       });
+      const authHeaders = typeof getAuthHeaders === "function" ? await getAuthHeaders() : {};
+      const res = await fetch("/analyze/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders },
+        body: JSON.stringify({ text }),
+        signal,
+      });
        if (!res.ok) {
          let detail = `Server error (${res.status})`;
          try { detail = (await res.json()).detail || detail; } catch {}
@@ -214,14 +223,15 @@
                  ? buildUnbiasedHTML(text, ub.text, streamingSegments)
                  : escapeHtml(ub.text);
            }
-           // Neutral rewrite JSON string is closed — hide spinner even if bytes
-           // still drain (server should stop early too). Button stays disabled
-           // until the stream ends or ``result`` arrives.
-           if (ub && ub.closed && !streamLoadingDismissed) {
-             streamLoadingDismissed = true;
-             clearInterval(timerInterval);
-             loadingEl.classList.add("hidden");
-           }
+          // Neutral rewrite JSON string is closed — hide spinner and re-enable
+          // the button immediately. The stream may still drain the final
+          // ``result`` event + EOF in the background, but the UI is done.
+          if (ub && ub.closed && !streamLoadingDismissed) {
+            streamLoadingDismissed = true;
+            clearInterval(timerInterval);
+            loadingEl.classList.add("hidden");
+            analyzeBtn.disabled = false;
+          }
          } else if (payload.result !== undefined) {
            resultRendered = true;
            renderResults(payload.result);
@@ -280,6 +290,8 @@
          }
        }
      } catch (err) {
+       // Silently discard — this stream was intentionally cancelled by a new analysis.
+       if (err.name === "AbortError") return;
        clearInterval(timerInterval);
        const elapsed = Math.floor((Date.now() - startTime) / 1000);
        // 502/503 with no tokens = uvicorn still starting behind nginx (CPU cold start ~30s).
@@ -454,12 +466,17 @@
      document.querySelector(".panels").classList.remove("hidden");
      document.querySelector(".breakdown-section").classList.remove("hidden");
      noBiasEl.classList.add("hidden");
-     renderSummary(biased_segments);
-     highlightEl.innerHTML = buildHighlightedHTML(original_text, biased_segments);
-     attachMarkTooltips(biased_segments);
-     unbiasedEl.innerHTML  = buildUnbiasedHTML(original_text, unbiased_text, biased_segments);
-     renderSegmentCards(biased_segments);
-   }
+    renderSummary(biased_segments);
+    highlightEl.innerHTML = buildHighlightedHTML(original_text, biased_segments);
+    attachMarkTooltips(biased_segments);
+    unbiasedEl.innerHTML  = buildUnbiasedHTML(original_text, unbiased_text, biased_segments);
+    renderSegmentCards(biased_segments);
+
+    // Trigger feedback popup 2.5s after results appear (cloud only)
+    if (typeof IS_CLOUD !== "undefined" && IS_CLOUD) {
+      setTimeout(() => openFeedbackPopup(original_text), 2500);
+    }
+  }
    // ============================================================
    // SUMMARY BAR
    // ============================================================
@@ -588,13 +605,183 @@
    // ============================================================
    // UNBIASED HTML BUILDER
    // ============================================================
-   function buildUnbiasedHTML(original, unbiased, segments) {
-     const replacements = segments.map(s => s.replacement).filter(Boolean);
-     let html = escapeHtmlText(unbiased);
-     replacements.forEach((rep) => {
-       if (!rep) return;
-       const escaped = escapeHtmlText(rep);
-       html = html.replace(escaped, `<mark class="replaced-green">${escaped}</mark>`);
-     });
-     return html;
-   }
+  function buildUnbiasedHTML(original, unbiased, segments) {
+    const replacements = segments.map(s => s.replacement).filter(Boolean);
+    let html = escapeHtmlText(unbiased);
+    replacements.forEach((rep) => {
+      if (!rep) return;
+      const escaped = escapeHtmlText(rep);
+      html = html.replace(escaped, `<mark class="replaced-green">${escaped}</mark>`);
+    });
+    return html;
+  }
+
+/* ============================================================
+   FEEDBACK POPUP
+   ============================================================ */
+
+let _lastAnalyzedText = "";
+let _selectedRating   = null;  // 1–5
+let _selectedSpeed    = null;  // "too_slow" | "acceptable" | "fast"
+let _selectedAccuracy = null;  // "not_accurate" | "somewhat" | "very_accurate"
+let _popupClosing     = false; // guard against double-close
+
+// ── Open ──────────────────────────────────────────────────────
+
+function openFeedbackPopup(inputText) {
+  if (typeof IS_CLOUD === "undefined" || !IS_CLOUD) return;
+  _lastAnalyzedText = inputText || "";
+
+  const overlay = document.getElementById("feedback-overlay");
+  const popup   = document.getElementById("feedback-popup");
+  if (!overlay || !popup) return;
+
+  // Reset form state
+  document.querySelectorAll(".reaction-btn").forEach(b => b.classList.remove("selected"));
+  document.querySelectorAll(".star-btn").forEach(b => _setStarFill(b, false));
+  document.querySelectorAll(".feedback-pill").forEach(b => b.classList.remove("selected"));
+  document.getElementById("feedback-message").value = "";
+  document.getElementById("feedback-char-count").textContent = "0 / 1000";
+  document.getElementById("feedback-submit-btn").disabled = true;
+  document.getElementById("feedback-ack").classList.add("hidden");
+  _selectedRating   = null;
+  _selectedSpeed    = null;
+  _selectedAccuracy = null;
+  _popupClosing     = false;
+
+  // Show elements (opacity: 0 via CSS), then animate in next frame so
+  // browser paints the initial invisible state before the transition fires.
+  overlay.classList.remove("hidden");
+  popup.classList.remove("hidden");
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      popup.classList.add("popup-enter");
+      overlay.classList.add("visible");
+    });
+  });
+}
+
+// ── Close ─────────────────────────────────────────────────────
+
+function closeFeedbackPopup() {
+  const overlay = document.getElementById("feedback-overlay");
+  const popup   = document.getElementById("feedback-popup");
+  if (!overlay || !popup || _popupClosing) return;
+  _popupClosing = true;
+
+  // Trigger CSS transitions (opacity/transform back to initial values)
+  popup.classList.remove("popup-enter");
+  overlay.classList.remove("visible");
+
+  // After transitions complete, fully remove from layout
+  setTimeout(() => {
+    overlay.classList.add("hidden");
+    popup.classList.add("hidden");
+    _popupClosing = false;
+  }, 240);
+}
+
+// ── Star rating ───────────────────────────────────────────────
+
+function _setStarFill(btn, filled) {
+  const svg = btn.querySelector("svg path");
+  if (!svg) return;
+  svg.setAttribute("fill", filled ? "#EB088A" : "none");
+  svg.setAttribute("stroke", filled ? "#EB088A" : "currentColor");
+}
+
+function _updateStars(rating) {
+  document.querySelectorAll(".star-btn").forEach(btn => {
+    const n = parseInt(btn.dataset.star, 10);
+    _setStarFill(btn, n <= rating);
+    btn.classList.toggle("selected", n <= rating);
+  });
+}
+
+document.querySelectorAll(".star-btn").forEach(btn => {
+  btn.addEventListener("mouseenter", () => {
+    const n = parseInt(btn.dataset.star, 10);
+    document.querySelectorAll(".star-btn").forEach(b => {
+      _setStarFill(b, parseInt(b.dataset.star, 10) <= n);
+    });
+  });
+  btn.addEventListener("mouseleave", () => {
+    _updateStars(_selectedRating || 0);
+  });
+  btn.addEventListener("click", () => {
+    _selectedRating = parseInt(btn.dataset.star, 10);
+    _updateStars(_selectedRating);
+  });
+});
+
+// ── Speed & Accuracy pills ────────────────────────────────────
+
+document.querySelectorAll(".feedback-pill").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const group = btn.dataset.group;
+    document.querySelectorAll(`.feedback-pill[data-group="${group}"]`)
+      .forEach(b => b.classList.remove("selected"));
+    btn.classList.add("selected");
+    if (group === "speed")    _selectedSpeed    = btn.dataset.value;
+    if (group === "accuracy") _selectedAccuracy = btn.dataset.value;
+  });
+});
+
+// ── Reaction (required — enables Submit) ─────────────────────
+
+document.querySelectorAll(".reaction-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".reaction-btn").forEach(b => b.classList.remove("selected"));
+    btn.classList.add("selected");
+    document.getElementById("feedback-submit-btn").disabled = false;
+  });
+});
+
+// ── Char counter ──────────────────────────────────────────────
+
+document.getElementById("feedback-message")?.addEventListener("input", (e) => {
+  document.getElementById("feedback-char-count").textContent = `${e.target.value.length} / 1000`;
+});
+
+// ── Close handlers ────────────────────────────────────────────
+
+document.getElementById("feedback-close")?.addEventListener("click", closeFeedbackPopup);
+document.getElementById("feedback-overlay")?.addEventListener("click", closeFeedbackPopup);
+
+// ── Manual trigger from header button ────────────────────────
+
+document.getElementById("feedback-trigger-btn")?.addEventListener("click", () => {
+  openFeedbackPopup(_lastAnalyzedText);
+});
+
+// ── Submit ────────────────────────────────────────────────────
+
+document.getElementById("feedback-submit-btn")?.addEventListener("click", async () => {
+  const selected = document.querySelector(".reaction-btn.selected");
+  if (!selected) return;
+
+  const reaction  = selected.dataset.reaction;
+  const message   = document.getElementById("feedback-message").value.trim();
+  const submitBtn = document.getElementById("feedback-submit-btn");
+
+  submitBtn.disabled = true;
+  submitBtn.querySelector(".btn-text").textContent = "Sending...";
+
+  const result = await submitFeedback({
+    reaction,
+    message,
+    inputText: _lastAnalyzedText,
+    rating:    _selectedRating,
+    speed:     _selectedSpeed,
+    accuracy:  _selectedAccuracy,
+  });
+
+  if (result.ok) {
+    document.getElementById("feedback-ack").classList.remove("hidden");
+    setTimeout(closeFeedbackPopup, 1800);
+  } else {
+    submitBtn.disabled = false;
+    submitBtn.querySelector(".btn-text").textContent = "Submit";
+    showInlineError("Could not save feedback. Please try again.");
+  }
+});

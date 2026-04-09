@@ -15,7 +15,7 @@
 - **Reasoning** — Each segment includes an explanation of why it is considered biased, so you can review and act with context.
 - **Debiasing** — Per-segment neutral replacements plus a full rewritten `unbiased_text` of the input.
 - **Structured output** — Pydantic-validated `BiasResult`: `binary_label`, `severity` (1–5), `biased_segments`, and `unbiased_text`. Use via **CLI** (`unbias-plus --text "..."`), **REST API** (FastAPI + demo UI), or **Python API** (`UnBiasPlus().analyze()`).
-- **Production-ready** — Optional 4-bit quantization and default fine-tuned model [vector-institute/Unbias-plus-Qwen2.5](https://huggingface.co/vector-institute/Unbias-plus-Qwen2.5).
+- **Production-ready** — Optional 4-bit quantization and default fine-tuned model [vector-institute/Unbias-plus-Qwen3](https://huggingface.co/vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct).
 
 ---
 
@@ -23,8 +23,8 @@
 
 Videos show how to use the **demo UI** when you run the API with `unbias-plus --serve`:
 
-- [Demo UI (silent)](https://drive.google.com/file/d/1aNh0bqeA2rTZ-uKi_cfrljo_UHP1M4Uq/view?usp=sharing)
-- [Demo UI (voiced)](https://drive.google.com/file/d/1uPiLQ5GZKQH7cBeuV2QQeituxFPC6zTK/view?usp=sharing)
+- [Demo UI (silent)](https://drive.google.com/file/d/1bZaOl9rxCu8bohjlwYId2-W7agubJxc-/view?usp=sharing)
+- [Demo UI (voiced)](https://drive.google.com/file/d/1A7_on6kN5w1uYztvmwkvG7AyBX78tEG0/view?usp=sharing)
 
 ---
 
