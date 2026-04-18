@@ -78,7 +78,7 @@ unbias-plus = "unbias_plus.cli:main"
 
 [dependency-groups]
 dev = [
-    "pytest>=8.0.0",
+    "pytest>=9.0.3",
     "pytest-cov>=4.0.0",
     "pytest-mock>=3.0.0",
     "pytest-asyncio>=0.25.2",
@@ -217,3 +217,9 @@ filterwarnings = [
 [tool.coverage.run]
 source = ["src/unbias_plus"]
 omit = ["tests/*", "*__init__.py"]
+
+# Pre-specified build metadata to allow lock file updates without CUDA
+[[tool.uv.dependency-metadata]]
+name = "flash-attn"
+version = "2.7.3"
+requires-dist = ["einops", "torch>=2.0.0"]
