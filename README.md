@@ -181,11 +181,7 @@ json_str = pipe.analyze_to_json("...")   # pretty-printed JSON string
 
 Developed by the **AI Engineering** team at the [Vector Institute](https://vectorinstitute.ai).
 
-**Research & Development**
-Shaina Raza, PhD · Ahmed Y. Radwan · Sindhuja Chaduvula
-
-**Infrastructure & Deployment**
-Amrit Krishnan
+Ahmed Y. Radwan · Amrit Krishnan · Shaina Raza, PhD
 
 
 ## Acknowledgement
@@ -198,7 +194,7 @@ This research is also supported by the European Union's Horizon Europe research 
 
 ## License
 
-Licensed under the **Apache License 2.0**. See [LICENSE](https://github.com/VectorInstitute/unbias-plus/blob/main/LICENSE.md) in the repository.
+Licensed under the **Vector Institute License**. Use is restricted to Academic Entities, Sponsors, and Partners of the Vector Institute; by accessing or using the work, you agree to be bound by the license terms. See [LICENSE](https://github.com/VectorInstitute/unbias-plus/blob/main/LICENSE.md) in the repository.
 
 ## Support
 
