@@ -59,6 +59,7 @@ dependencies = [
     "tornado>=6.5.5",
     "slowapi>=0.1.9",
     "supabase>=2.28.3",
+    "pillow>=12.2.0",
 ]
 
 [project.urls]
@@ -80,7 +81,7 @@ unbias-plus = "unbias_plus.cli:main"
 
 [dependency-groups]
 dev = [
-    "pytest>=8.0.0",
+    "pytest>=9.0.3",
     "pytest-cov>=4.0.0",
     "pytest-mock>=3.0.0",
     "pytest-asyncio>=0.25.2",
