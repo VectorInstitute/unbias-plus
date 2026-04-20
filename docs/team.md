@@ -1,9 +1,8 @@
 # Team
 Developed by the **AI Engineering** team at the [Vector Institute](https://vectorinstitute.ai).
 
-| Ahmed Y. Radwan | Sindhuja Chaduvula | Shaina Raza | Amrit Krishnan |
-|:---:|:---:|:---:|:---:|
-| Vector Institute | Vector Institute | Vector Institute | Vector Institute |
+Ahmed Y. Radwan · Amrit Krishnan · Shaina Raza, PhD
+
 
 ---
 

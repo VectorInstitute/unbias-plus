@@ -31,7 +31,8 @@ def parse_args() -> argparse.Namespace:
     input_group.add_argument(
         "--file",
         type=str,
-        help="Path to a .txt file to analyze.",
+        nargs="+",
+        help="Path(s) to .txt file(s) to analyze.",
     )
     input_group.add_argument(
         "--serve",
@@ -87,6 +88,7 @@ def main() -> None:
     --------
     $ unbias-plus --text "Women are too emotional to lead."
     $ unbias-plus --file article.txt --json
+    $ unbias-plus --file article1.txt article2.txt
     $ unbias-plus --serve --model path/to/model --port 8000
     $ unbias-plus --serve --load-in-4bit
 
@@ -109,26 +111,35 @@ def main() -> None:
         )
         sys.exit(1)
 
-    if args.file:
-        try:
-            with open(args.file) as f:
-                text = f.read()
-        except FileNotFoundError:
-            print(f"Error: file '{args.file}' not found.", file=sys.stderr)
-            sys.exit(1)
-    else:
-        text = args.text
-
     pipe = UnBiasPlus(
         model_name_or_path=args.model,
         load_in_4bit=args.load_in_4bit,
         max_new_tokens=args.max_new_tokens,
     )
 
-    if args.json:
-        print(pipe.analyze_to_json(text))
+    if args.file:
+        for idx, file_path in enumerate(args.file):
+            try:
+                with open(file_path) as f:
+                    text = f.read()
+            except FileNotFoundError:
+                print(f"Error: file '{file_path}' not found.", file=sys.stderr)
+                sys.exit(1)
+
+            if len(args.file) > 1:
+                print(f"=== {file_path} ===")
+
+            if args.json:
+                print(pipe.analyze_to_json(text))
+            else:
+                print(pipe.analyze_to_cli(text))
+
+            if idx < len(args.file) - 1:
+                print()
+    elif args.json:
+        print(pipe.analyze_to_json(args.text))
     else:
-        print(pipe.analyze_to_cli(text))
+        print(pipe.analyze_to_cli(args.text))
 
 
 if __name__ == "__main__":

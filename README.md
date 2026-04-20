@@ -194,7 +194,7 @@ This research is also supported by the European Union's Horizon Europe research 
 
 ## License
 
-Licensed under the **Vector Institute License**. Use is restricted to Academic Entities, Sponsors, and Partners of the Vector Institute; by accessing or using the work, you agree to be bound by the license terms. See [LICENSE](https://github.com/VectorInstitute/unbias-plus/blob/main/LICENSE.md) in the repository.
+Licensed under the **Vector Institute Custom License**. Use is restricted to Academic Entities, Sponsors, and Partners of the Vector Institute; by accessing or using the work, you agree to be bound by the license terms. See [LICENSE](https://github.com/VectorInstitute/unbias-plus/blob/main/LICENSE.md) in the repository.
 
 ## Support
 

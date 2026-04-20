@@ -40,7 +40,7 @@ Analyze a file and output JSON:
 unbias-plus --file article.txt --json
 ```
 
-Start the API server and demo UI (default model `vector-institute/Unbias-plus-Qwen2.5`, port 8000). The demo UI is served at the same host/port:
+Start the API server and demo UI (default model `vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct`, port 8000). The demo UI is served at the same host/port:
 
 ```bash
 unbias-plus --serve
@@ -71,7 +71,7 @@ Programmatic server start:
 
 ```python
 from unbias_plus.api import serve
-serve()  # default model vector-institute/Unbias-plus-Qwen2.5, port 8000
+serve()  # default model vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct, port 8000
 # Or: serve("path/to/model", port=8000, load_in_4bit=False)
 ```
 
@@ -82,7 +82,7 @@ serve()  # default model vector-institute/Unbias-plus-Qwen2.5, port 8000
 ```python
 from unbias_plus import UnBiasPlus, BiasResult, BiasedSegment
 
-pipe = UnBiasPlus()  # default: vector-institute/Unbias-plus-Qwen2.5 (loads in 4-bit by default)
+pipe = UnBiasPlus()  # default: vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct
 result = pipe.analyze("Women are too emotional to lead.")
 
 # Result fields

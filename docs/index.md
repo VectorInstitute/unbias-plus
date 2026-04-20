@@ -52,4 +52,4 @@ print(result.binary_label, result.unbiased_text)
 - [User Guide](user_guide.md) — Installation, CLI, REST API, Python API, and development.
 - [API Reference](api.md) — Module and class reference for `unbias_plus`.
 - [Team](team.md) — Contributors, acknowledgement, and support.
-- [License](license.md) — Apache License 2.0.
+- [License](license.md) — Vector Institute's Custom License.

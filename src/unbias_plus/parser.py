@@ -19,11 +19,12 @@ def parse_llm_output(raw_output: str) -> BiasResult:
     then validates it against the BiasResult schema.
 
     Strategies (in order):
-    1. Strip thinking block if present (Qwen3 with enable_thinking=True)
-    2. Direct JSON parse of extracted block
-    3. Fix truncated strings (LLM cut off mid-output)
-    4. Fix missing commas between JSON items
-    5. Aggressive key-by-key extraction as last resort
+    1. Fast path: direct parse of the full stripped text before any extraction
+    2. Strip thinking block if present (Qwen3 with enable_thinking=True)
+    3. Direct JSON parse of extracted block
+    4. Fix truncated strings (LLM cut off mid-output)
+    5. Fix missing commas between JSON items
+    6. Aggressive key-by-key extraction as last resort
 
     Parameters
     ----------
@@ -57,40 +58,41 @@ def parse_llm_output(raw_output: str) -> BiasResult:
     >>> result = parse_llm_output(raw)
     >>> result.binary_label
     'biased'
-
     """
-    # Strip thinking block before any JSON extraction.
-    # Works for all cases:
-    #   - Qwen3 with thinking: removes <think>...</think>, leaves JSON
-    #   - Qwen3 without thinking / any other model: no-op
     text = _strip_thinking_block(raw_output)
 
-    cleaned = _extract_json(text)
+    # Fast path: try direct parse on the full stripped text first.
+    # This catches well-formed output before any extraction logic can corrupt it.
+    data = _try_parse(text.strip())
 
-    # Step 2: Strip thinking block from the extracted text.
-    # Safe to call on any model — no-op if no thinking block present.
-    # Runs after extraction so a <think> tag hallucinated after the JSON
-    # never causes _strip_thinking_block to incorrectly empty the string.
-    text = _strip_thinking_block(cleaned)
-
-    # Strategy 1: Direct parse
-    data = _try_parse(text)
-
-    # Strategy 2: Fix truncated JSON (most common LLM failure)
     if data is None:
-        data = _try_parse(_fix_truncated_json(text))
+        cleaned = _extract_json(text)
+        # NOTE: do NOT call _strip_thinking_block again here.
+        # If the model appends a trailing "assistant<think>...</think>" after
+        # the JSON (a common turn-delimiter artifact), a second call would see
+        # the unclosed/trailing <think> tag and wipe the entire extracted string.
+        # _extract_json already stops at the first closing brace, so any trailing
+        # tags are already excluded from `cleaned`.
+        text = cleaned
 
-    # Strategy 3: Fix missing commas
-    if data is None:
-        data = _try_parse(_fix_missing_commas(text))
+        # Strategy 1: Direct parse
+        data = _try_parse(text)
 
-    # Strategy 4: Fix truncated + missing commas combined
-    if data is None:
-        data = _try_parse(_fix_missing_commas(_fix_truncated_json(text)))
+        # Strategy 2: Fix truncated JSON (most common LLM failure)
+        if data is None:
+            data = _try_parse(_fix_truncated_json(text))
 
-    # Strategy 5: Regex-based field extraction (last resort)
-    if data is None:
-        data = _extract_fields_by_regex(text)
+        # Strategy 3: Fix missing commas
+        if data is None:
+            data = _try_parse(_fix_missing_commas(text))
+
+        # Strategy 4: Fix truncated + missing commas combined
+        if data is None:
+            data = _try_parse(_fix_missing_commas(_fix_truncated_json(text)))
+
+        # Strategy 5: Regex-based field extraction (last resort)
+        if data is None:
+            data = _extract_fields_by_regex(text)
 
     if data is None:
         raise ValueError(
@@ -119,9 +121,16 @@ def parse_llm_output(raw_output: str) -> BiasResult:
 def _strip_thinking_block(raw_output: str) -> str:
     """Remove Qwen3 <think>...</think> block from model output.
 
+    Handles three cases:
+    1. Leading block: <think>...</think> before the JSON — strip and return
+       everything after </think>.
+    2. Trailing block: JSON then "assistant<think>..." turn delimiter — strip
+       from <think> onward since the JSON is already complete before it.
+    3. Unclosed leading block: model hit max_new_tokens mid-think — return
+       empty string so fallback strategies handle it gracefully.
+
     Safe to call on any model output — if no thinking block is present
-    the string is returned unchanged. Also handles the edge case where
-    the model hit max_new_tokens mid-think and never closed the tag.
+    the string is returned unchanged.
 
     Parameters
     ----------
@@ -133,18 +142,24 @@ def _strip_thinking_block(raw_output: str) -> str:
     str
         Output with thinking block removed, ready for JSON extraction.
     """
-    # Clean close: <think>...</think> followed by JSON
-    if "</think>" in raw_output:
-        return raw_output.split("</think>", 1)[-1].strip()
+    if "<think>" not in raw_output:
+        # No thinking block — return as-is (any other model)
+        return raw_output
 
-    # Unclosed thinking block: model hit max_new_tokens mid-think.
-    # Nothing after <think> will be valid JSON — return empty so
-    # fallback strategies handle it gracefully.
-    if "<think>" in raw_output:
+    think_idx = raw_output.find("<think>")
+    brace_idx = raw_output.find("{")
+
+    # Case 1 & 3: <think> appears before the JSON (or there is no JSON yet)
+    if brace_idx == -1 or think_idx < brace_idx:
+        if "</think>" in raw_output:
+            # Clean leading block: strip it and return everything after
+            return raw_output.split("</think>", 1)[-1].strip()
+        # Unclosed leading block — nothing useful follows
         return ""
 
-    # No thinking block — return as-is (any other model)
-    return raw_output
+    # Case 2: <think> appears AFTER the JSON opening brace — it is a trailing
+    # turn delimiter. Strip from <think> onward; the JSON before it is intact.
+    return raw_output[:think_idx].strip()
 
 
 def _deduplicate_segments(segments: list[dict]) -> list[dict]:
@@ -166,37 +181,31 @@ def _deduplicate_segments(segments: list[dict]) -> list[dict]:
     -------
     list[dict]
         Deduplicated list with one entry per unique original phrase.
-
     """
     seen: dict[str, dict] = {}
     for seg in segments:
         original = seg.get("original", "").strip()
         if not original:
             continue
-
         if original not in seen:
             seen[original] = dict(seg)
         else:
             merged = seen[original]
-
             # Merge bias_type — append only if not already present
             existing_types = {t.strip() for t in merged.get("bias_type", "").split("/")}
             new_type = seg.get("bias_type", "").strip()
             if new_type and new_type not in existing_types:
                 merged["bias_type"] = merged["bias_type"].strip() + " / " + new_type
-
             # Merge reasoning — append only if not already present
             existing_reasoning = merged.get("reasoning", "")
             new_reasoning = seg.get("reasoning", "").strip()
             if new_reasoning and new_reasoning not in existing_reasoning:
                 merged["reasoning"] = existing_reasoning.strip() + " " + new_reasoning
-
             # Keep highest severity
             existing_rank = SEVERITY_RANK.get(merged.get("severity", "low").lower(), 1)
             new_rank = SEVERITY_RANK.get(seg.get("severity", "low").lower(), 1)
             if new_rank > existing_rank:
                 merged["severity"] = seg["severity"]
-
     return list(seen.values())
 
 
@@ -221,31 +230,24 @@ def _remove_contained_segments(segments: list[dict]) -> list[dict]:
     -------
     list[dict]
         Filtered list with contained sub-segments removed.
-
     """
     if len(segments) <= 1:
         return segments
-
     # Sort longest original first so we always prefer the broader segment
     sorted_segs = sorted(
         segments, key=lambda s: len(s.get("original", "")), reverse=True
     )
-
     kept: list[dict] = []
     kept_originals: list[str] = []
-
     for seg in sorted_segs:
         original = seg.get("original", "").strip()
         if not original:
             continue
-
         # Check if this segment's text is a substring of any already-kept segment
         is_contained = any(original in kept_orig for kept_orig in kept_originals)
-
         if not is_contained:
             kept.append(seg)
             kept_originals.append(original)
-
     return kept
 
 
@@ -270,7 +272,9 @@ def _extract_json(raw_output: str) -> str:
 
     Handles markdown code fences and leading/trailing prose.
     Uses brace counting to stop exactly at the closing } of the
-    root JSON object — any text after is excluded.
+    first complete root JSON object — any text after (including
+    repeated copies from token-limit loops, or trailing turn
+    delimiters like "assistant<think></think>") is excluded.
 
     Parameters
     ----------
@@ -283,18 +287,19 @@ def _extract_json(raw_output: str) -> str:
     str
         Best-effort JSON string ready for parsing.
     """
-    # Strip markdown code fences (greedy to grab full block)
-    fenced = re.search(r"```(?:json)?\s*(\{.*\})\s*```", raw_output, re.DOTALL)
+    # Non-greedy match: grab the FIRST fenced block only.
+    # The original greedy `.*` would span across repeated JSON copies.
+    fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw_output, re.DOTALL)
     if fenced:
         return fenced.group(1).strip()
 
-    # Find the outermost { ... } block using brace counting
+    # Find the outermost { ... } block using brace counting.
+    # Return immediately on depth==0 so repeated output never bleeds in.
     start = raw_output.find("{")
     if start == -1:
         return raw_output.strip()
 
     depth = 0
-    last_valid_end = start
     in_string = False
     escape_next = False
 
@@ -315,13 +320,15 @@ def _extract_json(raw_output: str) -> str:
         elif ch == "}":
             depth -= 1
             if depth == 0:
-                last_valid_end = i + 1
-                break
+                # Return immediately — everything after is noise
+                # (repeated copies, trailing "assistant<think>..." etc.)
+                return raw_output[start : i + 1].strip()
             if depth < 0:
-                break
-        last_valid_end = i + 1
+                # Malformed — return what we have so far
+                return raw_output[start:i].strip()
 
-    return raw_output[start:last_valid_end].strip()
+    # Never closed — return everything from start
+    return raw_output[start:].strip()
 
 
 def _fix_truncated_json(text: str) -> str:
@@ -344,7 +351,6 @@ def _fix_truncated_json(text: str) -> str:
     stack = []
     in_string = False
     escape_next = False
-
     for ch in text:
         if escape_next:
             escape_next = False
@@ -361,13 +367,10 @@ def _fix_truncated_json(text: str) -> str:
             stack.append(ch)
         elif ch in "}]" and stack:
             stack.pop()
-
     if in_string:
         text += '"'
-
     closers = {"{": "}", "[": "]"}
     text += "".join(closers[ch] for ch in reversed(stack))
-
     return text
 
 
@@ -410,32 +413,25 @@ def _extract_fields_by_regex(raw_output: str) -> dict | None:
         Extracted fields as a dict, or None if extraction fails.
     """
     data: dict = {}
-
     m = re.search(r'"binary_label"\s*:\s*"([^"]+)"', raw_output)
     if m:
         data["binary_label"] = m.group(1)
-
     m = re.search(r'"severity"\s*:\s*(\d+)', raw_output)
     if m:
         data["severity"] = int(m.group(1))
-
     m = re.search(r'"bias_found"\s*:\s*(true|false)', raw_output, re.IGNORECASE)
     if m:
         data["bias_found"] = m.group(1).lower() == "true"
-
     m = re.search(r'"unbiased_text"\s*:\s*"(.*?)(?:"|$)', raw_output, re.DOTALL)
     if m:
         data["unbiased_text"] = m.group(1).replace('\\"', '"').strip()
-
     m = re.search(r'"biased_segments"\s*:\s*(\[.*?\])\s*[,}]', raw_output, re.DOTALL)
     if m:
         segments = _try_parse_json(m.group(1))
         data["biased_segments"] = segments if isinstance(segments, list) else []
     else:
         data["biased_segments"] = []
-
     required = {"binary_label", "severity", "bias_found", "biased_segments"}
     if required.issubset(data.keys()):
         return data
-
     return None
