@@ -163,13 +163,13 @@ if (DEMO_DIR / "static").exists():
 
 
 @app.get("/", response_class=HTMLResponse, response_model=None)
-def index() -> str | RedirectResponse:
-    """Cloud: redirect to /login. Local: serve index.html directly.
+def index() -> str | RedirectResponse | HTMLResponse:
+    """Cloud: landing page (or /login if template missing). Local: serve index.html.
 
     Returns
     -------
-    str | RedirectResponse
-        Redirect in cloud mode; raw HTML in local mode.
+    str | RedirectResponse | HTMLResponse
+        Landing HTML or redirect in cloud mode; raw HTML in local mode.
 
     Raises
     ------
@@ -177,7 +177,11 @@ def index() -> str | RedirectResponse:
         404 if index.html is not found (local mode only).
     """
     if VLLM_BASE_URL:
-        return RedirectResponse(url="/login")
+        html_file = DEMO_DIR / "templates" / "landing.html"
+        if not html_file.exists():
+            return RedirectResponse(url="/login")
+        html = html_file.read_text()
+        return HTMLResponse(content=html)
     html_file = DEMO_DIR / "templates" / "index.html"
     if not html_file.exists():
         raise HTTPException(status_code=404, detail="Demo UI not found.")

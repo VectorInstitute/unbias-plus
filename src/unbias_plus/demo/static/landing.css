@@ -1,0 +1,202 @@
+/* Landing page only — load after style.css (templates/landing.html) */
+
+html.landing-root,
+html.landing-root body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+/* Override global `main` — landing uses <main class="login-main"> */
+html.landing-root body.landing-page main.login-main {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  gap: 0;
+}
+
+/* Vector primary gradient: Magenta #EB088A → Cobalt #313CFF (animated position) */
+html.landing-root body.landing-page {
+  background: linear-gradient(
+    125deg,
+    #ffffff 0%,
+    rgba(235, 8, 138, 0.32) 22%,
+    #ffffff 42%,
+    rgba(49, 60, 255, 0.28) 65%,
+    rgba(235, 8, 138, 0.12) 88%,
+    #ffffff 100%
+  );
+  background-size: 220% 220%;
+  background-color: var(--bg);
+  animation: landing-gradient-shift 22s ease-in-out infinite;
+}
+
+@keyframes landing-gradient-shift {
+  0%   { background-position: 0% 40%; }
+  50%  { background-position: 100% 60%; }
+  100% { background-position: 0% 40%; }
+}
+
+.landing-page .noise {
+  opacity: 0.022;
+}
+
+.landing-root header .logo-tagline {
+  display: block;
+}
+
+.landing-hero {
+  text-align: center;
+  max-width: 640px;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: fadeUp 0.55s ease both;
+}
+
+.landing-headline {
+  font-family: var(--font-display);
+  font-size: clamp(36px, 5vw, 56px);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+.landing-subline {
+  font-family: var(--font-body);
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--text-2);
+  text-align: center;
+  margin: 0 0 28px;
+}
+
+/* Shrink-wrap the row so <a> cannot stretch to full hero width */
+.landing-hero .landing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  align-self: center;
+}
+
+/*
+ * Hero CTAs — same footprint as login auth-submit-btn / analyze:
+ * Open Sans 14px bold, radius-sm, 13px×24px padding; filled vs outlined only.
+ */
+body.landing-page .landing-actions > a.analyze-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  box-sizing: border-box;
+  text-decoration: none;
+  align-items: center;
+  justify-content: center;
+  padding: 13px 24px;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  border-radius: var(--radius-sm);
+}
+
+body.landing-page a.landing-cta-outline {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 13px 24px;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--text);
+  background: transparent;
+  color: var(--text);
+  text-decoration: none;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: transform 0.15s, border-color 0.15s, color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+body.landing-page a.landing-cta-outline:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-dim);
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+
+body.landing-page a.analyze-btn:hover {
+  text-decoration: none;
+}
+
+/* Nav Sign In — same outlined control as hero secondary */
+body.landing-page header .header-auth > a.landing-cta-outline {
+  flex: 0 0 auto;
+}
+
+body.landing-page a.landing-cta-outline:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(235, 8, 138, 0.12);
+}
+
+/* Footer: plain text links */
+body.landing-page .site-footer {
+  margin-top: 0;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+body.landing-page .landing-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+}
+
+body.landing-page a.landing-footer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-3);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+body.landing-page a.landing-footer-link:hover {
+  color: var(--text-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+body.landing-page a.landing-footer-link svg {
+  opacity: 0.75;
+  flex-shrink: 0;
+}
