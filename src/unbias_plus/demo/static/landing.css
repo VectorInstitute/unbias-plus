@@ -83,25 +83,32 @@ html.landing-root body.landing-page {
   margin: 0 0 28px;
 }
 
-/* Shrink-wrap the row so <a> cannot stretch to full hero width */
+/* CTA block: row of buttons, then row of text links */
 .landing-hero .landing-actions {
   display: flex;
-  flex-wrap: wrap;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 14px;
+  gap: 18px;
   width: fit-content;
   max-width: 100%;
   margin-inline: auto;
   align-self: center;
 }
 
+.landing-hero .landing-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
 /*
- * Hero CTAs — same footprint as login auth-submit-btn / analyze:
- * Open Sans 14px bold, radius-sm, 13px×24px padding; filled vs outlined only.
+ * Primary row — same footprint as login auth-submit / analyze:
+ * Open Sans 14px bold, radius-sm, 13px×24px padding.
  */
-body.landing-page .landing-actions > a.analyze-btn {
+body.landing-page .landing-actions-row > a.analyze-btn {
   flex: 0 0 auto;
   display: inline-flex;
   width: fit-content;
@@ -116,6 +123,18 @@ body.landing-page .landing-actions > a.analyze-btn {
   font-weight: 700;
   letter-spacing: 0.01em;
   border-radius: var(--radius-sm);
+}
+
+/* Right arrow (Unicode RIGHTWARDS ARROW) — slightly larger & heavier than label */
+body.landing-page .landing-actions-row .analyze-btn .btn-arrow {
+  font-size: 1.32em;
+  font-weight: 800;
+  line-height: 1;
+  display: inline-block;
+  margin-left: 0.12em;
+  position: relative;
+  top: 0.04em;
+  letter-spacing: 0;
 }
 
 body.landing-page a.landing-cta-outline {
@@ -151,52 +170,20 @@ body.landing-page a.analyze-btn:hover {
   text-decoration: none;
 }
 
-/* Nav Sign In — same outlined control as hero secondary */
-body.landing-page header .header-auth > a.landing-cta-outline {
-  flex: 0 0 auto;
+body.landing-page .analyze-btn:hover .btn-arrow {
+  transform: translateX(3px);
+}
+
+/* Second row: Docs · GitHub (typography in style.css) */
+body.landing-page .landing-actions-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
 }
 
 body.landing-page a.landing-cta-outline:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgba(235, 8, 138, 0.12);
-}
-
-/* Footer: plain text links */
-body.landing-page .site-footer {
-  margin-top: 0;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-body.landing-page .landing-footer-links {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 1.25rem;
-}
-
-body.landing-page a.landing-footer-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-family: var(--font-body);
-  font-size: 13px;
-  font-weight: 400;
-  color: var(--text-3);
-  text-decoration: none;
-  transition: color 0.15s;
-}
-
-body.landing-page a.landing-footer-link:hover {
-  color: var(--text-2);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-body.landing-page a.landing-footer-link svg {
-  opacity: 0.75;
-  flex-shrink: 0;
 }

@@ -81,6 +81,11 @@
      gap: 4px;
    }
 
+   .header-left .logo-link {
+     text-decoration: none;
+     color: inherit;
+   }
+
    .logo-tagline {
      font-family: var(--font-body);
      font-size: 13px;
@@ -1358,4 +1363,31 @@
   padding: 10px 14px;
   margin-bottom: 16px;
   animation: fadeUp 0.25s ease both;
+}
+
+/* Landing — Docs · GitHub: exact same color as .landing-subline (var(--text-2)); underline hover only */
+html.landing-root body.landing-page .landing-actions-links .landing-inline-sep {
+  color: var(--text-2);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 400;
+  user-select: none;
+}
+
+html.landing-root body.landing-page .landing-actions-links a.landing-inline-link {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--text-2);
+  text-decoration: none;
+  text-underline-offset: 0;
+  transition: color 0.15s;
+}
+
+html.landing-root body.landing-page .landing-actions-links a.landing-inline-link:hover {
+  color: var(--text-2);
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 4px;
 }
