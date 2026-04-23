@@ -229,10 +229,12 @@ jobs:
 
   # ── Deploy vLLM to Cloud Run (GPU) ─────────────────────────────────────────
   #
-  # Uses a Cloud Run GPU service (NVIDIA L4) with min-instances=0 (scales to
-  # zero when idle). Model weights are cached in GCS so cold starts load from
-  # GCS (~1-3 min) rather than downloading from HuggingFace every time.
-  # vLLM handles concurrency via continuous batching and PagedAttention.
+  # Uses a Cloud Run GPU service (NVIDIA L4) with min-instances=1 (always one
+  # warm instance). Model weights are cached in GCS so cold starts load from
+  # GCS (~7 min) rather than downloading from HuggingFace every time.
+  # vLLM handles concurrency via continuous batching and PagedAttention;
+  # containerConcurrency=16 lets each GPU instance absorb burst load before
+  # triggering a slow scale-out.
   #
   # Required GCP setup (one-time, already done):
   #   - L4 GPU quota without zonal redundancy in us-east4
@@ -272,7 +274,7 @@ jobs:
             --gpu-type=nvidia-l4 \
             --memory=32Gi \
             --cpu=8 \
-            --concurrency=4 \
+            --concurrency=16 \
             --min-instances=1 \
             --max-instances=3 \
             --timeout=3600 \
@@ -377,7 +379,7 @@ jobs:
             --timeout=900 \
             --no-cpu-throttling \
             --allow-unauthenticated \
-            --set-env-vars="VLLM_BASE_URL=${{ steps.vllm-url.outputs.url }}/v1,VLLM_MODEL_NAME=unbias-plus,MAX_INPUT_CHARS=5000,TOKENIZERS_PARALLELISM=false,SUPABASE_URL=${{ secrets.SUPABASE_URL }},SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }},SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            --set-env-vars="VLLM_BASE_URL=${{ steps.vllm-url.outputs.url }}/v1,VLLM_MODEL_NAME=unbias-plus,MAX_INPUT_CHARS=5000,TOKENIZERS_PARALLELISM=false,RATE_LIMIT=60/minute,SUPABASE_URL=${{ secrets.SUPABASE_URL }},SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }},SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
             --quiet
 
           URL=$(gcloud run services describe ${{ env.DEMO_SERVICE }} \

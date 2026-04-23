@@ -144,19 +144,21 @@
      const labelEl = document.querySelector(".loading-label");
      let tokenCount = 0;
      let firstTokenReceived = false;
+     let serverConnected = false; // true once HTTP 200 received — model is up, may just be busy
      let accumulated = "";
      let streamingSegments = [];
      let lastStreamedUnbiased = "";
      let resultRendered = false;
      let streamLoadingDismissed = false;
      // Elapsed timer — updates label every second until first token arrives.
-     // After 8 s of silence, shows a cold-start warning with a live counter.
+     // Cold-start warning only fires before HTTP 200 arrives; once connected,
+     // slow tokens mean the GPU is under load, not that the model is loading.
      const startTime = Date.now();
      const timerInterval = setInterval(() => {
        if (firstTokenReceived) return;
        const elapsed = Math.floor((Date.now() - startTime) / 1000);
        if (!labelEl) return;
-       if (elapsed < 8) {
+       if (serverConnected || elapsed < 8) {
          labelEl.textContent = "Analyzing bias patterns...";
        } else {
          labelEl.innerHTML =
@@ -180,6 +182,7 @@
          httpErr.status = res.status;
          throw httpErr;
        }
+       serverConnected = true; // model is loaded; remaining wait is GPU queue time
        const reader  = res.body.getReader();
        const decoder = new TextDecoder();
        let buffer = "";
@@ -312,7 +315,7 @@
          return; // keep button disabled, retry automatically
        }
        // GPU cold start: long wait with no tokens received.
-       const isGpuColdStart = elapsed > 8 && !firstTokenReceived;
+       const isGpuColdStart = elapsed > 8 && !firstTokenReceived && !serverConnected;
        analyzeBtn.disabled = false;
        coldStartRetries = 0;
        if (isGpuColdStart) {
