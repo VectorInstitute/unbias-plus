@@ -48,9 +48,9 @@ There is a need for a unified toolkit that can detect and neutralize bias within
 
 # Software Design
 
-UnBias-Plus is designed around two guiding principles: *accessibility*, ensuring that practitioners without programming experience can operate the toolkit directly, and *modularity*, enabling extension to new models, tasks, and deployment contexts without modification to the core pipeline. As shown in Figure 1, input text flows through prompt construction, LLM inference, structured JSON parsing, character-offset computation, and result assembly.
+UnBias-Plus is designed around two guiding principles: *accessibility*, ensuring that practitioners without programming experience can operate the toolkit directly, and *modularity*, enabling extension to new models, tasks, and deployment contexts without modification to the core pipeline. As shown in \autoref{fig:pipeline}, input text flows through prompt construction, LLM inference, structured JSON parsing, character-offset computation, and result assembly.
 
-**Interface.** UnBias-Plus deliberately separates its interfaces by user profile. For developers, the toolkit exposes three programmatic entry points over a shared pipeline implementation: a Python API, a CLI, and a REST API served via FastAPI. The CLI accepts raw text strings or plain-text files, requiring no application code. For non-technical practitioners such as journalists, educators, and content reviewers, invoking `unbias-plus --serve` launches both the `/analyze` REST endpoint and an interactive web interface simultaneously, accessible from any browser without additional configuration as shown in Figure 2. The web interface presents bias severity through color-coded highlighting and provides per-segment reasoning, surfacing the toolkit's output in a form that requires no programming expertise to interpret.
+**Interface.** UnBias-Plus deliberately separates its interfaces by user profile. For developers, the toolkit exposes three programmatic entry points over a shared pipeline implementation: a Python API, a CLI, and a REST API served via FastAPI. The CLI accepts raw text strings or plain-text files, requiring no application code. For non-technical practitioners such as journalists, educators, and content reviewers, invoking `unbias-plus --serve` launches both the `/analyze` REST endpoint and an interactive web interface simultaneously, accessible from any browser without additional configuration as shown in \autoref{fig:ui_demo}. The web interface presents bias severity through color-coded highlighting and provides per-segment reasoning, surfacing the toolkit's output in a form that requires no programming expertise to interpret.
 
 ![Pipeline architecture of UnBias-Plus. Input text flows through prompt construction, LLM inference, JSON parsing, offset computation, and result assembly.\label{fig:pipeline}](UnBias.drawio.png)
 
@@ -93,7 +93,7 @@ At the societal level, such tools can promote more equitable information dissemi
 
 UnBias-Plus targets practitioners across several domains. Editorial teams can review drafts before publication: the toolkit highlights biased phrases, explains each issue, and suggests neutral rewrites, reducing the time required for manual bias review at scale. HR and policy teams can apply the same pipeline to job postings and internal documents before wider distribution. NLP and fairness researchers can also utilize the toolkit for dataset construction and benchmarking. Developers can integrate bias detection directly into existing pipelines using the same interface.
 
-# AI Disclosure
+# AI usage disclosure
 
 ChatGPT was used for grammar and readability improvements in the paper text, and for AI-assisted code suggestions during development. All outputs were reviewed, edited, and validated by the human authors, who made all core design and architectural decisions.
 
