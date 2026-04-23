@@ -28,7 +28,7 @@ VLLM_BASE_URL = os.environ.get("VLLM_BASE_URL")
 VLLM_MODEL_NAME = os.environ.get("VLLM_MODEL_NAME", "unbias-plus")
 MAX_INPUT_CHARS = int(os.environ.get("MAX_INPUT_CHARS", "5000"))
 # Tune via RATE_LIMIT env var, e.g. "20/minute", "100/hour"
-RATE_LIMIT = os.environ.get("RATE_LIMIT", "10/minute")
+RATE_LIMIT = os.environ.get("RATE_LIMIT", "25/minute")
 
 
 def _get_client_ip(request: Request) -> str:
