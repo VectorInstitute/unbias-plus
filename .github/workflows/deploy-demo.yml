@@ -273,7 +273,7 @@ jobs:
             --memory=32Gi \
             --cpu=8 \
             --concurrency=4 \
-            --min-instances=0 \
+            --min-instances=1 \
             --max-instances=3 \
             --timeout=3600 \
             --execution-environment=gen2 \
@@ -372,7 +372,7 @@ jobs:
             --memory=2Gi \
             --cpu=2 \
             --concurrency=80 \
-            --min-instances=0 \
+            --min-instances=1 \
             --max-instances=10 \
             --timeout=900 \
             --no-cpu-throttling \
