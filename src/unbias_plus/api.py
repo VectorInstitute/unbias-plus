@@ -392,18 +392,21 @@ def analyze_stream(request: Request, body: AnalyzeRequest) -> StreamingResponse:
                     stop=["<|im_end|>", "<|endoftext|>"],
                     extra_body={
                         "chat_template_kwargs": {"enable_thinking": False},
-                        "stop_token_ids": [151645, 151643],  # token ID fallback
+                        "stop_token_ids": [151645, 151643],
                     },
                 )
-                for chunk in stream:
-                    token = chunk.choices[0].delta.content or ""
-                    if token:
-                        raw_output += token
-                        yield "data: " + json.dumps({"t": token}) + "\n\n"
-                    early = _sse_result_line_or_none(raw_output, text)
-                    if early is not None:
-                        yield early
-                        return
+                try:
+                    for chunk in stream:
+                        token = chunk.choices[0].delta.content or ""
+                        if token:
+                            raw_output += token
+                            yield "data: " + json.dumps({"t": token}) + "\n\n"
+                        early = _sse_result_line_or_none(raw_output, text)
+                        if early is not None:
+                            yield early
+                            return
+                finally:
+                    stream.close()
             else:
                 # Local model streaming via HuggingFace TextIteratorStreamer.
                 assert pipe is not None
