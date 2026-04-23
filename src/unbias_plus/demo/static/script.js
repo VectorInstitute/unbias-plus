@@ -162,9 +162,9 @@
          labelEl.textContent = "Analyzing bias patterns...";
        } else {
          labelEl.innerHTML =
-           "Cold start: loading model from GCS\u00a0\u00a0"
+           "Loading model from GCS\u00a0\u00a0"
            + "<span style='font-variant-numeric:tabular-nums;'>" + elapsed + "s</span>"
-           + "<br><span style='font-size:0.85em;opacity:0.6;'>First request after idle takes ~7 min. Hang tight.</span>";
+           + "<br><span style='font-size:0.85em;opacity:0.6;'>New GPU instance is warming up (~7 min). Hang tight.</span>";
        }
      }, 1000);
      try {
@@ -320,8 +320,8 @@
        coldStartRetries = 0;
        if (isGpuColdStart) {
          if (labelEl) labelEl.innerHTML =
-           "Connection dropped after " + elapsed + "s — model is still loading.<br>"
-           + "<span style='font-size:0.85em;opacity:0.6;'>GPU is warming up (~7 min total). Click Analyze again to reconnect.</span>";
+           "No response after " + elapsed + "s — service may be starting up or temporarily unavailable.<br>"
+           + "<span style='font-size:0.85em;opacity:0.6;'>If a new GPU instance is loading, it takes ~7 min. Click Analyze again to retry.</span>";
        } else {
          loadingEl.classList.add("hidden");
          if (labelEl) labelEl.textContent = "Analyzing bias patterns...";
