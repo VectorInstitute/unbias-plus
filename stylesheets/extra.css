@@ -1,3 +1,10 @@
+/* =============================================================================
+   unbias-plus â€” site styling
+   Layered on top of Material for MkDocs.
+   Brand: magenta #eb088a primary, teal #48c0d9 accent.
+============================================================================= */
+
+/* ---- Material brand palette ---------------------------------------------- */
 [data-md-color-primary="vector"] {
   --md-primary-fg-color: #eb088a;
   --md-primary-fg-color--light: #f252a5;
@@ -33,7 +40,7 @@
   /* Dark mode styling */
 }
 
-/* Vector logo css styling to match overrides/partial/copyright.html */
+/* ---- Footer ------------------------------------------------------------- */
 .md-footer-vector {
   display: flex;
   align-items: center;
@@ -41,8 +48,8 @@
 }
 
 .md-footer-vector img {
-  height: 24px; /* Reduce height to a fixed value */
-  width: auto; /* Maintain aspect ratio */
+  height: 24px;
+  width: auto;
   transition: opacity 0.25s;
   opacity: 0.7;
 }
@@ -51,41 +58,518 @@
   opacity: 1;
 }
 
-/* Make the inner footer grid elements distribute evenly */
 .md-footer-meta__inner {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-/* To make socials and Vector logo not stack when viewing on mobile */
 @media screen and (max-width: 76.234375em) {
   .md-footer-meta__inner.md-grid {
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
   }
-
   .md-copyright,
   .md-social {
     width: auto;
     max-width: 49%;
   }
-
-  /* Prevent margin that causes stacking */
   .md-social {
     margin: 0;
   }
 }
 
-/* Reduce margins for h2 when using grid cards */
+/* ---- Grid card spacing -------------------------------------------------- */
 .grid.cards h2 {
-  margin-top: 0; /* Remove top margin completely in cards */
-  margin-bottom: 0.5rem; /* Smaller bottom margin in cards */
+  margin-top: 0;
+  margin-bottom: 0.5rem;
 }
 
 .vector-icon {
   color: #eb088a;
   opacity: 0.7;
   margin-right: 0.2em;
+}
+
+
+/* =============================================================================
+   Page-level components used in index.md, how_it_works.md, examples.md
+============================================================================= */
+
+/* ---- Severity / fix tokens (light) -------------------------------------- */
+:root {
+  --up-high:    #b00068;
+  --up-high-bg: rgba(235, 8, 138, 0.09);
+  --up-high-bd: rgba(235, 8, 138, 0.32);
+
+  --up-med:     #b45309;
+  --up-med-bg:  rgba(217, 119, 6, 0.10);
+  --up-med-bd:  rgba(217, 119, 6, 0.30);
+
+  --up-fix:     #047857;
+  --up-fix-bg:  rgba(4, 120, 87, 0.09);
+  --up-fix-bd:  rgba(4, 120, 87, 0.30);
+
+  --up-edge:    rgba(15, 23, 42, 0.10);
+  --up-edge-2:  rgba(15, 23, 42, 0.16);
+  --up-mute:    var(--md-default-fg-color--light);
+}
+
+/* ---- Severity / fix tokens (dark) --------------------------------------- */
+[data-md-color-scheme="slate"] {
+  --up-high:    #fb7185;
+  --up-high-bg: rgba(251, 113, 133, 0.12);
+  --up-high-bd: rgba(251, 113, 133, 0.32);
+
+  --up-med:     #fbbf24;
+  --up-med-bg:  rgba(251, 191, 36, 0.10);
+  --up-med-bd:  rgba(251, 191, 36, 0.32);
+
+  --up-fix:     #34d399;
+  --up-fix-bg:  rgba(52, 211, 153, 0.12);
+  --up-fix-bd:  rgba(52, 211, 153, 0.32);
+
+  --up-edge:    rgba(255, 255, 255, 0.10);
+  --up-edge-2:  rgba(255, 255, 255, 0.18);
+}
+
+
+/* ---- Hero --------------------------------------------------------------- */
+.up-hero {
+  position: relative;
+  padding: 2.25rem 0 1.5rem;
+}
+
+.up-hero::before {
+  content: "";
+  position: absolute;
+  inset: -1.5rem -8vw auto -8vw;
+  height: 70%;
+  background:
+    radial-gradient(60% 80% at 18% 25%, rgba(235, 8, 138, 0.07), transparent 70%),
+    radial-gradient(50% 70% at 82% 60%, rgba(72, 192, 217, 0.06), transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.up-hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+.up-hero h1 {
+  font-size: clamp(2.1rem, 1.4rem + 2.6vw, 3.6rem);
+  line-height: 1.04;
+  letter-spacing: -0.022em;
+  font-weight: 800;
+  margin: 0.25rem 0 1rem;
+}
+
+.up-hero__accent {
+  color: var(--md-primary-fg-color);
+  font-weight: 800;
+}
+
+.up-hero__eyebrow {
+  display: inline-block;
+  font-size: 0.74rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--md-primary-fg-color);
+  margin-bottom: 0.6rem;
+}
+
+.up-hero__lede {
+  font-size: 1.075rem;
+  line-height: 1.6;
+  color: var(--md-default-fg-color--light);
+  max-width: 64ch;
+  margin: 0.5rem 0 1rem;
+}
+
+.up-hero__lede strong {
+  color: var(--md-default-fg-color);
+  font-weight: 700;
+}
+
+.up-hero__cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1.25rem 0 1rem;
+}
+
+.up-hero p:has(img) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 1rem;
+  align-items: center;
+}
+
+
+/* ---- Before / Neutral-rewrite diff -------------------------------------- */
+.up-diff {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 1.5rem 0 0.75rem;
+}
+
+@media (max-width: 60em) {
+  .up-diff { grid-template-columns: 1fr; }
+}
+
+.up-diff__col {
+  position: relative;
+  padding: 1.1rem 1.2rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--up-edge);
+  background: var(--md-default-bg-color);
+}
+
+.up-diff__col--before {
+  border-color: var(--up-high-bd);
+  background:
+    linear-gradient(180deg, var(--up-high-bg), transparent 70%),
+    var(--md-default-bg-color);
+}
+
+.up-diff__col--after {
+  border-color: var(--up-fix-bd);
+  background:
+    linear-gradient(180deg, var(--up-fix-bg), transparent 70%),
+    var(--md-default-bg-color);
+}
+
+/* Reset Material's blockquote chrome inside diff cols */
+.up-diff__col blockquote {
+  margin: 0.6rem 0 0;
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+.up-diff__col blockquote::before { content: none; }
+.up-diff__col blockquote p {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--md-default-fg-color);
+}
+
+.up-diff__label {
+  display: inline-block;
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+}
+.up-diff__label--before {
+  color: var(--up-high);
+  background: var(--up-high-bg);
+}
+.up-diff__label--after {
+  color: var(--up-fix);
+  background: var(--up-fix-bg);
+}
+
+
+/* ---- Inline phrase markers (used inside diff + examples) ---------------- */
+.up-bias,
+.up-fix {
+  border-radius: 3px;
+  padding: 0.04em 0.22em;
+  text-decoration: none;
+}
+
+.up-bias { background: var(--up-med-bg);  box-shadow: inset 0 -2px 0 var(--up-med-bd);  }
+.up-bias--high   { background: var(--up-high-bg); box-shadow: inset 0 -2px 0 var(--up-high-bd); }
+.up-bias--medium { background: var(--up-med-bg);  box-shadow: inset 0 -2px 0 var(--up-med-bd);  }
+.up-fix          { background: var(--up-fix-bg);  box-shadow: inset 0 -2px 0 var(--up-fix-bd);  }
+
+
+/* ---- Pills + segment rationales ----------------------------------------- */
+.up-pill {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  margin-right: 0.5rem;
+  border: 1px solid var(--up-edge);
+  background: var(--md-default-bg-color);
+  color: var(--md-default-fg-color--light);
+  vertical-align: 0.05em;
+}
+.up-pill--high {
+  color: var(--up-high);
+  background: var(--up-high-bg);
+  border-color: var(--up-high-bd);
+}
+.up-pill--medium {
+  color: var(--up-med);
+  background: var(--up-med-bg);
+  border-color: var(--up-med-bd);
+}
+
+.up-segments {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0.5rem 0 0.25rem;
+  padding-top: 0.25rem;
+}
+.up-segments p {
+  margin: 0;
+  font-size: 0.93rem;
+  line-height: 1.55;
+  color: var(--md-default-fg-color--light);
+}
+.up-segments em,
+.up-segments p em {
+  color: var(--md-default-fg-color);
+  font-style: normal;
+  font-weight: 600;
+}
+
+
+/* ---- Pillars (Detect / Explain / Rewrite) ------------------------------- */
+.up-pillars.grid.cards > ul > li {
+  position: relative;
+  border-radius: 14px;
+  border: 1px solid var(--up-edge);
+  background: var(--md-default-bg-color);
+  padding-top: 1.4rem;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+.up-pillars.grid.cards > ul > li::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  border-radius: 14px 14px 0 0;
+  background: linear-gradient(
+    90deg,
+    var(--md-primary-fg-color),
+    var(--md-accent-fg-color)
+  );
+  opacity: 0.55;
+  transition: opacity 0.18s ease;
+}
+.up-pillars.grid.cards > ul > li:hover {
+  transform: translateY(-2px);
+  border-color: var(--up-edge-2);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+}
+[data-md-color-scheme="slate"] .up-pillars.grid.cards > ul > li:hover {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+.up-pillars.grid.cards > ul > li:hover::before { opacity: 1; }
+
+.up-pillar-icon {
+  color: var(--md-primary-fg-color);
+  font-size: 1.4rem;
+  margin-right: 0.35em;
+  vertical-align: -0.12em;
+}
+
+
+/* ---- Flow (vertical timeline in how_it_works.md) ----------------------- */
+.up-flow {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.1rem;
+  margin: 1.5rem 0 1.75rem;
+  padding-left: 1.75rem;
+}
+
+/* The vertical rail */
+.up-flow::before {
+  content: "";
+  position: absolute;
+  left: 0.4rem;
+  top: 0.55rem;
+  bottom: 0.55rem;
+  width: 1.5px;
+  background: var(--up-edge);
+}
+
+.up-flow__step {
+  position: relative;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--md-default-fg-color--light);
+}
+
+/* Step dot, sits on the rail */
+.up-flow__step::before {
+  content: "";
+  position: absolute;
+  left: -1.55rem;
+  top: 0.45rem;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--md-default-bg-color);
+  border: 1.5px solid var(--up-edge-2);
+  box-sizing: border-box;
+}
+
+/* Output step â€” filled magenta dot, slightly larger */
+.up-flow__step--out::before {
+  background: var(--md-primary-fg-color);
+  border-color: var(--md-primary-fg-color);
+  width: 0.7rem;
+  height: 0.7rem;
+  left: -1.625rem;
+  top: 0.4rem;
+}
+
+.up-flow__title {
+  display: block;
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: -0.005em;
+  color: var(--md-default-fg-color);
+  margin-bottom: 0.2rem;
+}
+
+.up-flow__step--out .up-flow__title {
+  color: var(--md-primary-fg-color);
+}
+
+.up-flow__step p {
+  margin: 0;
+}
+
+/* Inline â†’ arrows in the markdown become invisible â€” the rail does this job */
+.up-flow__arrow {
+  display: none;
+}
+
+
+/* ---- Entry-points triptych (CLI / REST / Python) ------------------------ */
+.up-entry {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin: 1.25rem 0;
+}
+@media (max-width: 60em) {
+  .up-entry { grid-template-columns: 1fr; }
+}
+
+.up-entry__col {
+  border-left: 3px solid var(--md-primary-fg-color);
+  padding: 0.7rem 1rem;
+  background: var(--md-code-bg-color);
+  border-radius: 0 10px 10px 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+[data-md-color-scheme="default"] .up-entry__col {
+  background: rgba(15, 23, 42, 0.03);
+}
+
+.up-entry__col code {
+  background: transparent;
+  padding: 0;
+  font-size: 0.86em;
+}
+
+.up-entry__title {
+  display: block;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--md-default-fg-color);
+  margin-bottom: 0.3rem;
+}
+
+
+/* ---- Examples gallery (examples.md) ------------------------------------- */
+.up-example {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 1.5rem 0 0.5rem;
+}
+@media (max-width: 60em) {
+  .up-example { grid-template-columns: 1fr; }
+}
+
+.up-example__before,
+.up-example__after {
+  border: 1px solid var(--up-edge);
+  border-radius: 10px;
+  padding: 1rem 1.1rem 0.9rem;
+  background: var(--md-default-bg-color);
+}
+.up-example__before {
+  border-color: var(--up-high-bd);
+  background:
+    linear-gradient(180deg, var(--up-high-bg), transparent 70%),
+    var(--md-default-bg-color);
+}
+.up-example__after {
+  border-color: var(--up-fix-bd);
+  background:
+    linear-gradient(180deg, var(--up-fix-bg), transparent 70%),
+    var(--md-default-bg-color);
+}
+
+.up-example__before p,
+.up-example__after p {
+  margin: 0.4rem 0 0;
+  font-size: 0.98rem;
+  line-height: 1.55;
+}
+
+.up-example__tag {
+  display: inline-block;
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  color: var(--up-high);
+  background: var(--up-high-bg);
+  margin-bottom: 0.25rem;
+}
+.up-example__tag--green {
+  color: var(--up-fix);
+  background: var(--up-fix-bg);
+}
+
+.up-example__segs {
+  margin: 0.5rem 0 1.5rem;
+}
+.up-example__segs table {
+  width: 100%;
+  font-size: 0.92rem;
+}
+
+
+/* ---- Polish: hero badges row -------------------------------------------- */
+.up-hero img[alt^="PyPI"],
+.up-hero img[alt^="Open"],
+.up-hero img[alt^="License"] {
+  vertical-align: middle;
+}
+
+/* Tighten the rule below the hero so the diff doesn't feel detached */
+.up-hero + hr,
+.up-hero ~ hr:first-of-type {
+  margin-top: 1.25rem;
 }
