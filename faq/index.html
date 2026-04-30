@@ -866,47 +866,47 @@
 
 
 <h1 id="faq">FAQ<a class="headerlink" href="#faq" title="Permanent link">&para;</a></h1>
-<p>Common questions about how UnBias-Plus works, what it does and doesn't do, and how to use it safely. For technical details, see <a href="../how_it_works/">How it works</a>; for installation and usage, see the <a href="../user_guide/">User Guide</a>.</p>
+<p>Common questions about how UnBias-Plus works, what it does and does not do, and how to use it safely. For technical details, see <a href="../how_it_works/">How it works</a>. For installation and usage, see the <a href="../user_guide/">User Guide</a>.</p>
 <hr />
 <h2 id="data-privacy">Data privacy<a class="headerlink" href="#data-privacy" title="Permanent link">&para;</a></h2>
 <h3 id="what-happens-to-text-i-submit-through-the-demo">What happens to text I submit through the demo?<a class="headerlink" href="#what-happens-to-text-i-submit-through-the-demo" title="Permanent link">&para;</a></h3>
-<p>Nothing is stored or shared. Text submitted through the <a href="https://unbias-plus.vectorinstitute.ai/">live demo</a> is processed in real time and discarded immediately after analysis. We don't retain submissions, review them, or use them to train our models. No account, login, or personal information is required.</p>
-<p>For sensitive or unpublished material, we recommend self-hosting the open-source Python package — it runs entirely on your own machine and no data ever leaves your device. See the <a href="../user_guide/">User Guide</a> for installation.</p>
+<p>Nothing is stored or shared. Text submitted through the <a href="https://unbias-plus.vectorinstitute.ai/">live demo</a> is processed in real time and discarded immediately after analysis. Submissions are not retained, reviewed, or used to train the models. No account, login, or personal information is required.</p>
+<p>For sensitive or unpublished material, we recommend self-hosting the open-source Python package. It runs entirely on your own machine, and no data leaves your device. See the <a href="../user_guide/">User Guide</a> for installation.</p>
 <hr />
 <h2 id="about-unbias-plus">About UnBias-Plus<a class="headerlink" href="#about-unbias-plus" title="Permanent link">&para;</a></h2>
 <h3 id="what-kinds-of-bias-does-unbias-plus-detect">What kinds of bias does UnBias-Plus detect?<a class="headerlink" href="#what-kinds-of-bias-does-unbias-plus-detect" title="Permanent link">&para;</a></h3>
 <p>UnBias-Plus identifies several categories of biased language:</p>
 <ul>
-<li><strong>Loaded language</strong> — words with strong emotional connotations</li>
-<li><strong>Dehumanizing framing</strong> — language that strips dignity from groups</li>
-<li><strong>False generalizations</strong> — sweeping statements like <em>"they always"</em> or <em>"all of them"</em></li>
-<li><strong>Framing bias</strong> — selective wording that implies a viewpoint</li>
-<li><strong>Euphemism / dysphemism</strong> — softening or hardening language to shape perception</li>
-<li><strong>Politically charged terminology</strong> — labels used to provoke rather than describe</li>
-<li><strong>Sensationalism</strong> — exaggerated language meant to trigger emotional reactions</li>
+<li><strong>Loaded language</strong> &mdash; words with strong emotional connotations</li>
+<li><strong>Dehumanizing framing</strong> &mdash; language that strips dignity from groups</li>
+<li><strong>False generalizations</strong> &mdash; sweeping statements like <em>"they always"</em> or <em>"all of them"</em></li>
+<li><strong>Framing bias</strong> &mdash; selective wording that implies a viewpoint</li>
+<li><strong>Euphemism and dysphemism</strong> &mdash; softening or hardening language to shape perception</li>
+<li><strong>Politically charged terminology</strong> &mdash; labels used to provoke rather than describe</li>
+<li><strong>Sensationalism</strong> &mdash; exaggerated language meant to trigger emotional reactions</li>
 </ul>
-<p>Each flagged segment is rated by severity (low, medium, or high) and accompanied by a short explanation. The model was trained primarily on English news articles and works best on journalistic text — it surfaces patterns like gender bias, racial stereotypes, hiring language, and workplace framing. Bias is context-dependent, so results should always be reviewed by a human.</p>
+<p>Each flagged segment is rated by severity (low, medium, or high) and accompanied by a short explanation. The model was trained primarily on English news articles and works best on journalistic text, where it surfaces patterns such as gender bias, racial stereotypes, hiring language, and workplace framing. Bias is context-dependent, so results should always be reviewed by a human.</p>
 <h3 id="how-does-unbias-plus-decide-whether-something-is-biased">How does UnBias-Plus decide whether something is biased?<a class="headerlink" href="#how-does-unbias-plus-decide-whether-something-is-biased" title="Permanent link">&para;</a></h3>
-<p>UnBias-Plus is built on language models fine-tuned on news data, with bias annotations reviewed through multiple human-in-the-loop iterations. For each piece of text, the model identifies specific phrases showing signs of bias, classifies the bias type, assigns a severity rating, and provides a short explanation alongside a neutral rewrite.</p>
-<p>Bias is subjective and context-dependent, so results should be treated as indicative rather than definitive. UnBias-Plus is designed to support editorial judgment, not replace it. For the full pipeline and methodology, see <a href="../how_it_works/">How it works</a>.</p>
+<p>UnBias-Plus is built on a language model fine-tuned on news data, with bias annotations refined through multiple human-in-the-loop iterations. For each piece of text, the model identifies specific phrases showing signs of bias, classifies the bias type, assigns a severity rating, and provides a short explanation alongside a neutral rewrite.</p>
+<p>Because bias is subjective and context-dependent, results should be treated as indicative rather than definitive. UnBias-Plus is designed to support editorial judgment, not replace it. For the full pipeline and methodology, see <a href="../how_it_works/">How it works</a>.</p>
 <h3 id="what-data-is-the-model-trained-on">What data is the model trained on?<a class="headerlink" href="#what-data-is-the-model-trained-on" title="Permanent link">&para;</a></h3>
-<p>UnBias-Plus is fine-tuned on a curated dataset of English-language news articles assembled by the Vector Institute. Each article in the training set includes expert-annotated bias labels, segment-level annotations identifying biased phrases, and human-written neutral rewrites that preserve original meaning.</p>
-<p>The dataset spans a broad range of news topics and outlets to reflect real-world reporting styles, and was reviewed through multiple human-in-the-loop iterations to improve labeling consistency. Because the training data is news-focused and primarily English, the model performs best on journalistic text. For more details on the dataset and model, see the <a href="https://huggingface.co/vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct">model card on Hugging Face</a>.</p>
+<p>UnBias-Plus is fine-tuned on a curated dataset of English-language news articles assembled by the Vector Institute. Each article in the training set includes expert-annotated bias labels, segment-level annotations identifying biased phrases, and human-written neutral rewrites that preserve the original meaning.</p>
+<p>The dataset spans a broad range of news topics and outlets to reflect real-world reporting styles, and was reviewed through multiple human-in-the-loop iterations to improve labeling consistency. Because the training data is news-focused and primarily English, the model performs best on journalistic text. For dataset and model details, see the <a href="https://huggingface.co/vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct">model card on Hugging Face</a>.</p>
 <h3 id="does-unbias-plus-detect-misinformation-or-ai-generated-content">Does UnBias-Plus detect misinformation or AI-generated content?<a class="headerlink" href="#does-unbias-plus-detect-misinformation-or-ai-generated-content" title="Permanent link">&para;</a></h3>
-<p>No. UnBias-Plus focuses specifically on detecting biased language in text. It does not verify factual accuracy, fact-check claims, or identify AI-generated content. These are separate and important challenges that Vector's research community continues to work on through related projects.</p>
-<p>To stay informed about future tools — including work on misinformation detection and multimodal (audio and visual) bias analysis — follow the <a href="https://vectorinstitute.ai">Vector Institute</a>.</p>
+<p>No. UnBias-Plus focuses specifically on detecting biased language in text. It does not verify factual accuracy, fact-check claims, or identify AI-generated content. These are separate and important challenges that the Vector research community continues to work on through related projects.</p>
+<p>To stay informed about future tools, including work on misinformation detection and multimodal (audio and visual) bias analysis, follow the <a href="https://vectorinstitute.ai">Vector Institute</a>.</p>
 <h3 id="does-unbias-plus-work-in-french-or-other-languages">Does UnBias-Plus work in French or other languages?<a class="headerlink" href="#does-unbias-plus-work-in-french-or-other-languages" title="Permanent link">&para;</a></h3>
 <p>UnBias-Plus is currently trained and optimized for English text. It may produce results when given content in other languages, but accuracy and reliability cannot be guaranteed outside of English. Expanding to French and additional languages is on the roadmap, and feedback from multilingual users is welcome.</p>
 <h3 id="is-there-a-word-or-character-limit">Is there a word or character limit?<a class="headerlink" href="#is-there-a-word-or-character-limit" title="Permanent link">&para;</a></h3>
-<p>The web demo accepts up to 1,000 characters per submission, which is suitable for short passages, paragraphs, or excerpts. The model performs best on news-style articles under 5,000 characters.</p>
+<p>The web demo accepts up to 5,000 characters per submission, which is suitable for short articles, paragraphs, or excerpts. The model performs best on news-style articles under that limit.</p>
 <p>For longer documents, full articles, or batch processing, install the open-source package directly. It supports the command line, a Python API, and a self-hosted REST API, giving you full control over input length and processing volume. See the <a href="../user_guide/">User Guide</a> to get started.</p>
 <hr />
 <h2 id="open-source-code">Open-source code<a class="headerlink" href="#open-source-code" title="Permanent link">&para;</a></h2>
 <h3 id="where-can-i-access-the-code">Where can I access the code?<a class="headerlink" href="#where-can-i-access-the-code" title="Permanent link">&para;</a></h3>
-<p>The full UnBias-Plus codebase is available on <a href="https://github.com/VectorInstitute/unbias-plus">GitHub</a>. It is built for researchers, developers, journalists, and educators who want to integrate bias detection into newsroom tools, academic research, content platforms, hiring reviews, or media literacy projects. The tool can be used as a Python package, a self-hosted REST API, or a command-line interface — see the <a href="../user_guide/">User Guide</a> for installation and usage.</p>
+<p>The full UnBias-Plus codebase is available on <a href="https://github.com/VectorInstitute/unbias-plus">GitHub</a>. It is built for researchers, developers, journalists, and educators who want to integrate bias detection into newsroom tools, academic research, content platforms, hiring reviews, or media literacy projects. The tool can be used as a Python package, a self-hosted REST API, or a command-line interface. See the <a href="../user_guide/">User Guide</a> for installation and usage.</p>
 <div class="admonition note">
 <p class="admonition-title">On third-party use</p>
-<p>UnBias-Plus is released as open source in the spirit of transparency and collaborative improvement. Vector Institute cannot control downstream use of the code, and any modified or third-party versions are not affiliated with, or endorsed by, the Vector Institute.</p>
+<p>UnBias-Plus is released as open source in the spirit of transparency and collaborative improvement. The Vector Institute cannot control downstream use of the code, and any modified or third-party versions are not affiliated with, nor endorsed by, the Vector Institute.</p>
 </div>
 
 

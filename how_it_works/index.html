@@ -466,10 +466,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-the-model-is-actually-told-to-do" class="md-nav__link">
+  <a href="#what-the-model-is-asked-to-do" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What the model is actually told to do
+        What the model is asked to do
       
     </span>
   </a>
@@ -658,10 +658,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-the-model-is-actually-told-to-do" class="md-nav__link">
+  <a href="#what-the-model-is-asked-to-do" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What the model is actually told to do
+        What the model is asked to do
       
     </span>
   </a>
@@ -744,13 +744,13 @@
 
 
 <h1 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h1>
-<p>unbias-plus is a thin pipeline around a fine-tuned language model. The interesting part isn't the model alone — it's that the model is prompted, parsed, and validated to return a <strong>structured, auditable result</strong> instead of free-form prose. This page walks through what happens between calling <code>analyze()</code> and getting a <code>BiasResult</code> back.</p>
+<p>UnBias-Plus is a thin, deliberate pipeline around a fine-tuned language model. The model isn't the interesting part on its own; what matters is that the model is prompted, parsed, and validated to return a <strong>structured, auditable result</strong> instead of free-form prose. This page walks through what happens between calling <code>analyze()</code> and getting a <code>BiasResult</code> back.</p>
 <hr />
 <h2 id="the-pipeline-at-a-glance">The pipeline at a glance<a class="headerlink" href="#the-pipeline-at-a-glance" title="Permanent link">&para;</a></h2>
 <div class="up-flow">
 <div class="up-flow__step">
 <p><strong class="up-flow__title">Input</strong></p>
-<p>Raw text — a sentence, paragraph, or full article. Passed via CLI, REST, or <code>pipe.analyze(text)</code>.</p>
+<p>Raw text &mdash; a sentence, paragraph, or full article. Passed via CLI, REST, or <code>pipe.analyze(text)</code>.</p>
 </div>
 <div class="up-flow__arrow">→</div>
 <div class="up-flow__step">
@@ -764,7 +764,7 @@
 </div>
 <div class="up-flow__arrow">→</div>
 <div class="up-flow__step">
-<p><strong class="up-flow__title">Parse &amp; validate</strong></p>
+<p><strong class="up-flow__title">Parse and validate</strong></p>
 <p>The JSON is extracted, validated with Pydantic, and character offsets are attached to each segment.</p>
 </div>
 <div class="up-flow__arrow">→</div>
@@ -774,8 +774,8 @@
 </div>
 </div>
 <hr />
-<h2 id="what-the-model-is-actually-told-to-do">What the model is actually told to do<a class="headerlink" href="#what-the-model-is-actually-told-to-do" title="Permanent link">&para;</a></h2>
-<p>The system prompt defines a tight contract. Severity scales, segment rules, output shape — all explicit, so the parsing step has something stable to verify against. A condensed view:</p>
+<h2 id="what-the-model-is-asked-to-do">What the model is asked to do<a class="headerlink" href="#what-the-model-is-asked-to-do" title="Permanent link">&para;</a></h2>
+<p>The system prompt defines a tight contract. Severity scales, segment rules, and output shape are all explicit, so the parsing step has something stable to verify against. A condensed view:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>## BIAS TYPES
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>- loaded language             : words with strong emotional connotations
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>- dehumanizing framing        : language that strips dignity from groups
@@ -799,14 +799,14 @@
 </span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>  &quot;unbiased_text&quot;: &quot;Full rewritten neutral article&quot;
 </span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>}
 </span></code></pre></div>
-<p>Two design choices follow from this:</p>
+<p>Two design choices follow from this contract:</p>
 <div class="admonition info">
 <p class="admonition-title">Exact substrings, not paraphrases</p>
-<p>The model is instructed to return the <strong>exact original substring</strong> for each biased segment. In practice, offset matching first tries direct substring lookup, then a small normalization fallback (trimmed text + quote/dash normalization). If no match is found, the segment is still returned and <code>start</code>/<code>end</code> remain <code>None</code>.</p>
+<p>The model is instructed to return the <strong>exact original substring</strong> for each biased segment. In practice, offset matching first tries direct substring lookup, then a small normalization fallback (trimmed text plus quote and dash normalization). If no match is found, the segment is still returned, and <code>start</code> and <code>end</code> remain <code>None</code>.</p>
 </div>
 <div class="admonition info">
 <p class="admonition-title">Preserve facts, change framing</p>
-<p>The rewriter is told to modify only the segments it flagged. Names, numbers, places, and quotes stay; loaded framing around them changes. The unbiased text shouldn't read as a <em>different</em> article — just a calmer one.</p>
+<p>The rewriter is instructed to modify only the segments it flagged. Names, numbers, places, and quotes stay; loaded framing around them changes. The unbiased text should not read as a different article &mdash; just a calmer one.</p>
 </div>
 <hr />
 <h2 id="the-structured-output-is-the-point">The structured output is the point<a class="headerlink" href="#the-structured-output-is-the-point" title="Permanent link">&para;</a></h2>
@@ -829,48 +829,48 @@
 </span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>    <span class="n">unbiased_text</span><span class="p">:</span> <span class="nb">str</span>              <span class="c1"># full neutral rewrite</span>
 </span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>    <span class="n">original_text</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span>
 </span></code></pre></div>
-<p>That shape is what unlocks the practical applications. With offsets and reasoning attached:</p>
+<p>That shape is what makes practical applications possible. With offsets and reasoning attached:</p>
 <ul>
-<li>A <strong>frontend</strong> can render the original text with biased phrases highlighted in place — and show the rationale on hover.</li>
+<li>A <strong>frontend</strong> can render the original text with biased phrases highlighted in place, and show the rationale on hover.</li>
 <li>A <strong>moderation queue</strong> can sort items by <code>severity</code> and route only <code>severity &gt;= 3</code> to a human reviewer.</li>
 <li>An <strong>annotation pipeline</strong> can persist segments as labeled spans for training or analysis.</li>
-<li>A <strong>diff view</strong> can show the original and the rewritten text side by side, segment-by-segment.</li>
+<li>A <strong>diff view</strong> can show the original and the rewritten text side by side, segment by segment.</li>
 </ul>
-<p>A free-form "this text is biased because…" paragraph from a stock LLM doesn't enable any of that without bespoke parsing.</p>
+<p>A free-form "this text is biased because..." paragraph from a stock LLM does not enable any of that without bespoke parsing.</p>
 <hr />
 <h2 id="how-offsets-get-computed">How offsets get computed<a class="headerlink" href="#how-offsets-get-computed" title="Permanent link">&para;</a></h2>
-<p>The model returns the biased phrase as it appeared in the input, but it doesn't return character positions. <code>schema.compute_offsets()</code> walks the original text with a cursor:</p>
+<p>The model returns the biased phrase as it appeared in the input, but it does not return character positions. <code>schema.compute_offsets()</code> walks the original text with a cursor:</p>
 <ol>
 <li>For each segment, search for the exact phrase starting from the cursor's current position.</li>
-<li>If found, attach <code>start</code> and <code>end</code> and advance the cursor past <code>end</code>. This handles repeated phrases — <em>"always"</em> appearing twice gets two distinct offset pairs in order of appearance.</li>
-<li>If not found from the cursor, fall back to a search from position 0. If still missing, log a warning and leave offsets unset (the segment is still returned).</li>
+<li>If found, attach <code>start</code> and <code>end</code> and advance the cursor past <code>end</code>. This handles repeated phrases: <em>"always"</em> appearing twice gets two distinct offset pairs in order of appearance.</li>
+<li>If not found from the cursor, fall back to a search from position <code>0</code>. If still missing, log a warning and leave offsets unset (the segment is still returned).</li>
 <li>After processing all segments, sort by <code>start</code>.</li>
 </ol>
-<p>The result: a list you can iterate in reading order, with positions that map cleanly onto the original text for highlighting.</p>
+<p>The result is a list you can iterate in reading order, with positions that map cleanly onto the original text for highlighting.</p>
 <hr />
 <h2 id="three-entry-points-one-pipeline">Three entry points, one pipeline<a class="headerlink" href="#three-entry-points-one-pipeline" title="Permanent link">&para;</a></h2>
 <div class="up-entry">
 <div class="up-entry__col">
 <p><strong class="up-entry__title">CLI</strong></p>
-<p><code>unbias-plus --text "…"</code>, <code>--file</code>, <code>--serve</code> — quick experiments, scripts, batch runs.</p>
+<p><code>unbias-plus --text "..."</code>, <code>--file</code>, <code>--serve</code> &mdash; quick experiments, scripts, batch runs.</p>
 </div>
 <div class="up-entry__col">
 <p><strong class="up-entry__title">REST API</strong></p>
-<p><code>unbias-plus --serve</code> — <code>POST /analyze</code>, <code>GET /health</code>, plus a bundled demo UI.</p>
+<p><code>unbias-plus --serve</code> &mdash; <code>POST /analyze</code>, <code>GET /health</code>, plus a bundled demo UI.</p>
 </div>
 <div class="up-entry__col">
 <p><strong class="up-entry__title">Python API</strong></p>
-<p><code>from unbias_plus import UnBiasPlus</code> — embed in pipelines, notebooks, services.</p>
+<p><code>from unbias_plus import UnBiasPlus</code> &mdash; embed in pipelines, notebooks, services.</p>
 </div>
 </div>
-<p>All three expose the same <code>BiasResult</code> shape. In local mode, CLI and Python call <code>pipeline.UnBiasPlus.analyze()</code> directly; REST uses the same local pipeline unless <code>VLLM_BASE_URL</code> is set (remote proxy mode).</p>
+<p>All three expose the same <code>BiasResult</code> shape. In local mode, CLI and Python call <code>pipeline.UnBiasPlus.analyze()</code> directly. REST uses the same local pipeline unless <code>VLLM_BASE_URL</code> is set, in which case it operates as a remote proxy.</p>
 <hr />
 <h2 id="performance-notes">Performance notes<a class="headerlink" href="#performance-notes" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Default model</strong>: <a href="https://huggingface.co/vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct"><code>vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct</code></a> — fine-tuned from Qwen3-8B for this task.</li>
-<li><strong>VRAM</strong>: roughly 16 GB at BF16; pass <code>load_in_4bit=True</code> (or <code>--load-in-4bit</code> on the CLI) to fit on smaller GPUs at the cost of some replacement quality.</li>
-<li><strong>Input limits</strong>: model context is 8,192 tokens. REST additionally enforces <code>MAX_INPUT_CHARS</code> (default <code>5000</code>, configurable via env var). CLI/Python do not enforce a fixed character cap; practical limits still come from model context and available memory.</li>
-<li><strong>CPU</strong>: supported via <code>device="cpu"</code>, but expect slow inference. GPU is recommended for any real workload.</li>
+<li><strong>Default model</strong>: <a href="https://huggingface.co/vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct"><code>vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct</code></a>, fine-tuned from Qwen3-8B for this task.</li>
+<li><strong>VRAM</strong>: roughly 16 GB at BF16. Pass <code>load_in_4bit=True</code> (or <code>--load-in-4bit</code> on the CLI) to fit on smaller GPUs, at the cost of some replacement quality.</li>
+<li><strong>Input limits</strong>: model context is 8,192 tokens. REST additionally enforces <code>MAX_INPUT_CHARS</code> (default <code>5000</code>, configurable via environment variable). CLI and Python do not enforce a fixed character cap; practical limits come from model context and available memory.</li>
+<li><strong>CPU</strong>: supported via <code>device="cpu"</code>, but inference is slow. GPU is recommended for any real workload.</li>
 </ul>
 <hr />
 <h2 id="next">Next<a class="headerlink" href="#next" title="Permanent link">&para;</a></h2>
@@ -878,7 +878,7 @@
 <ul>
 <li>
 <p><a href="../user_guide/"><strong>User Guide <span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg></span></strong></a></p>
-<p>Install and run unbias-plus locally — CLI, REST, or Python.</p>
+<p>Install and run UnBias-Plus locally &mdash; CLI, REST, or Python.</p>
 </li>
 <li>
 <p><a href="https://github.com/VectorInstitute/unbias-plus"><strong>GitHub repository <span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg></span></strong></a></p>
