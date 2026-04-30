@@ -22,11 +22,19 @@
       </a>
       <span class="logo-tagline">Detect and neutralize bias in text</span>
     </div>
-    <img
-      src="/static/Vector-Logo-FullColour_Horizontal.png"
-      alt="Vector Institute"
-      class="vector-logo"
-    />
+    <a
+      href="https://vectorinstitute.ai/"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="vector-logo-link"
+      aria-label="Visit the Vector Institute"
+    >
+      <img
+        src="/static/Vector-Logo-FullColour_Horizontal.png"
+        alt="Vector Institute"
+        class="vector-logo"
+      />
+    </a>
     <!-- Auth controls — only visible in cloud mode (auth.js hides if IS_CLOUD is false) -->
     <div class="header-auth hidden" id="header-auth">
       <span class="header-user-email" id="header-user-email"></span>
@@ -74,11 +82,13 @@
         placeholder="Paste any text here — news article, social media post, report, essay..."
         spellcheck="false"
       ></textarea>
+      <p class="disclaimer-note">
+        Because bias is subjective and context-dependent, results are indicative rather than definitive.
+      </p>
       <div class="input-footer">
         <span id="char-count" class="char-count">0 / 5000</span>
-        <span class="disclaimer-inline">⚠ Because bias is a subjective and context-dependent concept, results should be interpreted as indicative rather than definitive.</span>
         <button id="analyze-btn" class="analyze-btn">
-          <span class="btn-text">Analyze for Bias</span>
+          <span class="btn-text">Analyze for bias</span>
           <span class="btn-arrow">→</span>
         </button>
       </div>

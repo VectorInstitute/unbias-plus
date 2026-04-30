@@ -175,6 +175,52 @@ def _find_case_insensitive(text: str, phrase: str, start: int = 0) -> int:
     return text.lower().find(phrase.lower(), start)
 
 
+def _normalize_for_match(s: str) -> str:
+    """Map curly quotes and dashes to ASCII so model vs input typography still matches."""
+    return (
+        s.replace("\u201c", '"')
+        .replace("\u201d", '"')
+        .replace("\u2018", "'")
+        .replace("\u2019", "'")
+        .replace("\u2013", "-")
+        .replace("\u2014", "-")
+    )
+
+
+def _find_span_in_text(
+    original_text: str, phrase: str, cursor: int
+) -> tuple[int, int] | None:
+    """Return (start, end) exclusive end in *original_text*, or None if not found."""
+    if not phrase:
+        return None
+
+    candidates: list[str] = [phrase]
+    stripped = phrase.strip()
+    if stripped and stripped != phrase:
+        candidates.append(stripped)
+
+    for cand in candidates:
+        start = _find_case_insensitive(original_text, cand, cursor)
+        if start == -1:
+            start = _find_case_insensitive(original_text, cand, 0)
+        if start != -1:
+            return (start, start + len(cand))
+
+    norm_text = _normalize_for_match(original_text)
+    norm_phrase = _normalize_for_match(phrase)
+    if norm_text != original_text or norm_phrase != phrase:
+        for cand in (norm_phrase, norm_phrase.strip()):
+            if not cand:
+                continue
+            start = _find_case_insensitive(norm_text, cand, cursor)
+            if start == -1:
+                start = _find_case_insensitive(norm_text, cand, 0)
+            if start != -1:
+                return (start, start + len(cand))
+
+    return None
+
+
 def compute_offsets(
     original_text: str, segments: list[BiasedSegment]
 ) -> list[BiasedSegment]:
@@ -204,16 +250,13 @@ def compute_offsets(
         if not phrase:
             continue
 
-        start = _find_case_insensitive(original_text, phrase, cursor)
-        if start == -1:
-            start = _find_case_insensitive(original_text, phrase, 0)
-
-        if start == -1:
+        span = _find_span_in_text(original_text, phrase, cursor)
+        if span is None:
             logger.warning("Could not find segment in text: '%s'", phrase)
             enriched.append(seg)
             continue
 
-        end = start + len(phrase)
+        start, end = span
         enriched.append(seg.model_copy(update={"start": start, "end": end}))
         cursor = end
 

@@ -2,6 +2,7 @@
 
 import json
 import os
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, AsyncGenerator, Callable, Generator, cast
@@ -129,14 +130,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             model_name_or_path=model_path,
             load_in_4bit=load_in_4bit,
         )
-        # Warmup: run a short dummy inference to compile CUDA kernels so the
-        # first real user request doesn't pay the JIT compilation penalty (~60s).
-        print("Warming up CUDA kernels...")
-        try:
-            app.state.pipe.analyze("Warmup.")
-            print("Warmup complete.")
-        except Exception:
-            pass  # warmup failure is non-fatal
+        # Warmup in a background thread so startup does not block on the first
+        # full forward pass (can take minutes on cold CUDA/Torch). The server
+        # becomes reachable immediately; first real request may still pay JIT cost
+        # if it races ahead of warmup (rare for interactive demo use).
+        pipe_ref = app.state.pipe
+
+        def _cuda_warmup() -> None:
+            print("Warming up CUDA kernels (background)...")
+            try:
+                pipe_ref.analyze("Warmup.")
+                print("Warmup complete.")
+            except Exception:
+                pass  # warmup failure is non-fatal
+
+        threading.Thread(target=_cuda_warmup, daemon=True).start()
 
     yield
     app.state.pipe = None
