@@ -19,7 +19,7 @@ hide:
 
 [![PyPI version](https://img.shields.io/pypi/v/unbias-plus.svg)](https://pypi.org/project/unbias-plus/)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1FlUSeFFXr3VeADiStOIzX7hOV6IlliC8?usp=sharing)
-[![License](https://img.shields.io/github/license/VectorInstitute/unbias-plus)](https://github.com/VectorInstitute/unbias-plus/blob/main/LICENSE.md)
+[![License: Vector Institute](https://img.shields.io/badge/License-Vector%20Institute-003049.svg)](https://github.com/VectorInstitute/unbias-plus/blob/unbias-pretrained/LICENSE.md)
 
 </div>
 
@@ -193,7 +193,7 @@ Tours of the demo UI you get when you run `unbias-plus --serve`:
 
 Shaina Raza, PhD, Ahmed Y. Radwan, and Amrit Krishnan &mdash; AI Engineering team at the [Vector Institute](https://vectorinstitute.ai).
 
-Code is licensed under [Apache 2.0](https://github.com/VectorInstitute/unbias-plus/blob/main/LICENSE.md). The toolkit is released under the [Vector Institute custom license](https://github.com/VectorInstitute/unbias-plus/blob/unbias-pretrained/LICENSE.md).
+The toolkit is released under the [Vector Institute License](https://github.com/VectorInstitute/unbias-plus/blob/unbias-pretrained/LICENSE.md).
 
 For questions, collaboration, or licensing inquiries: [shaina.raza@vectorinstitute.ai](mailto:shaina.raza@vectorinstitute.ai). For bug reports and feature requests: [GitHub Issues](https://github.com/VectorInstitute/unbias-plus/issues).
 
