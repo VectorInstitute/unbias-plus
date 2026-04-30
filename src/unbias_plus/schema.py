@@ -176,7 +176,10 @@ def _find_case_insensitive(text: str, phrase: str, start: int = 0) -> int:
 
 
 def _normalize_for_match(s: str) -> str:
-    """Map curly quotes and dashes to ASCII so model vs input typography still matches."""
+    """Map curly quotes and dashes to ASCII.
+
+    This keeps matching stable when model output typography differs from input.
+    """
     return (
         s.replace("\u201c", '"')
         .replace("\u201d", '"')
