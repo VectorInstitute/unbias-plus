@@ -284,7 +284,7 @@ jobs:
             --allow-unauthenticated \
             --add-volume=name=hf-cache,type=cloud-storage,bucket=${{ env.MODEL_CACHE_BUCKET }} \
             --add-volume-mount=volume=hf-cache,mount-path=/hf-cache \
-            --startup-probe=httpGet.path=/health,initialDelaySeconds=30,failureThreshold=80,periodSeconds=15,timeoutSeconds=5 \
+            --startup-probe=httpGet.path=/health,initialDelaySeconds=60,failureThreshold=160,periodSeconds=15,timeoutSeconds=5 \
             --set-env-vars="HF_HOME=/hf-cache,VLLM_CACHE_ROOT=/hf-cache/vllm_cache,TOKENIZERS_PARALLELISM=false" \
             --quiet
 
@@ -294,6 +294,23 @@ jobs:
             --format='value(status.url)')
           echo "url=$URL" >> $GITHUB_OUTPUT
           echo "✓ vLLM deployed at $URL"
+
+      - name: Dump vLLM logs on deploy failure
+        if: failure()
+        run: |
+          REV=$(gcloud run revisions list \
+            --service=${{ env.VLLM_SERVICE }} \
+            --region=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }} \
+            --sort-by="~metadata.creationTimestamp" \
+            --limit=1 \
+            --format='value(metadata.name)')
+          echo "Latest revision: ${REV}"
+          gcloud logging read \
+            "resource.type=cloud_run_revision AND resource.labels.service_name=${{ env.VLLM_SERVICE }} AND resource.labels.revision_name=${REV}" \
+            --project=${{ env.PROJECT_ID }} \
+            --limit=200 \
+            --format='value(textPayload)'
 
   # ── Deploy demo app to Cloud Run (CPU) ─────────────────────────────────────
   #

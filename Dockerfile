@@ -18,8 +18,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     nginx \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy project files (pyproject.toml first for layer caching)
-COPY pyproject.toml README.md ./
+# Copy project files (metadata first for layer caching)
+COPY pyproject.toml README.md LICENSE.md ./
 COPY src/ src/
 
 # Install CPU-only torch to satisfy the package's torch dependency without
