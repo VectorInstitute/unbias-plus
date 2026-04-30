@@ -45,7 +45,7 @@ Start the API server and demo UI (default model `vector-institute/Qwen3-8B-UnBia
 ```bash
 unbias-plus --serve
 unbias-plus --serve --model path/to/model --port 8000
-unbias-plus --serve --load-in-4bit   # reduce VRAM (default for the bundled model)
+unbias-plus --serve --load-in-4bit   # reduce VRAM (optional)
 ```
 
 **Options:** `--model`, `--load-in-4bit`, `--max-new-tokens`, `--host`, `--port`, `--json`.
@@ -87,7 +87,7 @@ result = pipe.analyze("Women are too emotional to lead.")
 
 # Result fields
 print(result.binary_label)    # "biased" | "unbiased"
-print(result.severity)         # 1–5
+print(result.severity)         # 1-5 (article-level)
 print(result.bias_found)       # bool
 print(result.unbiased_text)   # full neutral rewrite
 
