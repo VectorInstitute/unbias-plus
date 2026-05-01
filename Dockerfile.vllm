@@ -9,7 +9,18 @@
 # vLLM provides continuous batching + PagedAttention for high
 # throughput under concurrent load.
 # ============================================================
-FROM vllm/vllm-openai:latest
+# Pin to a specific release so CI is reproducible and a surprise `latest` bump
+# doesn't silently change CUDA requirements.  v0.8.5.post1 is the minimum that
+# includes native Qwen3ForCausalLM support (needed for Qwen3-8B-SFT).
+#
+# CUDA requirement: this image is built against CUDA 12.4 (PyTorch cu124).
+# Cloud Run L4 must have NVIDIA driver ≥ 550.xx (CUDA 12.4 capable).
+# On older drivers (e.g. CUDA 12.2 / driver 535.xx), the LD_LIBRARY_PATH line
+# below activates CUDA Forward Compatibility — the /usr/local/cuda/compat stubs
+# shipped in the nvcr CUDA devel base override cuDriverGetVersion() so PyTorch's
+# version check passes, and the compat layer mediates calls that require newer
+# driver features.  Minimum host driver for CUDA 12.x compat: 450.xx.
+FROM vllm/vllm-openai:v0.8.5.post1
 
 ENV HF_HOME=/hf-cache
 # Redirect the entire vLLM cache root (torch.compile cache, etc.) to the
@@ -18,6 +29,9 @@ ENV HF_HOME=/hf-cache
 ENV VLLM_CACHE_ROOT=/hf-cache/vllm_cache
 ENV TOKENIZERS_PARALLELISM=false
 ENV VLLM_WORKER_MULTIPROC_METHOD=spawn
+# CUDA Forward Compatibility: override libcuda.so with the compat stubs so this
+# CUDA 12.4 image can start on host drivers that only support up to CUDA 12.2.
+ENV LD_LIBRARY_PATH=/usr/local/cuda/compat:${LD_LIBRARY_PATH}
 
 # Cloud Run injects $PORT (default 8080)
 ENV PORT=8080
