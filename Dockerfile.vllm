@@ -37,8 +37,8 @@ ENV LD_LIBRARY_PATH=/usr/local/cuda/compat:${LD_LIBRARY_PATH}
 ENV PORT=8080
 EXPOSE 8080
 
-# vllm/vllm-openai ENTRYPOINT is: vllm serve
-# Model is the first positional argument; remaining are flags.
+# vllm/vllm-openai ENTRYPOINT is: python -m vllm.entrypoints.openai.api_server
+# v0.8.x dropped the positional model arg — model must be --model flag.
 # Port hardcoded to 8080 (Cloud Run standard — ENV PORT=8080 set above).
 #
 # Key flags:
@@ -47,7 +47,7 @@ EXPOSE 8080
 #   --dtype bfloat16              native Qwen3 dtype; faster than fp16 on L4
 #   --enable-chunked-prefill      improves throughput for long prompts
 CMD [ \
-    "vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct", \
+    "--model", "vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct", \
     "--served-model-name", "unbias-plus", \
     "--port", "8080", \
     "--host", "0.0.0.0", \
