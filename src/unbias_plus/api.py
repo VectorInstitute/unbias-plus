@@ -37,7 +37,7 @@ _BQ_DATASET = "unbias_plus"
 _BQ_TABLE = "feedback"
 
 _bq_lock = threading.Lock()
-_bq_client: Any = None
+_bq_cache: dict[str, Any] = {}
 
 
 def _safe_error(e: Exception) -> str:
@@ -50,16 +50,15 @@ def _safe_error(e: Exception) -> str:
 
 def _get_bq_client() -> Any:
     """Return a cached BigQuery client, creating the dataset/table on first call."""
-    global _bq_client
-    if _bq_client is None:
+    if "client" not in _bq_cache:
         with _bq_lock:
-            if _bq_client is None:
+            if "client" not in _bq_cache:
                 from google.cloud import bigquery  # noqa: PLC0415
 
                 client = bigquery.Client(project=GCP_PROJECT)
                 _ensure_bq_table(client)
-                _bq_client = client
-    return _bq_client
+                _bq_cache["client"] = client
+    return _bq_cache["client"]
 
 
 def _ensure_bq_table(client: Any) -> None:
@@ -406,7 +405,7 @@ def analyze_stream(request: Request, body: AnalyzeRequest) -> StreamingResponse:
 
 
 @app.post("/feedback")
-def submit_feedback(body: FeedbackRequest) -> dict:  # type: ignore[type-arg]
+def submit_feedback(body: FeedbackRequest) -> dict[str, Any]:
     """Save user feedback to BigQuery.
 
     Returns
