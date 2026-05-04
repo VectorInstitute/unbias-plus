@@ -182,6 +182,30 @@ if (DEMO_DIR / "static").exists():
 
 @app.get("/", response_class=HTMLResponse, response_model=None)
 def index() -> str:
+    """Serve the landing page in cloud mode, or the demo UI locally.
+
+    Returns
+    -------
+    str
+        HTML content.
+
+    Raises
+    ------
+    HTTPException
+        404 if the template is not found.
+    """
+    if VLLM_BASE_URL:
+        html_file = DEMO_DIR / "templates" / "landing.html"
+        if html_file.exists():
+            return html_file.read_text()
+    html_file = DEMO_DIR / "templates" / "index.html"
+    if not html_file.exists():
+        raise HTTPException(status_code=404, detail="Demo UI not found.")
+    return html_file.read_text()
+
+
+@app.get("/demo", response_class=HTMLResponse, response_model=None)
+def demo_page() -> str:
     """Serve the demo UI.
 
     Returns
