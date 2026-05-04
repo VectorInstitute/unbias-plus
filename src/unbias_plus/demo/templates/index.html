@@ -8,8 +8,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300;0,400;0,600;0,700;0,800;1,300;1,400&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/style.css" />
-  <!-- Supabase JS SDK (cloud auth) -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
   <div class="noise"></div>
@@ -35,17 +33,12 @@
         class="vector-logo"
       />
     </a>
-    <!-- Auth controls — only visible in cloud mode (auth.js hides if IS_CLOUD is false) -->
-    <div class="header-auth hidden" id="header-auth">
-      <span class="header-user-email" id="header-user-email"></span>
-      <button class="feedback-trigger-btn" id="feedback-trigger-btn" title="Give feedback">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-        </svg>
-        Feedback
-      </button>
-      <button class="signout-btn" id="signout-btn">Sign out</button>
-    </div>
+    <button class="feedback-trigger-btn" id="feedback-trigger-btn" title="Give feedback">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      Feedback
+    </button>
   </header>
   <main>
     <!-- INPUT SECTION -->
@@ -265,7 +258,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script src="/static/auth.js"></script>
   <script src="/static/script.js"></script>
 </body>
 </html>

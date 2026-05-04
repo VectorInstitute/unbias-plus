@@ -339,22 +339,6 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
-      # Always resolve the current vLLM service URL — it is stable across
-      # deployments (Cloud Run URL is deterministic for a given service name).
-      - name: Get vLLM service URL
-        id: vllm-url
-        run: |
-          URL=$(gcloud run services describe ${{ env.VLLM_SERVICE }} \
-            --region=${{ env.REGION }} \
-            --project=${{ env.PROJECT_ID }} \
-            --format='value(status.url)' 2>/dev/null || echo "")
-          if [ -z "$URL" ]; then
-            echo "::error::vLLM service '${{ env.VLLM_SERVICE }}' not found in ${{ env.REGION }}."
-            echo "::error::Run this workflow with workflow_dispatch to deploy both services."
-            exit 1
-          fi
-          echo "url=$URL" >> $GITHUB_OUTPUT
-          echo "✓ vLLM service URL: $URL"
 
       # If the demo service was previously deployed with GPU (e.g. by mistake),
       # gcloud run deploy inherits resource limits from the existing revision and
@@ -396,7 +380,8 @@ jobs:
             --timeout=900 \
             --no-cpu-throttling \
             --allow-unauthenticated \
-            --set-env-vars="VLLM_BASE_URL=${{ steps.vllm-url.outputs.url }}/v1,VLLM_MODEL_NAME=unbias-plus,MAX_INPUT_CHARS=5000,TOKENIZERS_PARALLELISM=false,RATE_LIMIT=60/minute,SUPABASE_URL=${{ secrets.SUPABASE_URL }},SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }},SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            --set-env-vars="VLLM_BASE_URL=https://proxy.vectorinstitute.ai/v1,VLLM_MODEL_NAME=unbias-plus,MAX_INPUT_CHARS=5000,TOKENIZERS_PARALLELISM=false" \
+            --set-secrets="VLLM_API_KEY=vllm-proxy-api-key:latest" \
             --quiet
 
           URL=$(gcloud run services describe ${{ env.DEMO_SERVICE }} \
@@ -437,7 +422,7 @@ jobs:
           | Service | URL | Notes |
           |---------|-----|-------|
           | **Demo UI** | ${{ steps.deploy.outputs.url }} | Cloud Run CPU, scales to zero |
-          | **vLLM API** | ${{ steps.vllm-url.outputs.url }}/v1 | Cloud Run GPU (L4), scales to zero, GCS model cache |
+          | **vLLM API** | https://proxy.vectorinstitute.ai/v1 | Routed via Vector proxy gateway |
           | **Health** | ${{ steps.deploy.outputs.url }}/health | |
           | **Model** | vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct | served via vLLM |
 

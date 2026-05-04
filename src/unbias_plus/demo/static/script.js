@@ -168,10 +168,9 @@
        }
      }, 1000);
      try {
-      const authHeaders = typeof getAuthHeaders === "function" ? await getAuthHeaders() : {};
       const res = await fetch("/analyze/stream", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
         signal,
       });
@@ -747,6 +746,30 @@ document.getElementById("feedback-message")?.addEventListener("input", (e) => {
 });
 
 // ── Close handlers ────────────────────────────────────────────
+
+async function submitFeedback({ reaction, message, inputText, rating, speed, accuracy }) {
+  try {
+    const res = await fetch("/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        reaction,
+        message: message || "",
+        input_text: inputText || "",
+        rating: rating ?? null,
+        speed: speed || null,
+        accuracy: accuracy || null,
+      }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      return { ok: false, error: data.detail || "Server error" };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
 
 document.getElementById("feedback-close")?.addEventListener("click", closeFeedbackPopup);
 document.getElementById("feedback-overlay")?.addEventListener("click", closeFeedbackPopup);
