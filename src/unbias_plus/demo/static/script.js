@@ -474,10 +474,8 @@
     unbiasedEl.innerHTML  = buildUnbiasedHTML(original_text, unbiased_text, biased_segments);
     renderSegmentCards(biased_segments);
 
-    // Trigger feedback popup 2.5s after results appear (cloud only)
-    if (typeof IS_CLOUD !== "undefined" && IS_CLOUD) {
-      setTimeout(() => openFeedbackPopup(original_text), 2500);
-    }
+    // Trigger feedback popup 2.5s after results appear
+    setTimeout(() => openFeedbackPopup(original_text), 2500);
   }
    // ============================================================
    // SUMMARY BAR
@@ -631,7 +629,6 @@ let _popupClosing     = false; // guard against double-close
 // ── Open ──────────────────────────────────────────────────────
 
 function openFeedbackPopup(inputText) {
-  if (typeof IS_CLOUD === "undefined" || !IS_CLOUD) return;
   _lastAnalyzedText = inputText || "";
 
   const overlay = document.getElementById("feedback-overlay");
