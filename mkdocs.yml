@@ -69,7 +69,7 @@ theme:
     - toc.follow
   icon:
     repo: fontawesome/brands/github
-  logo: assets/vector-logo.svg
+  logo: assets/vector-logo-black.svg
   logo_footer: assets/vector-logo.svg
   name: material
   palette:

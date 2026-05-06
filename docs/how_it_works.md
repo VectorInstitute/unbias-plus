@@ -81,11 +81,11 @@ The system prompt defines a tight contract. Severity scales, segment rules, and 
 
 Two design choices follow from this contract:
 
-!!! info "Exact substrings, not paraphrases"
+!!! note "Exact substrings, not paraphrases"
 
     The model is instructed to return the **exact original substring** for each biased segment. In practice, offset matching first tries direct substring lookup, then a small normalization fallback (trimmed text plus quote and dash normalization). If no match is found, the segment is still returned, and `start` and `end` remain `None`.
 
-!!! info "Preserve facts, change framing"
+!!! note "Preserve facts, change framing"
 
     The rewriter is instructed to modify only the segments it flagged. Names, numbers, places, and quotes stay; loaded framing around them changes. The unbiased text should not read as a different article &mdash; just a calmer one.
 

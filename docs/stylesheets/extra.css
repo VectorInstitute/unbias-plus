@@ -19,12 +19,12 @@
   --md-primary-fg-color--dark: #b00068;
   --md-primary-bg-color: #eb088a;
 }
-
+/* scrolling element color update from mintgreen to magenta */
 [data-md-color-accent="vector-teal"] {
-  --md-accent-fg-color: #48c0d9;
-  --md-accent-fg-color--transparent: #526cfe1a;
+  --md-accent-fg-color: #eb088a;
+  --md-accent-fg-color--transparent: rgba(235, 8, 138, 0.1);
   --md-accent-bg-color: #fff;
-  --md-accent-bg-color--light: #ffffffb3;
+  --md-accent-bg-color--light: rgba(255, 255, 255, 0.7);
 }
 
 [data-md-color-scheme="slate"][data-md-color-primary="black"] {
@@ -46,6 +46,15 @@
   align-items: center;
   padding: 0 0.6rem;
 }
+/* ---- Header updated to solid white ---------------------------------------------- */
+.md-header {
+  background-color: #ffffff !important;
+  color: #000000;
+  border-bottom: 1px solid rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+
+
+}
 
 .md-footer-vector img {
   height: 24px;
@@ -53,17 +62,40 @@
   transition: opacity 0.25s;
   opacity: 0.7;
 }
-
+/* ---- Footer updated to solid black ---------------------------------------------- */
+.md-footer {
+  background-color: #000000;
+  color: #ffffff;
+}
 .md-footer-vector img:hover {
   opacity: 1;
 }
+/*updating mint green */
+.md-typeset .admonition.info {
+  background-color: rgba(107, 114, 128, 0.1) !important;
+  border-left: 4px solid #6b7280 !important;
+}
 
+.md-typeset .admonition.info > .admonition-title {
+  background-color: rgba(107, 114, 128, 0.2) !important;
+  color: #374151 !important;
+}
 .md-footer-meta__inner {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
+/*buttons updated rounded*/
+.md-button,
+.md-button--primary {
+  border-radius: 12px !important;
+  transition: all 0.2s ease;
 
+}
+.md-button--primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
 @media screen and (max-width: 76.234375em) {
   .md-footer-meta__inner.md-grid {
     flex-direction: row;
@@ -107,9 +139,9 @@
   --up-med-bg:  rgba(217, 119, 6, 0.10);
   --up-med-bd:  rgba(217, 119, 6, 0.30);
 
-  --up-fix:     #047857;
-  --up-fix-bg:  rgba(4, 120, 87, 0.09);
-  --up-fix-bd:  rgba(4, 120, 87, 0.30);
+  --up-fix:     #6b7280;
+  --up-fix-bg:  rgba(107, 114, 128, 0.1);
+  --up-fix-bd:  rgba(107, 114, 128, 0.3);
 
   --up-edge:    rgba(15, 23, 42, 0.10);
   --up-edge-2:  rgba(15, 23, 42, 0.16);
@@ -126,9 +158,9 @@
   --up-med-bg:  rgba(251, 191, 36, 0.10);
   --up-med-bd:  rgba(251, 191, 36, 0.32);
 
-  --up-fix:     #34d399;
-  --up-fix-bg:  rgba(52, 211, 153, 0.12);
-  --up-fix-bd:  rgba(52, 211, 153, 0.32);
+  --up-fix:     #6b7280;
+  --up-fix-bg:  rgba(107, 114, 128, 0.1);
+  --up-fix-bd:  rgba(107, 114, 128, 0.3);
 
   --up-edge:    rgba(255, 255, 255, 0.10);
   --up-edge-2:  rgba(255, 255, 255, 0.18);
@@ -138,17 +170,17 @@
 /* ---- Hero --------------------------------------------------------------- */
 .up-hero {
   position: relative;
-  padding: 2.25rem 0 1.5rem;
+  padding: 4rem 0 2.5rem;
 }
-
+/* ---- Background updated to new vector's cobalt-magenta ---------------------------------------------- */
 .up-hero::before {
   content: "";
   position: absolute;
   inset: -1.5rem -8vw auto -8vw;
   height: 70%;
   background:
-    radial-gradient(60% 80% at 18% 25%, rgba(235, 8, 138, 0.07), transparent 70%),
-    radial-gradient(50% 70% at 82% 60%, rgba(72, 192, 217, 0.06), transparent 70%);
+    linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.2)),
+    url("../assets/Magenta-Cobalt_01.png") center/cover no-repeat;
   pointer-events: none;
   z-index: 0;
 }
@@ -163,11 +195,13 @@
   line-height: 1.04;
   letter-spacing: -0.022em;
   font-weight: 800;
+    color: #000000;
+  
   margin: 0.25rem 0 1rem;
 }
 
 .up-hero__accent {
-  color: var(--md-primary-fg-color);
+  color: #ffffff;
   font-weight: 800;
 }
 
@@ -184,13 +218,14 @@
 .up-hero__lede {
   font-size: 1.075rem;
   line-height: 1.6;
-  color: var(--md-default-fg-color--light);
+  color:   #ffffff;
   max-width: 64ch;
   margin: 0.5rem 0 1rem;
 }
 
 .up-hero__lede strong {
-  color: var(--md-default-fg-color);
+  color:   inherit;
+
   font-weight: 700;
 }
 
@@ -198,7 +233,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  margin: 1.25rem 0 1rem;
+  margin: 1.5rem 0 1rem;
 }
 
 .up-hero p:has(img) {
@@ -572,4 +607,22 @@
 .up-hero + hr,
 .up-hero ~ hr:first-of-type {
   margin-top: 1.25rem;
+}
+
+@font-face {
+  font-family: "Karbon";
+  src: url("../assets/fonts/Karbon-Medium.otf") format("opentype");
+  font-weight: 500;
+}
+@font-face {
+  font-family: "Karbon";
+  src: url("../assets/fonts/Karbon-Italic.woff2") format("woff2");
+  font-style: italic;
+}
+h1, h2, h3 {
+  font-family: "Karbon", sans-serif;
+  font-weight: 500;
+}
+body {
+  font-family: "Open Sans", sans-serif;
 }
