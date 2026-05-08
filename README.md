@@ -179,9 +179,11 @@ json_str = pipe.analyze_to_json("...")   # pretty-printed JSON string
 
 ## 👥 Team
 
+
+
 Developed by the **AI Engineering** team at the [Vector Institute](https://vectorinstitute.ai).
 
-Ahmed Y. Radwan · Amrit Krishnan · Shaina Raza, PhD
+For research collaborations, partnerships, or technical inquiries, please contact **Shaina Raza, PhD** at shaina.raza@vectorinstitute.ai.
 
 
 ## Acknowledgement

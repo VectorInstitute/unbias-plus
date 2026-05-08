@@ -1,5 +1,5 @@
 /* =============================================================================
-   unbias-plus â€” site styling
+   unbias-plus — site styling
    Layered on top of Material for MkDocs.
    Brand: magenta #eb088a primary, teal #48c0d9 accent.
 ============================================================================= */
@@ -63,6 +63,21 @@
   opacity: 0.7;
 }
 /* ---- Footer updated to solid black ---------------------------------------------- */
+.md-footer,
+.md-footer-meta {
+  background-color: #15140f !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+.md-footer a,
+.md-footer-meta a {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+.md-footer a:hover,
+.md-footer-meta a:hover {
+  color: #ffffff !important;
+}
 
 .md-footer-vector img:hover {
   opacity: 1;
@@ -191,7 +206,7 @@
   font-size: clamp(2.1rem, 1.4rem + 2.6vw, 3.6rem);
   line-height: 1.04;
   letter-spacing: -0.022em;
-  font-weight: 800;
+  font-weight: 700;
     color: #000000;
   
   margin: 0.25rem 0 1rem;
@@ -199,7 +214,7 @@
 
 .up-hero__accent {
   color: #ffffff;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .up-hero__eyebrow {
@@ -215,7 +230,7 @@
 .up-hero__lede {
   font-size: 1.075rem;
   line-height: 1.6;
-  color:   #ffffff;
+  color: #15140f;
   max-width: 64ch;
   margin: 0.5rem 0 1rem;
 }
@@ -458,7 +473,7 @@
   box-sizing: border-box;
 }
 
-/* Output step â€” filled magenta dot, slightly larger */
+/* Output step — filled magenta dot, slightly larger */
 .up-flow__step--out::before {
   background: var(--md-primary-fg-color);
   border-color: var(--md-primary-fg-color);
@@ -485,7 +500,7 @@
   margin: 0;
 }
 
-/* Inline â†’ arrows in the markdown become invisible â€” the rail does this job */
+/* Inline → arrows in the markdown become invisible — the rail does this job */
 .up-flow__arrow {
   display: none;
 }
@@ -606,16 +621,78 @@
   margin-top: 1.25rem;
 }
 
+/* ---- Karbon (display / headlines) — full licensed family ---------------- */
+@font-face {
+  font-family: "Karbon";
+  src: url("../assets/fonts/Karbon-Light.otf") format("opentype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Karbon";
+  src: url("../assets/fonts/Karbon-LightItalic.otf") format("opentype");
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Karbon";
+  src: url("../assets/fonts/Karbon-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Karbon";
+  src: url("../assets/fonts/Karbon-RegularItalic.otf") format("opentype");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
 @font-face {
   font-family: "Karbon";
   src: url("../assets/fonts/Karbon-Medium.otf") format("opentype");
   font-weight: 500;
+  font-style: normal;
+  font-display: swap;
 }
 @font-face {
   font-family: "Karbon";
-  src: url("../assets/fonts/Karbon-Italic.woff2") format("woff2");
+  src: url("../assets/fonts/Karbon-MediumItalic.otf") format("opentype");
+  font-weight: 500;
   font-style: italic;
+  font-display: swap;
 }
+@font-face {
+  font-family: "Karbon";
+  src: url("../assets/fonts/Karbon-Semibold.otf") format("opentype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Karbon";
+  src: url("../assets/fonts/Karbon-SemiboldItalic.otf") format("opentype");
+  font-weight: 600;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Karbon";
+  src: url("../assets/fonts/Karbon-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Karbon";
+  src: url("../assets/fonts/Karbon-BoldItalic.otf") format("opentype");
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
 h1, h2, h3 {
   font-family: "Karbon", sans-serif;
   font-weight: 500;

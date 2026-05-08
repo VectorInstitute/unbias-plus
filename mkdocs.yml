@@ -55,6 +55,8 @@ site_url: https://vectorinstitute.github.io/unbias-plus/
 theme:
   custom_dir: docs/overrides
   favicon: assets/favicon-48x48.svg
+  font:
+    text: Open Sans
   features:
     - content.code.annotate
     - content.code.copy

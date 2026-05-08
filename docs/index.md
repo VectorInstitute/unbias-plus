@@ -191,11 +191,9 @@ Tours of the demo UI you get when you run `unbias-plus --serve`:
 
 ## About
 
-Shaina Raza, PhD, Ahmed Y. Radwan, and Amrit Krishnan &mdash; AI Engineering team at the [Vector Institute](https://vectorinstitute.ai).
+Built by the AI Engineering team at the [Vector Institute](https://vectorinstitute.ai), led by [Shaina Raza, PhD](mailto:shaina.raza@vectorinstitute.ai). Released under the [Vector Institute License](https://github.com/VectorInstitute/unbias-plus/blob/unbias-pretrained/LICENSE.md).
 
-The toolkit is released under the [Vector Institute License](https://github.com/VectorInstitute/unbias-plus/blob/unbias-pretrained/LICENSE.md).
-
-For questions, collaboration, or licensing inquiries: [shaina.raza@vectorinstitute.ai](mailto:shaina.raza@vectorinstitute.ai). For bug reports and feature requests: [GitHub Issues](https://github.com/VectorInstitute/unbias-plus/issues).
+For collaboration or licensing inquiries, email Shaina. For bugs and feature requests, use [GitHub Issues](https://github.com/VectorInstitute/unbias-plus/issues).
 
 ??? note "Acknowledgements"
     Resources used in preparing this research are provided, in part, by the Province of Ontario, the Government of Canada through CIFAR, and companies sponsoring the Vector Institute. This research is also supported by the European Union's Horizon Europe research and innovation programme under the **AIXPERT** project (Grant Agreement No. 101214389).
