@@ -35,13 +35,13 @@ IS_DDP = WORLD_SIZE > 1
 IS_MAIN = RANK == 0
 
 import torch
-from datasets import Dataset  # type: ignore[import-untyped]
+from datasets import Dataset
 from torch.nn.parallel import DistributedDataParallel
 
 if torch.cuda.is_available():
     torch.cuda.set_device(LOCAL_RANK)
 
-from unsloth import (  # type: ignore[import-not-found]
+from unsloth import (
     FastLanguageModel,
     PatchFastRL,
     is_bfloat16_supported,
@@ -49,9 +49,9 @@ from unsloth import (  # type: ignore[import-not-found]
 
 PatchFastRL("GRPO", FastLanguageModel)
 
-from trl import GRPOConfig, GRPOTrainer  # type: ignore[import-not-found]
+from trl import GRPOConfig, GRPOTrainer
 
-from prompts import GRPO_SYSTEM_PROMPT as SYSTEM_PROMPT  # type: ignore[import-not-found]
+from prompts import GRPO_SYSTEM_PROMPT as SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 

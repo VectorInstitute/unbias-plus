@@ -10,7 +10,7 @@ Usage:
 # would otherwise reorder it after the stdlib block.
 from __future__ import annotations
 
-from unsloth import FastLanguageModel  # type: ignore[import-not-found]
+from unsloth import FastLanguageModel
 
 import argparse
 import json
@@ -21,7 +21,7 @@ from typing import Any, cast
 
 import torch
 
-from prompts import SFT_SYSTEM_PROMPT as SYSTEM_PROMPT  # type: ignore[import-not-found]
+from prompts import SFT_SYSTEM_PROMPT as SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 

@@ -139,7 +139,16 @@ warn_unused_configs = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 strict_equality = true
-mypy_path = "src"
+mypy_path = ["src", "training"]
+
+# Heavy GPU/training-only dependencies aren't installed in every environment
+# (CI runs `uv sync --no-extra train`, dev clones may or may not). The override
+# tells mypy to treat them as Any when missing, and use real types when present
+# — which keeps the per-environment behaviour symmetric and avoids the
+# "unused type: ignore" trap from `warn_unused_ignores`.
+[[tool.mypy.overrides]]
+module = ["unsloth", "unsloth.*", "trl", "trl.*", "datasets", "datasets.*"]
+ignore_missing_imports = true
 
 [tool.ruff]
 line-length = 88

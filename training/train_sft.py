@@ -14,7 +14,7 @@ import os
 # Disable torch dynamo before any heavy imports (unsloth/torch read this at import).
 os.environ.setdefault("TORCHDYNAMO_DISABLE", "1")
 
-import unsloth  # type: ignore[import-not-found]  # noqa: F401 — must precede torch / datasets / trl
+import unsloth  # noqa: F401 — must precede torch / datasets / trl
 
 import argparse
 import json
@@ -24,11 +24,11 @@ from pathlib import Path
 from typing import Any, cast
 
 import torch
-from datasets import Dataset  # type: ignore[import-untyped]
-from trl import SFTConfig, SFTTrainer  # type: ignore[import-not-found]
+from datasets import Dataset
+from trl import SFTConfig, SFTTrainer
 from unsloth import FastLanguageModel
 
-from prompts import SFT_SYSTEM_PROMPT as SYSTEM_PROMPT  # type: ignore[import-not-found]
+from prompts import SFT_SYSTEM_PROMPT as SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
