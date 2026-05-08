@@ -863,7 +863,7 @@ mark.replaced-green {
   padding: 1.5rem 2rem;
   font-family: 'DM Mono', monospace;
   font-size: 0.72rem;
-  /* CHANGED: explicit black — not inherited, not overrideable by noise */
+  /* CHANGED: explicit black — not inherited, not overridable by noise */
   background: #15140f !important;
   color: rgba(255, 255, 255, 0.45) !important;
   border-top: none !important;
