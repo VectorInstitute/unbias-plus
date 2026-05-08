@@ -8,24 +8,10 @@ on:
     branches:
       - main
       - unbias-pretrained
-    paths:
-      - .pre-commit-config.yaml
-      - .github/workflows/code_checks.yml
-      - '**.py'
-      - uv.lock
-      - pyproject.toml
-      - '**.ipynb'
   pull_request:
     branches:
       - main
       - unbias-pretrained
-    paths:
-      - .pre-commit-config.yaml
-      - .github/workflows/code_checks.yml
-      - '**.py'
-      - uv.lock
-      - pyproject.toml
-      - '**.ipynb'
 
 jobs:
   run-code-check:
@@ -67,3 +53,4 @@ jobs:
             PYSEC-2024-161
             CVE-2026-1839
             CVE-2026-3219
+            CVE-2026-6357

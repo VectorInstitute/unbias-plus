@@ -1,81 +1,8 @@
 /* ============================================================
-   UnBias-Plus -- Vector Institute Brand
-   Typefaces: Karbon Medium (display) + Open Sans (body) + DM Mono (labels)
+   UnBias+ -- Vector Institute Brand
+   Typefaces: Open Sans (display + body) + DM Mono (labels)
    Palette: White + Black + Vector Magenta #EB088A
    ============================================================ */
-
-/* Karbon (display / headlines) — full family in /static/fonts/.
-   Vector has licensed Light, Regular, Medium, Semibold, and Bold (each + italic). */
-@font-face {
-  font-family: "Karbon";
-  src: url("fonts/Karbon-Light.otf") format("opentype");
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Karbon";
-  src: url("fonts/Karbon-LightItalic.otf") format("opentype");
-  font-weight: 300;
-  font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Karbon";
-  src: url("fonts/Karbon-Regular.otf") format("opentype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Karbon";
-  src: url("fonts/Karbon-RegularItalic.otf") format("opentype");
-  font-weight: 400;
-  font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Karbon";
-  src: url("fonts/Karbon-Medium.otf") format("opentype");
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Karbon";
-  src: url("fonts/Karbon-MediumItalic.otf") format("opentype");
-  font-weight: 500;
-  font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Karbon";
-  src: url("fonts/Karbon-Semibold.otf") format("opentype");
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Karbon";
-  src: url("fonts/Karbon-SemiboldItalic.otf") format("opentype");
-  font-weight: 600;
-  font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Karbon";
-  src: url("fonts/Karbon-Bold.otf") format("opentype");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Karbon";
-  src: url("fonts/Karbon-BoldItalic.otf") format("opentype");
-  font-weight: 700;
-  font-style: italic;
-  font-display: swap;
-}
 
 :root {
     --bg:          #ffffff;        /* Vector white */
@@ -106,7 +33,7 @@
 
   --radius:      12px;
   --radius-sm:   7px;
-  --font-display: 'Karbon', 'Open Sans', sans-serif;
+  --font-display: 'Open Sans', sans-serif;
   --font-body:    'Open Sans', sans-serif;
   --font-mono:    'DM Mono', monospace;
 }
@@ -181,9 +108,9 @@ header {
 
 .logo {
   font-family: var(--font-display);
-  font-size: 22px;
-  font-weight: 500;
-  letter-spacing: -0.02em;
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -1px;
   line-height: 1;
 }
 
@@ -196,10 +123,8 @@ header {
    }
 
    .logo-plus {
-     color: var(--text);
-     font-weight: 500;
-     letter-spacing: -0.01em;
-     margin-left: 1px;
+     color: var(--text-2);
+     font-weight: 400;
    }
 
 .vector-logo {
@@ -600,12 +525,9 @@ mark.severity-medium:hover { background: var(--medium-bg); }
    }
 mark.severity-low:hover { background: var(--low-bg); }
 
-/* Neutral rewrite highlight — was mint/saturated green; per brand review,
-   replaced with neutral grey to align with Vector's secondary palette.
-   Kept the class name to avoid touching script.js / templates. */
 mark.replaced-green {
-  background: rgba(60, 60, 60, 0.08);
-  color: var(--text-2);
+  background: rgba(34, 197, 94, 0.15);
+  color: #16a34a;
   border-radius: 3px;
   padding: 0 2px;
 }
@@ -997,8 +919,276 @@ mark.replaced-green {
   color: var(--text);
 }
 
-/* Hide user email in header on small screens */
+/* ============================================================
+   FEEDBACK POPUP
+   ============================================================ */
+
+.feedback-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.18);
+  z-index: 9000;
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease;
+}
+
+.feedback-overlay.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.feedback-popup {
+  position: fixed;
+  bottom: 32px;
+  right: 32px;
+  z-index: 9001;
+  background: var(--bg);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius);
+  padding: 28px 28px 24px;
+  width: 360px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  /* Start invisible so rAF can trigger the transition cleanly */
+  opacity: 0;
+  transform: translateY(18px) scale(0.97);
+  transition: opacity 0.24s ease, transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.feedback-popup.popup-enter {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.feedback-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.feedback-title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.feedback-close {
+  background: none;
+  border: none;
+  color: var(--text-3);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.feedback-close:hover {
+  color: var(--text);
+  background: var(--bg-3);
+}
+
+.feedback-subtitle {
+  font-size: 13px;
+  color: var(--text-3);
+  margin-top: -8px;
+}
+
+.feedback-reactions {
+  display: flex;
+  gap: 10px;
+}
+
+.reaction-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 12px;
+  background: var(--bg-3);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+}
+
+.reaction-btn:hover {
+  border-color: var(--border-2);
+  transform: translateY(-1px);
+}
+
+.reaction-btn.selected {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.reaction-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.reaction-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.feedback-textarea {
+  width: 100%;
+  min-height: 80px;
+  max-height: 160px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 12px 14px;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.feedback-textarea::placeholder { color: var(--text-3); }
+
+.feedback-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(235, 8, 138, 0.08);
+}
+
+.feedback-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.feedback-char-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.feedback-submit-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--text);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.feedback-submit-btn:hover:not(:disabled) {
+  background: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(235, 8, 138, 0.25);
+}
+
+.feedback-submit-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.feedback-ack {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent);
+  text-align: center;
+  padding: 8px 0 0;
+  animation: fadeUp 0.3s ease both;
+}
+
+.feedback-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.feedback-row-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Star rating */
+.star-rating {
+  display: flex;
+  gap: 4px;
+}
+
+.star-btn {
+  background: none;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  color: var(--border-2);
+  transition: color 0.12s, transform 0.1s;
+  line-height: 0;
+}
+
+.star-btn:hover,
+.star-btn.selected {
+  color: var(--accent);
+  transform: scale(1.12);
+}
+
+/* Speed / Accuracy pills */
+.feedback-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.feedback-pill {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.feedback-pill:hover {
+  border-color: var(--border-2);
+  color: var(--text);
+}
+
+.feedback-pill.selected {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
 @media (max-width: 900px) {
+  .feedback-popup {
+    bottom: 16px;
+    right: 16px;
+    left: 16px;
+    width: auto;
+  }
   .header-user-email { display: none; }
 }
 
