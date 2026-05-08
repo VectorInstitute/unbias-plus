@@ -25,6 +25,19 @@ The trained model itself is **not** in this repo — see "Model artifacts" below
   source .venv/bin/activate
   ```
 
+## Dataset
+
+The shipped checkpoint was trained on the
+[vector-institute/Unbias-plus](https://huggingface.co/datasets/vector-institute/Unbias-plus)
+dataset on HuggingFace. The training scripts expect a local JSON file with one
+record per sample matching the dataset's schema — keys used by the loaders are
+`article_text`, `unbiased_text`, `biased_segments`, `binary_label`, `severity`,
+and `bias_found` (see [`train_sft.py`](train_sft.py) `is_valid_sample` for the
+exact validation rules).
+
+To use it, download / export the dataset to a JSON file and pass its path via
+`--input-path`.
+
 ## Running
 
 ### SFT (single A100)
