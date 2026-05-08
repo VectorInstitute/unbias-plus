@@ -33,3 +33,4 @@ unsloth_compiled_cache/
 *.DS_Store
 site/
 logs/
+venv/

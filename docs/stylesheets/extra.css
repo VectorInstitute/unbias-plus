@@ -63,10 +63,7 @@
   opacity: 0.7;
 }
 /* ---- Footer updated to solid black ---------------------------------------------- */
-.md-footer {
-  background-color: #000000;
-  color: #ffffff;
-}
+
 .md-footer-vector img:hover {
   opacity: 1;
 }
@@ -179,8 +176,8 @@
   inset: -1.5rem -8vw auto -8vw;
   height: 70%;
   background:
-    linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.2)),
-    url("../assets/Magenta-Cobalt_01.png") center/cover no-repeat;
+  linear-gradient(rgba(255,255,255,0.40), rgba(255,255,255,0.40)),
+  url("../assets/Magenta-Cobalt_01.png") center/cover no-repeat;
   pointer-events: none;
   z-index: 0;
 }
