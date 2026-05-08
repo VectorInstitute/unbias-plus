@@ -96,7 +96,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href=".." title="unbias-plus" class="md-header__button md-logo" aria-label="unbias-plus" data-md-component="logo">
       
-<img src="../assets/vector-logo.svg" alt="logo">
+<img src="../assets/vector-logo-black.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -341,7 +341,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href=".." title="unbias-plus" class="md-nav__button md-logo" aria-label="unbias-plus" data-md-component="logo">
       
-<img src="../assets/vector-logo.svg" alt="logo">
+<img src="../assets/vector-logo-black.svg" alt="logo">
 
     </a>
     unbias-plus
@@ -800,11 +800,11 @@
 </span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>}
 </span></code></pre></div>
 <p>Two design choices follow from this contract:</p>
-<div class="admonition info">
+<div class="admonition note">
 <p class="admonition-title">Exact substrings, not paraphrases</p>
 <p>The model is instructed to return the <strong>exact original substring</strong> for each biased segment. In practice, offset matching first tries direct substring lookup, then a small normalization fallback (trimmed text plus quote and dash normalization). If no match is found, the segment is still returned, and <code>start</code> and <code>end</code> remain <code>None</code>.</p>
 </div>
-<div class="admonition info">
+<div class="admonition note">
 <p class="admonition-title">Preserve facts, change framing</p>
 <p>The rewriter is instructed to modify only the segments it flagged. Names, numbers, places, and quotes stay; loaded framing around them changes. The unbiased text should not read as a different article &mdash; just a calmer one.</p>
 </div>
