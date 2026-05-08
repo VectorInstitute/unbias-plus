@@ -8,24 +8,10 @@ on:
     branches:
       - main
       - unbias-pretrained
-    paths:
-      - .pre-commit-config.yaml
-      - .github/workflows/code_checks.yml
-      - '**.py'
-      - uv.lock
-      - pyproject.toml
-      - '**.ipynb'
   pull_request:
     branches:
       - main
       - unbias-pretrained
-    paths:
-      - .pre-commit-config.yaml
-      - .github/workflows/code_checks.yml
-      - '**.py'
-      - uv.lock
-      - pyproject.toml
-      - '**.ipynb'
 
 jobs:
   run-code-check:
