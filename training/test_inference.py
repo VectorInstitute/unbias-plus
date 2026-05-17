@@ -7,7 +7,7 @@ python training/test_inference.py \
  python training/test_inference.py \
   --model-path vector-institute/Qwen3-4B-UnBias-Plus-SFT \
   --load-in-4bit
-  """
+"""
 
 # ruff: noqa: E402, I001
 from __future__ import annotations
