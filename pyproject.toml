@@ -27,7 +27,7 @@ dependencies = [
     "torch>=2.0.0,<=2.6.0",
     "torchaudio>=0.13.0,<=2.6.0",
     "torchvision>=0.13.0,<=0.21.0",
-    "transformers>=4.35.0,<5.2.0",
+    "transformers>=4.35.0,<6.0.0",
     "accelerate>=1.0.0,<=1.10.1",
     # Fine-tuning
     "peft>=0.17.1",
@@ -102,6 +102,10 @@ docs = [
     "jinja2>=3.1.6",
     "ipykernel>=6.29.5",
     "ipython>=8.31.0",
+    # Pinned: PYSEC-2026-89 advisory flags 3.10.x even though it documents
+    # the fix as 3.8.1 — pin to the documented fix version until the
+    # advisory's affected-range data is corrected upstream.
+    "markdown==3.8.1",
 ]
 
 [build-system]
@@ -119,7 +123,7 @@ extra-index-url = ["https://download.pytorch.org/whl/cu124"]
 index-strategy = "unsafe-best-match"
 
 [tool.uv.sources]
-unsloth = { git = "https://github.com/unslothai/unsloth.git", tag = "February-2026" }
+unsloth = { git = "https://github.com/unslothai/unsloth.git", tag = "March-2026" }
 unsloth-zoo = { git = "https://github.com/unslothai/unsloth-zoo.git" }
 
 [tool.mypy]
