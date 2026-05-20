@@ -5,8 +5,11 @@
   <script type="text/javascript" src="https://cdn.weglot.com/weglot.min.js"></script>
   <script>
     Weglot.initialize({
-      api_key: 'wg_cadf5c5b0c9dbd8d156f4944ed03b49c9'
+      api_key: 'wg_cadf5c5b0c9dbd8d156f4944ed03b49c9',
+      styleOpt: { fullname: true },
+
     });
+    
   </script>
 <head>
   <meta charset="UTF-8" />
@@ -24,6 +27,29 @@
        CHANGED: Karbon @font-face declarations — full family.
        Vector has licensed Light, Regular, Medium, Semibold, and Bold (each + italic).
     ───────────────────────────────────────────── */
+/* Non-selected language */
+.disclaimer {
+  margin-top: 28px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.55);    /* dark for light background */
+  letter-spacing: 0.02em;
+}
+
+.disclaimer a {
+  color: rgba(0, 0, 0, 0.55);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.disclaimer a:hover {
+  color: rgba(0, 0, 0, 0.9);
+}
+.weglot-container a {
+  color: var(--cobalt) !important;
+  border-color: transparent !important;
+  background-color: transparent !important;
+}
+
     @font-face {
       font-family: "Karbon";
       src: url("../static/fonts/Karbon-Light.otf") format("opentype");
@@ -516,13 +542,23 @@
       background: var(--ink);
       border-top: none;
       display: flex;
-      justify-content: space-between;
+      justify-content: center;
       align-items: center;
       flex-wrap: wrap;
       gap: 12px;
       font-size: 12px;
       color: rgba(255,255,255,0.45);
+      
     }
+    footer span {
+  text-align: center;
+}
+
+#weglot-switcher {
+  position: absolute;
+  right: 20px;  /* pins Weglot to the right without affecting center text */
+}
+
     footer a {
       color: rgba(255,255,255,0.65);
       border-bottom: 1px solid rgba(255,255,255,0.2);
@@ -643,15 +679,19 @@
           </a>
           <!-- CHANGED: secondary link → Open Sans Regular  body copy system. -->
           <a class="cta-text" href="https://vectorinstitute.github.io/unbias-plus/" target="_blank" rel="noopener noreferrer">Read the docs</a>
+          
         </div>
-
+        <p class="disclaimer">
+          Demo input is processed in real time, never stored. &middot;
+          <a href="https://github.com/VectorInstitute/unbias-plus/blob/unbias-pretrained/LICENSE.md" target="_blank" rel="noopener noreferrer">License</a>
+        </p>
         <ul class="capabilities">
           <!-- CHANGED: .cap-num → Karbon Italic (was Fraunces italic). -->
           <li><span class="cap-num">01</span><span class="cap-dot"></span><span class="cap-verb">Detect</span></li>
           <li><span class="cap-num">02</span><span class="cap-dot"></span><span class="cap-verb">Explain</span></li>
           <li><span class="cap-num">03</span><span class="cap-dot"></span><span class="cap-verb">Rewrite</span></li>
         </ul>
-
+    
       </div>
     </div><!-- /hero -->
   </main>
@@ -662,10 +702,9 @@
   ───────────────────────────────────────────── -->
   <footer>
     <span>Built by the AI Engineering team at the Vector Institute.</span>
-    <span>
-      Demo input is processed in real time, never stored. &middot;
-      <a href="https://github.com/VectorInstitute/unbias-plus/blob/unbias-pretrained/LICENSE.md" target="_blank" rel="noopener noreferrer">License</a>
-    </span>
+    
+      <div id="weglot-switcher"></div>
+
   </footer>
 </body>
 </html>
