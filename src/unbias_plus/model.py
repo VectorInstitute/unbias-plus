@@ -2,12 +2,13 @@
 
 import threading
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, cast
 
 import torch
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
+    BatchEncoding,
     BitsAndBytesConfig,
     TextIteratorStreamer,
 )
@@ -148,7 +149,10 @@ class UnBiasModel:
         if self.enable_thinking:
             template_kwargs["thinking_budget"] = self.thinking_budget
 
-        tokenized = self.tokenizer.apply_chat_template(messages, **template_kwargs)
+        tokenized = cast(
+            BatchEncoding,
+            self.tokenizer.apply_chat_template(messages, **template_kwargs),
+        )
 
         input_ids = tokenized["input_ids"].to(self.device)
         attention_mask = tokenized["attention_mask"].to(self.device)
@@ -202,12 +206,15 @@ class UnBiasModel:
         if self.enable_thinking:
             template_kwargs["thinking_budget"] = self.thinking_budget
 
-        tokenized = self.tokenizer.apply_chat_template(messages, **template_kwargs)
+        tokenized = cast(
+            BatchEncoding,
+            self.tokenizer.apply_chat_template(messages, **template_kwargs),
+        )
         input_ids = tokenized["input_ids"].to(self.device)
         attention_mask = tokenized["attention_mask"].to(self.device)
 
         streamer = TextIteratorStreamer(
-            self.tokenizer,
+            cast(AutoTokenizer, self.tokenizer),
             skip_prompt=True,
             skip_special_tokens=True,
         )
