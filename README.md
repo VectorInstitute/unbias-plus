@@ -170,11 +170,26 @@ d        = pipe.analyze_to_dict("...")   # plain dict
 json_str = pipe.analyze_to_json("...")   # pretty-printed JSON string
 ```
 
+## Training
+
+The Qwen3-8B checkpoint shipped with the demo was fine-tuned in two stages
+— SFT followed by GRPO post-training — on the
+[vector-institute/Unbias-plus](https://huggingface.co/datasets/vector-institute/Unbias-plus)
+dataset on HuggingFace.
+
+Standalone scripts that reproduce both stages live in [`training/`](training/),
+along with a sanity-check inference runner. They depend on the `[train]`
+optional extra (`peft`, `trl`, `unsloth`, `flash-attn`) and require an A100
+or comparable GPU.
+
+See [`training/README.md`](training/README.md) for details, CLI invocations,
+and resource sizing.
+
 ## Development
 
 - **Tests**: `pytest` (see `pyproject.toml` for markers). Run from repo root: `uv run pytest tests/`.
 - **Linting / formatting**: `ruff` (format + lint), config in `pyproject.toml`.
-- **Type checking**: `mypy` with strict options, `mypy_path = "src"`.
+- **Type checking**: `mypy` with strict options, `mypy_path = ["src", "training"]`.
 
 
 ## 👥 Team

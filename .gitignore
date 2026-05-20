@@ -34,3 +34,8 @@ unsloth_compiled_cache/
 site/
 logs/
 venv/
+.venv-train/
+
+# Local HPC / cluster setup (machine-specific; do not commit)
+training/env_hpc.sh
+training/setup_hpc.sh
