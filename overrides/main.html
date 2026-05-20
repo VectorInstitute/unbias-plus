@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    var logo = document.querySelector(".md-header__button.md-logo");
+    if (logo) {
+      logo.setAttribute("href", "https://vectorinstitute.ai/");
+      logo.setAttribute("target", "_blank");
+      logo.setAttribute("rel", "noopener noreferrer");
+    }
+  });
+</script>
+{% endblock %}
