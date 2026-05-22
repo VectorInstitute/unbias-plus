@@ -1,103 +1,235 @@
-# Training scripts
+# UnBias-Plus Training Pipeline
 
-Code used to fine-tune the Qwen3 model that powers the `unbias-plus` demo.
-These are **standalone scripts**, not part of the installable `unbias_plus`
-Python package. They are kept here for reproducibility and reference.
+Fine-tuning pipeline for bias detection and debiasing on news articles. Trains models to identify biased language, annotate segments, and produce neutral rewrites.
 
-The trained model itself is **not** in this repo — see "Model artifacts" below.
+---
 
-## Files
+## Models on HuggingFace
 
-| File | Purpose |
-|---|---|
-| `train_sft.py` | SFT fine-tune of Qwen3-8B with completion-only loss, exports merged bf16 weights |
-| `train_grpo.py` | GRPO post-training pass (DDP across 4 GPUs) |
-| `sanity_check.py` | Smoke-test inference against a trained checkpoint on a single article |
+> These models are currently being improved. Links will be updated when final versions are released.
 
-## Environment
+| Model | 16-bit | 4-bit |
+|-------|--------|-------|
+| Qwen3-8B | [ahelkadyy/Qwen3-8B-UnBias-Plus-SFT-Instruct](https://huggingface.co/ahelkadyy/Qwen3-8B-UnBias-Plus-SFT-Instruct) | [4-bit](https://huggingface.co/ahelkadyy/Qwen3-8B-UnBias-Plus-SFT-Instruct-4bit) |
+| Qwen3.5-4B | [ahelkadyy/Qwen3.5-4B-UnBias-Plus-SFT-Instruct](https://huggingface.co/ahelkadyy/Qwen3.5-4B-UnBias-Plus-SFT-Instruct) | [4-bit](https://huggingface.co/ahelkadyy/Qwen3.5-4B-UnBias-Plus-SFT-Instruct-4bit) |
+| Llama-3.1-8B | [ahelkadyy/Llama-3.1-8B-UnBias-Plus-SFT-Instruct](https://huggingface.co/ahelkadyy/Llama-3.1-8B-UnBias-Plus-SFT-Instruct) | [4-bit](https://huggingface.co/ahelkadyy/Llama-3.1-8B-UnBias-Plus-SFT-Instruct-4bit) |
+| Ministral-3-8B | [ahelkadyy/Ministral-3-8B-UnBias-Plus-SFT-Instruct](https://huggingface.co/ahelkadyy/Ministral-3-8B-UnBias-Plus-SFT-Instruct) | [4-bit](https://huggingface.co/ahelkadyy/Ministral-3-8B-UnBias-Plus-SFT-Instruct-4bit) |
+| Gemma4-E4B | [ahelkadyy/Gemma4-E4B-UnBias-Plus-SFT-Instruct](https://huggingface.co/ahelkadyy/Gemma4-E4B-UnBias-Plus-SFT-Instruct) | [4-bit](https://huggingface.co/ahelkadyy/Gemma4-E4B-UnBias-Plus-SFT-Instruct-4bit) |
 
-- A machine with NVIDIA A100s (or comparable) and CUDA 12.4
-- Python 3.11 (matches `.python-version`)
-- The `[train]` optional extra of this project supplies `peft`, `trl`,
-  `unsloth`, `unsloth-zoo`, `flash-attn`. Install with:
-  ```bash
-  uv sync --extra train
-  source .venv/bin/activate
-  ```
+---
 
-## Dataset
+## Directory Structure
 
-The shipped checkpoint was trained on the
-[vector-institute/Unbias-plus](https://huggingface.co/datasets/vector-institute/Unbias-plus)
-dataset on HuggingFace. The training scripts expect a local JSON file with one
-record per sample matching the dataset's schema — keys used by the loaders are
-`article_text`, `unbiased_text`, `biased_segments`, `binary_label`, `severity`,
-and `bias_found` (see [`train_sft.py`](train_sft.py) `is_valid_sample` for the
-exact validation rules).
-
-To use it, download / export the dataset to a JSON file and pass its path via
-`--input-path`.
-
-## Running
-
-### SFT (single A100)
-
-```bash
-python training/train_sft.py \
-    --input-path /path/to/training_data.json \
-    --output-dir /path/to/output/qwen3_sft
+```
+train/
+├── train_sft.py        — main SFT training script
+├── model_configs.py    — model registry (5 models + per-model configs)
+├── quick_test.py       — inference sanity check on merged model
+├── run_inference.py    — GPU inference pipeline (saves JSONL for judge)
+├── run_judge.py        — GPT-4o-mini judge evaluation (CPU)
+├── push_to_hub.py      — push merged_16bit and 4-bit models to HuggingFace
+├── Models/             — trained model outputs per model key
+│   └── <model_key>/
+│       ├── merged_16bit/
+│       └── checkpoint-*/
+└── inference_results/  — inference JSONL + judge metrics + usage logs
 ```
 
-Other flags: `--base-model`, `--max-seq-length`, `--train-samples`, `--seed`.
-See `python training/train_sft.py --help`.
+---
 
-For reasonable resource sizing: 1× A100 80 GB, ~8 hours for the default
-~5 K-sample run at `max_seq_length=8192`.
+## Environment Setup (Compute Canada A100)
 
-### GRPO (4× A100, DDP)
+Compute Canada provides precompiled wheels for PyTorch and Flash Attention. Standard PyPI packages conflict with the cluster native NCCL and CUDA modules. Follow this setup exactly.
+
+### 1. Load modules
 
 ```bash
-accelerate launch \
-    --num_processes=4 \
-    --mixed_precision=bf16 \
-    --main_process_port=29500 \
-    training/train_grpo.py \
-        --input-path /path/to/training_data.json \
-        --output-dir /path/to/output/qwen3_grpo
+module purge
+module load StdEnv python/3.11 cuda/12.6 nccl/2.27.7
 ```
 
-Useful environment variables:
+### 2. Create virtual environment
+
 ```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
+### 3. Install packages
+
+Verified working versions:
+
+```
+torch==2.9.1+computecanada
+flash_attn==2.8.3+torch29.computecanada
+transformers==5.5.0
+unsloth==2026.5.2
+```
+
+```bash
+uv pip install unsloth==2026.5.2 unsloth-zoo trl transformers==5.5.0 \
+    datasets peft accelerate bitsandbytes python-dotenv wandb openai
+```
+
+### 4. Restore Compute Canada wheels
+
+Installing unsloth pulls standard PyPI torch which conflicts with cluster CUDA. Restore the precompiled wheels:
+
+```bash
+uv pip uninstall torch torchvision torchaudio torchao xformers \
+  nvidia-cublas-cu12 nvidia-cuda-cupti-cu12 nvidia-cuda-nvrtc-cu12 \
+  nvidia-cuda-runtime-cu12 nvidia-cudnn-cu12 nvidia-cufft-cu12 \
+  nvidia-cufile-cu12 nvidia-curand-cu12 nvidia-cusolver-cu12 \
+  nvidia-cusparse-cu12 nvidia-cusparselt-cu12 nvidia-nccl-cu12 \
+  nvidia-nvjitlink-cu12 nvidia-nvshmem-cu12 nvidia-nvtx-cu12
+
+uv pip install \
+  "torch==2.9.1+computecanada" \
+  "torchvision==0.24.0+computecanada" \
+  "torchaudio==2.9.1+computecanada" \
+  "flash_attn==2.8.3+torch29.computecanada" \
+  --find-links /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/generic/ \
+  --find-links /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/x86-64-v3/ \
+  --no-index --no-deps
+```
+
+### 5. Verify installation
+
+```bash
+python -c "import torch; print(torch.__version__)"
+python -c "import flash_attn; print(flash_attn.__version__)"
+python -c "import unsloth; print('ok')"
+```
+
+### 6. Required linker exports
+
+Add these to your Slurm scripts or shell before running any training or inference:
+
+```bash
+export LD_PRELOAD=/cvmfs/soft.computecanada.ca/easybuild/software/2023/x86-64-v3/Core/cudacore/12.6.2/lib64/libnvJitLink.so.12
+export LD_LIBRARY_PATH=$EBROOTCUDA/lib64:$LD_LIBRARY_PATH
 export TOKENIZERS_PARALLELISM=false
-export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
-# Do not set CUDA_VISIBLE_DEVICES — let accelerate manage all 4 GPUs.
+export HF_HOME="/path/to/hf_cache"
 ```
 
-The Python entrypoint exposes the full hyperparameter surface
-(`--load-in-4bit/--no-load-in-4bit`, `--max-completion-length`, `--lora-rank`,
-`--learning-rate`, etc.) — see `python training/train_grpo.py --help`.
-GRPO at default settings: 4× A100 80 GB, ~72 hours.
+### 7. Environment variables (.env)
 
-### Sanity check
+Create a `.env` file in the project root:
 
-Smoke-test a trained checkpoint against a single article in a text file:
+```
+HF_TOKEN=your_huggingface_token
+HF_USERNAME=your_hf_username
+WANDB_API_KEY=your_wandb_key
+VECTOR_API_KEY=your_vector_proxy_key
+```
+
+---
+
+## Full Pipeline: Replicating a Run
+
+### Step 1 — Train
+
+Via Slurm:
+```bash
+MODEL_KEY=qwen3_8b sbatch train/launch_sft.sh
+```
+
+Directly:
+```bash
+python train/train_sft.py --model-key qwen3_8b
+```
+
+All 5 models in parallel via Slurm:
+```bash
+for MODEL_KEY in qwen3_8b qwen35_4b gemma4_e4b llama31_8b ministral_8b; do
+    MODEL_KEY=$MODEL_KEY sbatch train/launch_sft.sh
+done
+```
+
+Smoke test (10 samples, no W&B, ~2 min):
+```bash
+python train/train_sft.py --model-key qwen3_8b --smoke-test
+```
+
+Output saved to `train/Models/<model_key>/merged_16bit/`.
+
+---
+
+### Step 2 — Sanity Check
 
 ```bash
-python training/sanity_check.py \
-    --model-path /path/to/output/qwen3_sft/merged_16bit \
-    --article-file my_article.txt
+python train/quick_test.py --model-path train/Models/qwen3_8b/merged_16bit
 ```
 
-`--thinking` / `--no-thinking` toggles Qwen's `<think>` block at inference
-(default `--no-thinking`, matching the SFT training-time setting).
+---
 
-## Model artifacts
+### Step 3 — Inference
 
-Trained checkpoints live outside the repo:
+Via Slurm:
+```bash
+MODEL_PATH=train/Models/qwen3_8b/merged_16bit sbatch train/launch_inference.sh
+```
 
-- SFT merged 16-bit: produced under `OUTPUT_DIR/merged_16bit/` after a successful
-  `train_sft.py` run.
-- (Add HuggingFace Hub repo here once published.)
+Directly:
+```bash
+python train/run_inference.py \
+    --model-path     train/Models/qwen3_8b/merged_16bit \
+    --test-path      evaluation/babe_golden_500.json \
+    --output-dir     train/inference_results \
+    --max-samples    100 \
+    --seed           42 \
+    --load-4bit \
+    --max-new-tokens 2048
+```
 
-The repo's `.gitignore` excludes `Models/`, `*.safetensors`, `unsloth_compiled_cache/`,
-etc., so running these scripts in-place will not accidentally commit weights.
+For models with verbose output (e.g. Llama):
+```bash
+MAX_NEW_TOKENS=4096 MODEL_PATH=train/Models/llama31_8b/merged_16bit sbatch train/launch_inference.sh
+```
+
+Output saved to `train/inference_results/inference_<model>.jsonl`.
+
+---
+
+### Step 4 — Judge Evaluation
+
+CPU only, no GPU needed. Requires `VECTOR_API_KEY` in `.env`:
+
+```bash
+python train/run_judge.py \
+    --inference-file train/inference_results/inference_qwen3_8b.jsonl \
+    --output-dir train/inference_results
+```
+
+Output per model:
+- `metrics_<model>.json` — aggregate scores (mean/median/min/max)
+- `predictions_<model>.jsonl` — per-sample scores
+- `usage_<model>.json` — token usage and cost per call
+
+---
+
+### Step 5 — Push to HuggingFace
+
+Via Slurm:
+```bash
+MODEL_KEY=qwen3_8b sbatch train/push_to_hub.sh
+```
+
+Directly:
+```bash
+python train/push_to_hub.py --model-key qwen3_8b
+```
+
+Requires `HF_TOKEN` and `HF_USERNAME` in `.env`.
+
+---
+
+## Troubleshooting
+
+**NCCL symbol crashes (`ncclCommWindowDeregister`):** Standard PyPI torch overrode the cluster NCCL module. Purge and reinstall with `--no-index` as described in Step 4 of environment setup.
+
+**HuggingFace 403 Forbidden:** Ensure `HF_TOKEN` in `.env` has Write permissions for your namespace.
+
+**JSON parse failures on inference:** Model output was truncated at `max_new_tokens`. Resubmit with `MAX_NEW_TOKENS=4096`.
+
+**Ministral loading errors:** Requires Unsloth — `AutoModelForCausalLM` does not support `Mistral3Config`. `run_inference.py` handles this automatically via fallback.

@@ -10,7 +10,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from sanity_check import extract_json, parse_args
+
+from training.sanity_check import extract_json, parse_args
 
 
 # ---------------------------------------------------------------------------

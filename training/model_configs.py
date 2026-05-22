@@ -24,6 +24,11 @@ class ModelConfig:
     gradient_accumulation_steps: int = 4
     per_device_eval_batch_size: int = 4
 
+    # Runtime properties added via CLI
+    _data_path: str | None = None
+    _train_samples: int | None = None
+    _smoke_test: bool = False
+
 
 HF_USERNAME = os.environ.get("HF_USERNAME", "ahelkadyy")
 
