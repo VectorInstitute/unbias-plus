@@ -376,7 +376,7 @@ def train_model(
             processing_class=tokenizer,  # TRL >= 0.12
         )
     except TypeError:
-        trainer = SFTTrainer(
+        trainer = SFTTrainer(  # type: ignore
             model=model,
             train_dataset=train_ds,
             eval_dataset=eval_ds,

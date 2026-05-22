@@ -592,7 +592,7 @@ def train_grpo(
     training_args: GRPOConfig,
 ) -> None:
     """Run GRPOTrainer.train() with TRL version fallbacks for tokenizer arg name."""
-    reward_funcs = [
+    reward_funcs: list[Any] = [
         reward_json_valid,
         reward_binary_label,
         reward_severity,
@@ -609,7 +609,7 @@ def train_grpo(
             train_dataset=dataset,
         )
     except TypeError:
-        trainer = GRPOTrainer(
+        trainer = GRPOTrainer(  # type: ignore
             model=model,
             tokenizer=tokenizer,
             reward_funcs=reward_funcs,
