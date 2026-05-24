@@ -17,8 +17,7 @@ DESIGN — Unpaired original bias:
     Call 1 (paired): original + predicted label + rewrite
                   -> correct_identification, unnecessary_rewrite
 
-Uses the Vector Institute proxy at https://proxy.vectorinstitute.ai/v1.
-Set VECTOR_API_KEY in .env at the project root.
+
 
 Usage:
   python train/run_judge.py \
