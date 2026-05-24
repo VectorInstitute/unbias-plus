@@ -44,7 +44,6 @@ from openai import OpenAI
 logger = logging.getLogger(__name__)
 
 DEFAULT_JUDGE_MODEL = "gpt-4o-mini"
-VECTOR_PROXY_URL = "https://proxy.vectorinstitute.ai/v1"
 MAX_RETRIES = 3
 
 # ---------------------------------------------------------------------------
