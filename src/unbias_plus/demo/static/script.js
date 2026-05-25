@@ -137,9 +137,19 @@
      }
      _activeAnalysisController = new AbortController();
      const signal = _activeAnalysisController.signal;
+    //  analyzeBtn.disabled = true;
+    //  resultsEl.classList.add("hidden");
+    //  loadingEl.classList.remove("hidden");
      analyzeBtn.disabled = true;
      resultsEl.classList.add("hidden");
      loadingEl.classList.remove("hidden");
+     // Clear all previous results so a new run never shows stale highlights/cards.
+     unbiasedEl.innerHTML  = "";
+     highlightEl.innerHTML = "";
+     segListEl.innerHTML   = "";
+     pillsEl.innerHTML     = "";
+     segCountEl.textContent = "0 segments";
+     noBiasEl.classList.add("hidden");
      unbiasedEl.innerHTML = "";
      const labelEl = document.querySelector(".loading-label");
      let tokenCount = 0;

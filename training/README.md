@@ -1,103 +1,161 @@
-# Training scripts
+# Training
 
-Code used to fine-tune the Qwen3 model that powers the `unbias-plus` demo.
-These are **standalone scripts**, not part of the installable `unbias_plus`
-Python package. They are kept here for reproducibility and reference.
+Standalone scripts for fine-tuning and evaluating the UnBias-Plus model.
+Not part of the installable `unbias_plus` package (`src/unbias_plus/`).
 
-The trained model itself is **not** in this repo — see "Model artifacts" below.
-
-## Files
+## Scripts
 
 | File | Purpose |
-|---|---|
-| `train_sft.py` | SFT fine-tune of Qwen3-8B with completion-only loss, exports merged bf16 weights |
-| `train_grpo.py` | GRPO post-training pass (DDP across 4 GPUs) |
-| `sanity_check.py` | Smoke-test inference against a trained checkpoint on a single article |
+|------|---------|
+| `prompts.py` | Shared system prompts (imported by the other scripts) |
+| `train.py` | SFT fine-tuning (main entry, 1× A100) |
+| `clean_dataset.py` | Clean / prepare the training JSON |
+| `eval_judge.py` | Run the model on a test set + LLM-judge metrics |
+| `quick_test.py` | Fast local inference smoke test |
+| `smoke_test_inference.py` | Inference check via the merged model / adapter |
 
 ## Environment
 
-- A machine with NVIDIA A100s (or comparable) and CUDA 12.4
-- Python 3.11 (matches `.python-version`)
-- The `[train]` optional extra of this project supplies `peft`, `trl`,
-  `unsloth`, `unsloth-zoo`, `flash-attn`. Install with:
-  ```bash
-  uv sync --extra train
-  source .venv/bin/activate
-  ```
-
-## Dataset
-
-The shipped checkpoint was trained on the
-[vector-institute/Unbias-plus](https://huggingface.co/datasets/vector-institute/Unbias-plus)
-dataset on HuggingFace. The training scripts expect a local JSON file with one
-record per sample matching the dataset's schema — keys used by the loaders are
-`article_text`, `unbiased_text`, `biased_segments`, `binary_label`, `severity`,
-and `bias_found` (see [`train_sft.py`](train_sft.py) `is_valid_sample` for the
-exact validation rules).
-
-To use it, download / export the dataset to a JSON file and pass its path via
-`--input-path`.
-
-## Running
-
-### SFT (single A100)
+### Standard setup
 
 ```bash
-python training/train_sft.py \
-    --input-path /path/to/training_data.json \
-    --output-dir /path/to/output/qwen3_sft
-```
+# create + activate the training venv
+python -m venv .venv-train
+source .venv-train/bin/activate
 
-Other flags: `--base-model`, `--max-seq-length`, `--train-samples`, `--seed`.
-See `python training/train_sft.py --help`.
+# install deps (torch, transformers, trl, unsloth, ...)
+uv sync --extra train      # or: pip install -r requirements.txt
 
-For reasonable resource sizing: 1× A100 80 GB, ~8 hours for the default
-~5 K-sample run at `max_seq_length=8192`.
-
-### GRPO (4× A100, DDP)
-
-```bash
-accelerate launch \
-    --num_processes=4 \
-    --mixed_precision=bf16 \
-    --main_process_port=29500 \
-    training/train_grpo.py \
-        --input-path /path/to/training_data.json \
-        --output-dir /path/to/output/qwen3_grpo
-```
-
-Useful environment variables:
-```bash
+# HF cache (home quota is small — point it at the project space)
+export HF_HOME=/projects/aixpert/.cache/huggingface
 export TOKENIZERS_PARALLELISM=false
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
-# Do not set CUDA_VISIBLE_DEVICES — let accelerate manage all 4 GPUs.
 ```
 
-The Python entrypoint exposes the full hyperparameter surface
-(`--load-in-4bit/--no-load-in-4bit`, `--max-completion-length`, `--lora-rank`,
-`--learning-rate`, etc.) — see `python training/train_grpo.py --help`.
-GRPO at default settings: 4× A100 80 GB, ~72 hours.
+### Compute Canada A100 (flash attention)
 
-### Sanity check
+Compute Canada provides precompiled wheels for PyTorch and Flash Attention. Standard PyPI packages conflict with the cluster's native NCCL and CUDA modules. Follow this setup exactly.
 
-Smoke-test a trained checkpoint against a single article in a text file:
+**1. Load modules**
 
 ```bash
-python training/sanity_check.py \
-    --model-path /path/to/output/qwen3_sft/merged_16bit \
-    --article-file my_article.txt
+module purge
+module load StdEnv python/3.11 cuda/12.6 nccl/2.27.7
 ```
 
-`--thinking` / `--no-thinking` toggles Qwen's `<think>` block at inference
-(default `--no-thinking`, matching the SFT training-time setting).
+**2. Create virtual environment**
 
-## Model artifacts
+```bash
+python -m venv .venv-train
+source .venv-train/bin/activate
+```
 
-Trained checkpoints live outside the repo:
+**3. Install packages**
 
-- SFT merged 16-bit: produced under `OUTPUT_DIR/merged_16bit/` after a successful
-  `train_sft.py` run.
-- (Add HuggingFace Hub repo here once published.)
+```bash
+uv pip install unsloth==2026.5.2 unsloth-zoo trl transformers==5.5.0 \
+    datasets peft accelerate bitsandbytes python-dotenv wandb openai
+```
 
-The repo's `.gitignore` excludes `Models/`, `*.safetensors`, `unsloth_compiled_cache/`,
-etc., so running these scripts in-place will not accidentally commit weights.
+**4. Restore Compute Canada wheels**
+
+Installing unsloth pulls standard PyPI torch which conflicts with cluster CUDA. Restore the precompiled wheels:
+
+```bash
+uv pip uninstall torch torchvision torchaudio torchao xformers \
+  nvidia-cublas-cu12 nvidia-cuda-cupti-cu12 nvidia-cuda-nvrtc-cu12 \
+  nvidia-cuda-runtime-cu12 nvidia-cudnn-cu12 nvidia-cufft-cu12 \
+  nvidia-cufile-cu12 nvidia-curand-cu12 nvidia-cusolver-cu12 \
+  nvidia-cusparse-cu12 nvidia-cusparselt-cu12 nvidia-nccl-cu12 \
+  nvidia-nvjitlink-cu12 nvidia-nvshmem-cu12 nvidia-nvtx-cu12
+
+uv pip install \
+  "torch==2.9.1+computecanada" \
+  "torchvision==0.24.0+computecanada" \
+  "torchaudio==2.9.1+computecanada" \
+  "flash_attn==2.8.3+torch29.computecanada" \
+  --find-links /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/generic/ \
+  --find-links /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/x86-64-v3/ \
+  --no-index --no-deps
+```
+
+**5. Verify installation**
+
+```bash
+python -c "import torch; print(torch.__version__)"
+python -c "import flash_attn; print(flash_attn.__version__)"
+python -c "import unsloth; print('ok')"
+```
+
+**6. Required linker exports**
+
+Add these to your Slurm scripts or shell before running any training or inference:
+
+```bash
+export LD_PRELOAD=/cvmfs/soft.computecanada.ca/easybuild/software/2023/x86-64-v3/Core/cudacore/12.6.2/lib64/libnvJitLink.so.12
+export LD_LIBRARY_PATH=$EBROOTCUDA/lib64:$LD_LIBRARY_PATH
+export TOKENIZERS_PARALLELISM=false
+export HF_HOME="/path/to/hf_cache"
+```
+
+**7. Environment variables (.env)**
+
+Create a `.env` file in the project root:
+
+```
+HF_TOKEN=your_huggingface_token
+HF_USERNAME=your_hf_username
+WANDB_API_KEY=your_wandb_key
+VECTOR_API_KEY=your_vector_proxy_key
+```
+
+## Data
+
+Source: https://huggingface.co/datasets/vector-institute/unbias-plus-dataset
+
+```python
+from datasets import load_dataset
+
+train = load_dataset("vector-institute/unbias-plus-dataset", name="unbias-plus_train", split="train")
+test  = load_dataset("vector-institute/unbias-plus-dataset", name="unbias-plus_test",  split="test")
+```
+
+Save a split to local JSON, then pass it to `train.py` / `eval_judge.py` via
+`--input-path` / `--test-path`. The data folder itself is gitignored.
+
+## Train
+
+```bash
+# smoke test (fast — 20 samples, 1 epoch)
+python train.py \
+  --input-path data/train.json \
+  --output-dir outputs/smoke_test \
+  --train-samples 20 --epochs 1 --max-seq-length 4096 --load-in-4bit
+
+# full run
+python train.py \
+  --input-path data/train.json \
+  --output-dir outputs/run5 --epochs 5
+```
+
+Output lands in `outputs/<run>/merged_16bit/` (gitignored).
+
+## Inference check
+
+```bash
+# defaults to outputs/vldbench_1k/merged_16bit; override with the env var or an arg
+UNBIAS_MODEL_PATH=outputs/run5/merged_16bit python quick_test.py
+# or
+python quick_test.py outputs/run5/merged_16bit
+```
+
+## Eval
+
+```bash
+python eval_judge.py \
+  --model-path outputs/run5/merged_16bit \
+  --test-path data/test.json \
+  --output-dir eval_results \
+  --env-path /path/to/.env \
+  --load-4bit
+```
