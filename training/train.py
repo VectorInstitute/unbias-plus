@@ -621,12 +621,12 @@ def log_adapter_artifact(output_dir: Path, project: str) -> None:
     import wandb  # noqa: PLC0415
 
     created = False
-    run = wandb.run  # type: ignore[attr-defined]
+    run = wandb.run
     if run is None:
-        run = wandb.init(project=project, job_type="export", resume="allow")  # type: ignore[attr-defined]
+        run = wandb.init(project=project, job_type="export", resume="allow")
         created = True
 
-    artifact = wandb.Artifact(name="lora-adapter", type="model")  # type: ignore[attr-defined]
+    artifact = wandb.Artifact(name="lora-adapter", type="model")
     for f in output_dir.iterdir():
         if f.is_file():
             artifact.add_file(str(f))
