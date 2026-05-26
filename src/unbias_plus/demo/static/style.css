@@ -113,6 +113,13 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+button {
+  font: inherit;
+  color: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
 html { scroll-behavior: smooth; }
 
 /* CHANGED: Added display:flex + flex-direction:column so footer is pushed
@@ -155,10 +162,17 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 24px;
+  flex-wrap: nowrap;
   /* CHANGED: explicit white background + stacking above noise */
   background: #ffffff;
   position: relative;
   z-index: 20;
+}
+
+header .vector-logo-link,
+header .feedback-trigger-btn {
+  flex-shrink: 0;
 }
 
 .header-left {
@@ -338,6 +352,15 @@ textarea:focus {
   position: relative;
 }
 
+.input-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
 .disclaimer-inline {
   position: absolute;
   left: 50%;
@@ -398,6 +421,38 @@ textarea:focus {
 }
 
 .analyze-btn:hover .btn-arrow { transform: translateX(3px); }
+
+/* Secondary action — matches upload-btn / example-chip pill style */
+.refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 22px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--text-2);
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: border-color 0.15s, color 0.15s, background 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+
+.refresh-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-dim);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(235, 8, 138, 0.12);
+}
+
+.refresh-btn:active { transform: translateY(0); }
 
 /* ============================================================
    LOADING
@@ -842,8 +897,13 @@ mark.replaced-green {
    ============================================================ */
 
 @media (max-width: 900px) {
-  header { padding: 20px 24px; }
+  header { padding: 20px 24px; gap: 12px; }
+  .vector-logo { height: 44px; }
   main { padding: 40px 24px 80px; }
+  .input-footer { flex-wrap: wrap; gap: 12px; }
+  .input-actions { gap: 8px; margin-left: auto; }
+  .refresh-btn { padding: 12px 16px; }
+  .analyze-btn { padding: 12px 18px; }
   .panels { grid-template-columns: 1fr; }
   .segment-card { grid-template-columns: auto 1fr; }
   .seg-replacement { grid-column: 2; align-items: flex-start; text-align: left; }
@@ -969,6 +1029,7 @@ mark.replaced-green {
   background: var(--bg-3);
   border: 1px solid var(--border);
   border-radius: 20px;
+  text-decoration: none;
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
   white-space: nowrap;
@@ -1238,6 +1299,20 @@ html.landing-root body.landing-page .landing-actions-links a.landing-inline-link
   border-radius: 4px;
 }
 
+.pypi-callout {
+  margin-top: 6px;
+}
+
+.pypi-callout a {
+  color: var(--text-3);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.pypi-callout a:hover {
+  color: var(--text-2);
+}
+
 /* ---------- Vector logo link wrapper (works on index.html too) ---------- */
 a.vector-logo-link {
   display: inline-flex;
@@ -1252,20 +1327,4 @@ a.vector-logo-link:hover { opacity: 0.85; transform: translateY(-1px); }
 a.vector-logo-link:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgba(49, 60, 255, 0.18);
-}
-.refresh-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  color: var(--text-muted);
-  text-decoration: none;
-  transition: color 0.2s, background 0.2s;
-}
-
-.refresh-btn:hover {
-  color: var(--text-primary);
-  background: var(--surface-2);
 }

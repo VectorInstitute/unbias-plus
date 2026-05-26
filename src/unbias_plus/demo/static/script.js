@@ -18,6 +18,7 @@
    const tooltip       = document.getElementById("tooltip");
    const errorBannerEl = document.getElementById("error-banner");
    const MAX_CHARS = 5000;
+   const PYPI_SLOW_SECONDS = 8;
    const MAX_COLD_START_RETRIES = 10; // 10 × 5 s = 50 s window for uvicorn to start
    let coldStartRetries = 0;
    let _activeAnalysisController = null; // AbortController for the in-flight stream
@@ -33,6 +34,7 @@
      errorBannerEl.classList.remove("hidden");
      setTimeout(() => errorBannerEl.classList.add("hidden"), 8000);
    }
+
    // ============================================================
    // EXAMPLE CHIPS
    // ============================================================
@@ -173,7 +175,7 @@
        if (firstTokenReceived) return;
        const elapsed = Math.floor((Date.now() - startTime) / 1000);
        if (!labelEl) return;
-       if (serverConnected || elapsed < 8) {
+       if (serverConnected || elapsed < PYPI_SLOW_SECONDS) {
          labelEl.textContent = "Analyzing bias patterns...";
        } else {
          labelEl.innerHTML =

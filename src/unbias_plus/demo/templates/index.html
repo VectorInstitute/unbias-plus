@@ -42,12 +42,6 @@
       </svg>
       Feedback
     </a>
-    <a class="refresh-btn" href="/" title="Start over" aria-label="Refresh page">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="23 4 23 10 17 10"/>
-        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-      </svg>
-    </a>
   </header>
 
   <main>
@@ -89,13 +83,27 @@
       Optimized for English; results in other languages may be less reliable.
       Because bias is subjective and context-dependent, results are indicative rather than definitive.
     </p>
+    <p class="disclaimer-note pypi-callout" id="pypi-callout">
+      For longer articles or slower processing, run
+      <a href="https://pypi.org/project/unbias-plus/" target="_blank" rel="noopener noreferrer">unbias-plus on PyPI</a>
+      on your own machine.
+    </p>
 
       <div class="input-footer">
         <span id="char-count" class="char-count">0 / 5000</span>
-        <button id="analyze-btn" class="analyze-btn">
-          <span class="btn-text">Analyze for bias</span>
-          <span class="btn-arrow">→</span>
-        </button>
+        <div class="input-actions">
+          <a href="/demo" class="refresh-btn" title="Refresh demo" aria-label="Refresh demo">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="23 4 23 10 17 10"/>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+            </svg>
+            Refresh
+          </a>
+          <button id="analyze-btn" type="button" class="analyze-btn">
+            <span class="btn-text">Analyze for bias</span>
+            <span class="btn-arrow">→</span>
+          </button>
+        </div>
       </div>
     </section>
     <!-- INLINE ERROR -->

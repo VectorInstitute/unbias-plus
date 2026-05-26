@@ -5,15 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>UnBias-Plus · Vector Institute</title>
 
-  <!-- Weglot translation widget (moved inside <head> — was invalid before <head>) -->
-  <script type="text/javascript" src="https://cdn.weglot.com/weglot.min.js"></script>
-  <script>
-    Weglot.initialize({
-      api_key: 'wg_cadf5c5b0c9dbd8d156f4944ed03b49c9',
-      styleOpt: { fullname: true },
-    });
-  </script>
-
   <!-- Fonts: Open Sans (body), Caveat (accent), DM Mono (labels). Karbon loaded via @font-face below. -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -85,6 +76,33 @@
     .vector-logo:hover { opacity:1; }
     .signin { font-family:var(--karbon); font-weight:500; font-size:13px; padding:8px 18px; border:1.5px solid var(--ink); border-radius:8px; color:var(--ink); transition:all 0.18s ease; white-space:nowrap; }
     .signin:hover { background:var(--ink); color:#ffffff; }
+
+    /* Language switcher (header — Vector-style EN / FR-CA dropdown) */
+    .lang-switcher { position:relative; flex-shrink:0; }
+    .lang-trigger {
+      background:none; border:none; padding:0; cursor:pointer;
+      font-family:var(--karbon); font-weight:700; font-size:14px; letter-spacing:0.06em;
+      color:var(--magenta); line-height:1;
+    }
+    .lang-trigger:hover { color:var(--magenta-deep); }
+    .lang-menu {
+      position:absolute; top:calc(100% + 10px); left:0; min-width:92px;
+      background:#ffffff; border-radius:4px;
+      box-shadow:0 6px 24px rgba(21,20,15,0.14), 0 2px 6px rgba(21,20,15,0.08);
+      padding:14px 18px; z-index:200;
+    }
+    .lang-menu.hidden { display:none; }
+    .lang-option {
+      display:block; width:100%; background:none; border:none; padding:0; cursor:pointer;
+      font-family:var(--karbon); font-weight:700; font-size:14px; letter-spacing:0.04em;
+      color:var(--ink); text-align:center; line-height:1;
+    }
+    .lang-option:hover { color:var(--magenta); }
+
+    .lang-sep { color:var(--rule); }
+
+    /* Hide Weglot's default switcher (keep init fully enabled) */
+    .weglot-container, .wg-default, #weglot-switcher { display:none !important; }
 
     /* ─── Main wrapper ───
        CHANGED: tightened top padding and let the hero sit a touch higher so it
@@ -252,10 +270,8 @@
       font-size:12px; color:rgba(255,255,255,0.45);
     }
     footer span { text-align:center; }
-    #weglot-switcher { position:absolute; right:20px; }
     footer a { color:rgba(255,255,255,0.65); border-bottom:1px solid rgba(255,255,255,0.2); transition:all 0.18s ease; }
     footer a:hover { color:#ffffff; border-color:#ffffff; }
-    .weglot-container a { color:var(--cobalt) !important; border-color:transparent !important; background-color:transparent !important; }
 
     @keyframes rise { from{opacity:0;transform:translateY(14px);} to{opacity:1;transform:translateY(0);} }
 
@@ -264,6 +280,7 @@
       header { height:56px; }
       .logo-tagline { display:none; }
       .topnav { display:none; }
+      .lang-sep { display:none; }
       .vector-logo { height:34px; }
       .hero-headline-inner { padding:36px 28px 28px; }
       .hero-body-card { padding:var(--space-4) 28px var(--space-5); }
@@ -294,6 +311,15 @@
     </div>
 
     <div class="header-right">
+      <div class="lang-switcher" id="lang-switcher">
+        <button type="button" class="lang-trigger" id="lang-trigger" aria-haspopup="listbox" aria-expanded="false" aria-label="Language">
+          <span id="lang-current">EN</span>
+        </button>
+        <div class="lang-menu hidden" id="lang-menu" role="listbox" aria-label="Choose language"></div>
+      </div>
+
+      <span class="topnav-sep lang-sep" aria-hidden="true">/</span>
+
       <nav class="topnav" aria-label="Site links">
         <a href="https://vectorinstitute.github.io/unbias-plus/" target="_blank" rel="noopener noreferrer">Docs</a>
         <span class="topnav-sep" aria-hidden="true">/</span>
@@ -372,8 +398,110 @@
   </main>
 
   <footer>
-    <span>Built by the AI Engineering team at the Vector Institute.</span>
-    <div id="weglot-switcher"></div>
+    <span>Copyright © 2026, Built by the AI Engineering team at the Vector Institute.</span>
   </footer>
+
+  <script src="https://cdn.weglot.com/weglot.min.js"></script>
+  <script>
+    (function () {
+      const LABELS = { en: "EN", fr: "FR-CA" };
+      const trigger = document.getElementById("lang-trigger");
+      const menu = document.getElementById("lang-menu");
+      const currentEl = document.getElementById("lang-current");
+      const switcher = document.getElementById("lang-switcher");
+
+      let wgCodes = null;
+      let activeKey = "en";
+      let wgReady = false;
+
+      function resolveWeglotCodes() {
+        const from = Weglot.options.language_from;
+        const destinations = (Weglot.options.languages || []).map(function (l) {
+          return l.language_to;
+        });
+        const frCode =
+          destinations.find(function (c) {
+            return c === "fr" || c === "fr-ca" || c.indexOf("fr") === 0;
+          }) || "fr";
+        wgCodes = { en: from, fr: frCode };
+      }
+
+      function keyFromWeglotCode(code) {
+        if (!wgCodes) return "en";
+        if (code === wgCodes.fr || (code && code.indexOf("fr") === 0)) return "fr";
+        return "en";
+      }
+
+      function syncUI() {
+        currentEl.textContent = LABELS[activeKey];
+        document.documentElement.lang = activeKey === "fr" ? "fr-CA" : "en";
+      }
+
+      function otherKey(key) {
+        return key === "en" ? "fr" : "en";
+      }
+
+      function renderMenu() {
+        const alt = otherKey(activeKey);
+        menu.innerHTML =
+          '<button type="button" class="lang-option" data-key="' + alt + '" role="option">' +
+          LABELS[alt] +
+          "</button>";
+        menu.querySelector(".lang-option").addEventListener("click", function () {
+          switchLang(this.getAttribute("data-key"));
+        });
+      }
+
+      function switchLang(key) {
+        if (!wgReady || !wgCodes) return;
+        const target = key === "fr" ? wgCodes.fr : wgCodes.en;
+        Weglot.switchTo(target);
+        closeMenu();
+      }
+
+      function closeMenu() {
+        menu.classList.add("hidden");
+        trigger.setAttribute("aria-expanded", "false");
+      }
+
+      trigger.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (!wgReady) return;
+        if (menu.classList.contains("hidden")) {
+          menu.classList.remove("hidden");
+          trigger.setAttribute("aria-expanded", "true");
+          renderMenu();
+        } else {
+          closeMenu();
+        }
+      });
+
+      document.addEventListener("click", function (e) {
+        if (!switcher.contains(e.target)) closeMenu();
+      });
+
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") closeMenu();
+      });
+
+      Weglot.on("initialized", function () {
+        resolveWeglotCodes();
+        activeKey = keyFromWeglotCode(Weglot.getCurrentLang());
+        wgReady = true;
+        syncUI();
+        renderMenu();
+      });
+
+      Weglot.on("languageChanged", function (newLang) {
+        activeKey = keyFromWeglotCode(newLang);
+        syncUI();
+        renderMenu();
+      });
+
+      Weglot.initialize({
+        api_key: "wg_cadf5c5b0c9dbd8d156f4944ed03b49c9",
+      });
+    })();
+  </script>
 </body>
 </html>

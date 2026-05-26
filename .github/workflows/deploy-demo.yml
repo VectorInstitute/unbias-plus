@@ -439,7 +439,7 @@ jobs:
           | **Demo UI** | ${{ steps.deploy.outputs.url }} | Cloud Run CPU, scales to zero |
           | **vLLM API** | https://proxy.vectorinstitute.ai/v1 | Routed via Vector proxy gateway |
           | **Health** | ${{ steps.deploy.outputs.url }}/health | |
-          | **Model** | vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct | served via vLLM |
+          | **Model** | vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-Legacy | served via vLLM |
 
           ---
           *Deployed at $(date -u +"%Y-%m-%d %H:%M:%S UTC")*

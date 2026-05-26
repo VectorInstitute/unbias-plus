@@ -26,6 +26,13 @@ resolution-markers = [
     "(python_full_version < '3.11' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (python_full_version < '3.11' and sys_platform == 'darwin')",
 ]
 
+[manifest]
+
+[[manifest.dependency-metadata]]
+name = "flash-attn"
+version = "2.7.3"
+requires-dist = ["einops", "torch>=2.0.0"]
+
 [[package]]
 name = "accelerate"
 version = "1.10.1"
@@ -5353,7 +5360,7 @@ wheels = [
 
 [[package]]
 name = "unbias-plus"
-version = "0.1.5"
+version = "0.1.6"
 source = { editable = "." }
 dependencies = [
     { name = "accelerate" },
