@@ -6,7 +6,11 @@ from unbias_plus.formatter import format_cli, format_dict, format_json
 from unbias_plus.model import DEFAULT_MODEL, UnBiasModel
 from unbias_plus.parser import parse_llm_output
 from unbias_plus.prompt import build_messages
-from unbias_plus.schema import BiasResult, compute_offsets
+from unbias_plus.schema import (
+    BiasResult,
+    compute_offsets,
+    compute_replacement_offsets,
+)
 
 
 class UnBiasPlus:
@@ -85,16 +89,7 @@ class UnBiasPlus:
         messages = build_messages(text)
         raw_output = self._model.generate(messages)
         result = parse_llm_output(raw_output)
-
-        # Compute character-level offsets for frontend highlighting
-        segments_with_offsets = compute_offsets(text, result.biased_segments)
-
-        return result.model_copy(
-            update={
-                "biased_segments": segments_with_offsets,
-                "original_text": text,
-            }
-        )
+        return finalize_result(text, result)
 
     def analyze_to_cli(self, text: str) -> str:
         """Analyze text and return a formatted CLI string.
@@ -143,3 +138,15 @@ class UnBiasPlus:
 
         """
         return format_json(self.analyze(text))
+
+
+def finalize_result(text: str, result: BiasResult) -> BiasResult:
+    """Attach original text and character offsets for each biased segment."""
+    segments = compute_offsets(text, result.biased_segments)
+    segments = compute_replacement_offsets(result.unbiased_text, segments)
+    return result.model_copy(
+        update={
+            "biased_segments": segments,
+            "original_text": text,
+        }
+    )

@@ -1,20 +1,20 @@
 [project]
 name = "unbias-plus"
-version = "0.1.5"
+version = "0.1.6"
 description = "Bias detection and debiasing: identify segments, classify severity, get reasoning and replacements, full neutral rewrite"
 readme = {file = "README.md", content-type = "text/markdown"}
 
 authors = [
     {name = "Ahmed Y. Radwan", email = "ahmed.radwan@vectorinstitute.ai"}
 ]
-license = {text = "Apache-2.0"}
+license = {file = "LICENSE.md"}
 requires-python = ">=3.10"
 
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: Apache Software License",
+    "License :: Other/Proprietary License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -27,7 +27,7 @@ dependencies = [
     "torch>=2.0.0,<=2.6.0",
     "torchaudio>=0.13.0,<=2.6.0",
     "torchvision>=0.13.0,<=0.21.0",
-    "transformers>=4.35.0,<5.2.0",
+    "transformers>=4.35.0,<6.0.0",
     "accelerate>=1.0.0,<=1.10.1",
     # Fine-tuning
     "peft>=0.17.1",
@@ -50,13 +50,17 @@ dependencies = [
     "pydantic-settings>=2.11.0",
     # Utilities
     "tqdm>=4.67.3",
-    "python-dotenv==1.1",
+    "python-dotenv==1.2.2",
     "einops>=0.8.1",
     "tiktoken==0.7.0",
     # API server
     "fastapi>=0.110.0",
+    "starlette>=1.0.1",
+    "openai>=1.0.0",
     "uvicorn>=0.29.0",
     "tornado>=6.5.5",
+    "google-cloud-bigquery>=3.0.0",
+    "pillow>=12.2.0",
 ]
 
 [project.urls]
@@ -99,6 +103,10 @@ docs = [
     "jinja2>=3.1.6",
     "ipykernel>=6.29.5",
     "ipython>=8.31.0",
+    # Pinned: PYSEC-2026-89 advisory flags 3.10.x even though it documents
+    # the fix as 3.8.1 — pin to the documented fix version until the
+    # advisory's affected-range data is corrected upstream.
+    "markdown==3.8.1",
 ]
 
 [build-system]
@@ -112,12 +120,11 @@ artifacts = ["src/unbias_plus/demo/**"]
 [tool.uv]
 default-groups = ["dev", "docs"]
 index-url = "https://pypi.org/simple"
-extra-build-dependencies = { flash-attn = ["torch"] }
 extra-index-url = ["https://download.pytorch.org/whl/cu124"]
 index-strategy = "unsafe-best-match"
 
 [tool.uv.sources]
-unsloth = { git = "https://github.com/unslothai/unsloth.git", tag = "February-2026" }
+unsloth = { git = "https://github.com/unslothai/unsloth.git", tag = "March-2026" }
 unsloth-zoo = { git = "https://github.com/unslothai/unsloth-zoo.git" }
 
 [tool.mypy]
@@ -137,7 +144,16 @@ warn_unused_configs = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 strict_equality = true
-mypy_path = "src"
+mypy_path = ["src", "training"]
+
+# Heavy GPU/training-only dependencies aren't installed in every environment
+# (CI runs `uv sync --no-extra train`, dev clones may or may not). The override
+# tells mypy to treat them as Any when missing, and use real types when present
+# — which keeps the per-environment behaviour symmetric and avoids the
+# "unused type: ignore" trap from `warn_unused_ignores`.
+[[tool.mypy.overrides]]
+module = ["unsloth", "unsloth.*", "trl", "trl.*", "datasets", "datasets.*"]
+ignore_missing_imports = true
 
 [tool.ruff]
 line-length = 88
@@ -190,6 +206,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["E402", "F401", "F403", "F811"]
 "tests/*" = ["D103", "D105", "D107"]
+"src/unbias_plus/api.py" = ["PLC0415"]  # lazy imports for optional cloud deps
 
 [tool.ruff.lint.pep8-naming]
 ignore-names = ["X*", "setUp"]
@@ -204,7 +221,7 @@ convention = "numpy"
 max-doc-length = 88
 
 [tool.pytest.ini_options]
-testpaths = ["tests/unit", "tests/integration"]
+testpaths = ["tests/unbias_plus", "tests/training"]
 python_files = ["test_*.py"]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",

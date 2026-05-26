@@ -2,18 +2,19 @@
 
 import threading
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, cast
 
 import torch
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
+    BatchEncoding,
     BitsAndBytesConfig,
     TextIteratorStreamer,
 )
 
 
-DEFAULT_MODEL = "vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct"
+DEFAULT_MODEL = "vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-Legacy"
 MAX_SEQ_LENGTH = 8192
 
 
@@ -73,6 +74,13 @@ class UnBiasModel:
             self.tokenizer.pad_token = self.tokenizer.eos_token
             self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
         self.tokenizer.padding_side = "left"
+        self.eos_token_ids = list(
+            {
+                self.tokenizer.eos_token_id,
+                self.tokenizer.convert_tokens_to_ids("<|im_end|>"),
+                self.tokenizer.convert_tokens_to_ids("<|endoftext|>"),
+            }
+        )
 
         # --- Quantization config ---
         # 4-bit quantization is opt-in via --load-in-4bit flag only.
@@ -141,7 +149,10 @@ class UnBiasModel:
         if self.enable_thinking:
             template_kwargs["thinking_budget"] = self.thinking_budget
 
-        tokenized = self.tokenizer.apply_chat_template(messages, **template_kwargs)
+        tokenized = cast(
+            BatchEncoding,
+            self.tokenizer.apply_chat_template(messages, **template_kwargs),
+        )
 
         input_ids = tokenized["input_ids"].to(self.device)
         attention_mask = tokenized["attention_mask"].to(self.device)
@@ -155,7 +166,7 @@ class UnBiasModel:
                 temperature=None,  # must be None when do_sample=False
                 top_p=None,  # must be None when do_sample=False
                 pad_token_id=self.tokenizer.pad_token_id,
-                eos_token_id=self.tokenizer.eos_token_id,
+                eos_token_id=self.eos_token_ids,
             )
 
         # Decode only the new tokens — strip the input prompt.
@@ -195,12 +206,15 @@ class UnBiasModel:
         if self.enable_thinking:
             template_kwargs["thinking_budget"] = self.thinking_budget
 
-        tokenized = self.tokenizer.apply_chat_template(messages, **template_kwargs)
+        tokenized = cast(
+            BatchEncoding,
+            self.tokenizer.apply_chat_template(messages, **template_kwargs),
+        )
         input_ids = tokenized["input_ids"].to(self.device)
         attention_mask = tokenized["attention_mask"].to(self.device)
 
         streamer = TextIteratorStreamer(
-            self.tokenizer,
+            cast(AutoTokenizer, self.tokenizer),
             skip_prompt=True,
             skip_special_tokens=True,
         )
@@ -213,7 +227,7 @@ class UnBiasModel:
             "temperature": None,
             "top_p": None,
             "pad_token_id": self.tokenizer.pad_token_id,
-            "eos_token_id": self.tokenizer.eos_token_id,
+            "eos_token_id": self.eos_token_ids,
             "streamer": streamer,
         }
 

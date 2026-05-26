@@ -1,0 +1,77 @@
+# Cloud Build config for pre-caching HuggingFace model weights in GCS.
+#
+# Downloads the model to local disk (bypassing GCS FUSE) and uploads the
+# blob files + GCS FUSE symlink objects directly to the cache bucket.
+# This avoids huggingface_hub's append-mode writes, which GCS FUSE does
+# not support.
+#
+# Required substitutions:
+#   _MODEL  — HuggingFace model ID (e.g. vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct)
+#   _BUCKET — GCS bucket name (e.g. unbias-plus-model-cache)
+
+steps:
+- name: 'python:3.11-slim'
+  id: 'download'
+  entrypoint: bash
+  env:
+  - '_MODEL=${_MODEL}'
+  - 'HF_HUB_DISABLE_XET=1'
+  args:
+  - -c
+  - |
+    pip install -q "huggingface_hub>=0.23"
+    python3 -c "
+    from huggingface_hub import snapshot_download; import os
+    model = os.environ['_MODEL']
+    print(f'Downloading {model} ...')
+    snapshot_download(model, cache_dir='/workspace/hf-cache')
+    print('Download complete.')
+    "
+
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+  id: 'upload'
+  entrypoint: bash
+  args:
+  - -c
+  - |
+    set -euo pipefail
+    # Use lowercase variable names — Cloud Build substitutes any all-caps brace patterns.
+    # snapshot_download(cache_dir=X) puts files at X/models--...  (no hub/ subdir).
+    # GCS must use hub/models--... to match HF_HOME=/hf-cache on Cloud Run.
+    model_slug="models--$(echo '${_MODEL}' | sed 's|/|--|g')"
+    local_dir="/workspace/hf-cache/${model_slug}"
+    dest="gs://${_BUCKET}/hub/${model_slug}"
+
+    echo "=== Uploading blobs ==="
+    gsutil -m cp "${local_dir}/blobs/"* "${dest}/blobs/"
+
+    # Recreate snapshot symlinks as GCS FUSE symlink objects (0-byte with
+    # gcsfuse_symlink_target metadata), matching the structure GCS FUSE expects.
+    echo "=== Writing snapshot symlinks ==="
+    for snap_dir in "${local_dir}/snapshots"/*/; do
+      commit=$(basename "${snap_dir}")
+      for f in "${snap_dir}"*; do
+        [ -e "${f}" ] || continue
+        fname=$(basename "${f}")
+        if [ -L "${f}" ]; then
+          target=$(readlink "${f}")
+          echo "  ${fname} -> ${target}"
+          echo -n | gsutil \
+            -h "Content-Type:text/plain; charset=utf-8" \
+            -h "x-goog-meta-gcsfuse_symlink_target:${target}" \
+            cp - "${dest}/snapshots/${commit}/${fname}"
+        fi
+      done
+    done
+
+    echo "=== Uploading refs ==="
+    gsutil -m cp "${local_dir}/refs/"* "${dest}/refs/"
+
+    echo "=== Done ==="
+    gsutil du -sh "${dest}/"
+
+timeout: '3600s'
+options:
+  machineType: 'E2_HIGHCPU_8'
+  diskSizeGb: '60'
+  logging: CLOUD_LOGGING_ONLY

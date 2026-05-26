@@ -8,7 +8,10 @@ wheels/
 
 # Virtual environments
 .venv
+.venv-train/
+venv/
 .env
+.env.*
 .envrc
 
 # Lint & Test
@@ -22,13 +25,72 @@ archive/**
 **.txt
 **.xml
 
-
 # Pre-commit & virtualenv caches
 .cache/
 unsloth_compiled_cache/
+
 # Vscode
 .vscode
 
 # macos
 *.DS_Store
 site/
+logs/
+
+# Local HPC / cluster setup (machine-specific; do not commit)
+training/env_hpc.sh
+training/setup_hpc.sh
+
+# Model weights / checkpoints
+*.bin
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+*.gguf
+*.onnx
+checkpoint-*/
+checkpoints/
+merged/
+outputs/
+
+# HuggingFace cache
+hf_cache/
+**/models--*/
+
+# Keys / secrets
+*.key
+*.pem
+secret_keys/
+**/secret_keys/
+
+# SLURM logs
+*.out
+*.err
+slurm-*.out
+# wandb run logs
+wandb/
+training/wandb/
+
+# Training data (lives on HF hub, not git)
+training/data/
+
+# Eval results / outputs — not tracked
+eval_results/
+**/eval_results/
+training/eval/
+training/results/
+*_eval.json
+*_results.json
+*_metrics.json
+
+# Legacy scripts — kept on disk, not tracked
+training/legacy/
+
+# Cluster job scripts & machine-specific setup — kept on disk, not tracked
+training/slurm/
+training/hpc/
+
+# Scratch / backup files
+src/unbias_plus/demo/templates/index-bk.html
+training/train-2.py

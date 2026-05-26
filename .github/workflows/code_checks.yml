@@ -8,24 +8,10 @@ on:
     branches:
       - main
       - unbias-pretrained
-    paths:
-      - .pre-commit-config.yaml
-      - .github/workflows/code_checks.yml
-      - '**.py'
-      - uv.lock
-      - pyproject.toml
-      - '**.ipynb'
   pull_request:
     branches:
       - main
       - unbias-pretrained
-    paths:
-      - .pre-commit-config.yaml
-      - .github/workflows/code_checks.yml
-      - '**.py'
-      - uv.lock
-      - pyproject.toml
-      - '**.ipynb'
 
 jobs:
   run-code-check:
@@ -37,7 +23,7 @@ jobs:
         uses: astral-sh/setup-uv@v8.1.0
         with:
           # Install a specific version of uv.
-          version: "0.9.11"
+          version: "0.10.12"
           enable-cache: true
 
       - name: "Set up Python"
@@ -66,3 +52,20 @@ jobs:
             GHSA-4xh5-x5gv-qwph
             PYSEC-2024-161
             CVE-2026-1839
+            CVE-2026-3219
+            CVE-2026-6357
+            # markdown PYSEC-2026-89: advisory documents 3.8.1 as the fix, but
+            # OSV affected-range data still flags 3.8.1+. We're pinned to 3.8.1.
+            PYSEC-2026-89
+            # transformers PYSEC-2025-211..218: checkpoint-conversion / model-load
+            # RCEs. No fix version published in OSV — flagged on every release.
+            # Exploitation requires loading attacker-controlled checkpoints; we
+            # don't ingest untrusted checkpoints in the API or demo paths.
+            PYSEC-2025-211
+            PYSEC-2025-212
+            PYSEC-2025-213
+            PYSEC-2025-214
+            PYSEC-2025-215
+            PYSEC-2025-216
+            PYSEC-2025-217
+            PYSEC-2025-218

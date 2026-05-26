@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>UnBias+ | Vector Institute</title>
+  <title>UnBias-Plus | Vector Institute</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300;0,400;0,600;0,700;0,800;1,300;1,400&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
@@ -13,17 +13,37 @@
   <div class="noise"></div>
   <header>
     <div class="header-left">
-      <div class="logo">
-        <span class="logo-un">Un</span><span class="logo-bias">Bias</span><span class="logo-plus"> Plus</span>
-      </div>
+      <a href="/" class="logo-link" aria-label="UnBias-Plus home">
+        <div class="logo">
+          <span class="logo-un">Un</span><span class="logo-bias">Bias</span><span class="logo-plus">-Plus</span>
+        </div>
+      </a>
       <span class="logo-tagline">Detect and neutralize bias in text</span>
     </div>
-    <img
-      src="/static/Vector-Logo-FullColour_Horizontal.png"
-      alt="Vector Institute"
-      class="vector-logo"
-    />
+    <a
+      href="https://vectorinstitute.ai/"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="vector-logo-link"
+      aria-label="Visit the Vector Institute"
+    >
+      <img
+        src="/static/Vector-Logo-FullColour_Horizontal.png"
+        alt="Vector Institute"
+        class="vector-logo"
+      />
+    </a>
+    <a class="feedback-trigger-btn" id="feedback-trigger-btn"
+       href="https://docs.google.com/forms/d/e/1FAIpQLSfmYHzgOYBvWMvNiumfP8Xql-2VUNkmu8fw6LsZ-0evNQ8eSQ/viewform"
+       target="_blank" rel="noopener noreferrer"
+       title="Give feedback (opens in a new tab)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      Feedback
+    </a>
   </header>
+
   <main>
     <!-- INPUT SECTION -->
     <section class="input-section">
@@ -55,17 +75,35 @@
         <input type="file" id="file-input" accept=".txt,.pdf" style="display:none" />
       </div>
       <textarea
-        id="input-text"
-        placeholder="Paste any text here — news article, social media post, report, essay..."
-        spellcheck="false"
-      ></textarea>
+      id="input-text"
+      placeholder="Paste an English article, social media post, report, or essay"
+      spellcheck="false"
+    ></textarea>
+    <p class="disclaimer-note">
+      Optimized for English; results in other languages may be less reliable.
+      Because bias is subjective and context-dependent, results are indicative rather than definitive.
+    </p>
+    <p class="disclaimer-note pypi-callout" id="pypi-callout">
+      For longer articles or slower processing, run
+      <a href="https://pypi.org/project/unbias-plus/" target="_blank" rel="noopener noreferrer">unbias-plus on PyPI</a>
+      on your own machine.
+    </p>
+
       <div class="input-footer">
         <span id="char-count" class="char-count">0 / 5000</span>
-        <span class="disclaimer-inline">⚠ Because bias is a subjective and context-dependent concept, results should be interpreted as indicative rather than definitive.</span>
-        <button id="analyze-btn" class="analyze-btn">
-          <span class="btn-text">Analyze for Bias</span>
-          <span class="btn-arrow">→</span>
-        </button>
+        <div class="input-actions">
+          <a href="/demo" class="refresh-btn" title="Refresh demo" aria-label="Refresh demo">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="23 4 23 10 17 10"/>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+            </svg>
+            Refresh
+          </a>
+          <button id="analyze-btn" type="button" class="analyze-btn">
+            <span class="btn-text">Analyze for bias</span>
+            <span class="btn-arrow">→</span>
+          </button>
+        </div>
       </div>
     </section>
     <!-- INLINE ERROR -->
@@ -137,6 +175,7 @@
     </div>
   </div>
   <footer class="site-footer">Copyright © 2026, Vector AI Engineering</footer>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="/static/script.js"></script>
 </body>
