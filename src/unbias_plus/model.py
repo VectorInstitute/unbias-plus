@@ -14,7 +14,7 @@ from transformers import (
 )
 
 
-DEFAULT_MODEL = "vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct"
+DEFAULT_MODEL = "vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-Legacy"
 MAX_SEQ_LENGTH = 8192
 
 

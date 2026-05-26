@@ -47,7 +47,7 @@ EXPOSE 8080
 #   --dtype bfloat16              native Qwen3 dtype; faster than fp16 on L4
 #   --enable-chunked-prefill      improves throughput for long prompts
 CMD [ \
-    "--model", "vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct", \
+    "--model", "vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-Legacy", \
     "--served-model-name", "unbias-plus", \
     "--port", "8080", \
     "--host", "0.0.0.0", \

@@ -1,6 +1,7 @@
 """Data schemas for unbias-plus output."""
 
 import logging
+import re
 
 from pydantic import BaseModel, field_validator
 
@@ -40,6 +41,12 @@ class BiasedSegment(BaseModel):
     end : int | None
         Character offset end in the original text. Computed
         by the pipeline after parsing.
+    replacement_start : int | None
+        Character offset start of ``replacement`` in ``unbiased_text``.
+        Computed by the pipeline after parsing.
+    replacement_end : int | None
+        Character offset end of ``replacement`` in ``unbiased_text``.
+        Computed by the pipeline after parsing.
 
     Examples
     --------
@@ -62,6 +69,8 @@ class BiasedSegment(BaseModel):
     reasoning: str = ""
     start: int | None = None
     end: int | None = None
+    replacement_start: int | None = None
+    replacement_end: int | None = None
 
     @field_validator("severity")
     @classmethod
@@ -190,78 +199,178 @@ def _normalize_for_match(s: str) -> str:
     )
 
 
+def _collapse_whitespace(s: str) -> str:
+    return " ".join(s.split())
+
+
+def _flexible_whitespace_pattern(phrase: str) -> re.Pattern[str] | None:
+    """Build a regex that matches *phrase* with flexible internal whitespace."""
+    tokens = phrase.split()
+    if not tokens:
+        return None
+    return re.compile(r"\s+".join(re.escape(t) for t in tokens), re.IGNORECASE)
+
+
+def _phrase_candidates(phrase: str) -> list[str]:
+    """Variants to try in order before flexible-regex matching."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for cand in (
+        phrase,
+        phrase.strip(),
+        _normalize_for_match(phrase),
+        _normalize_for_match(phrase).strip(),
+        _collapse_whitespace(phrase),
+        _collapse_whitespace(_normalize_for_match(phrase)),
+    ):
+        if cand and cand not in seen:
+            seen.add(cand)
+            out.append(cand)
+    return out
+
+
 def _find_span_in_text(
-    original_text: str, phrase: str, cursor: int
+    haystack: str,
+    phrase: str,
+    cursor: int,
+    *,
+    label: str = "phrase",
+    log_failure: bool = True,
 ) -> tuple[int, int] | None:
-    """Return (start, end) exclusive end in *original_text*, or None if not found."""
+    """Return (start, end) in *haystack* at or after *cursor*, or None."""
     if not phrase:
         return None
 
-    candidates: list[str] = [phrase]
-    stripped = phrase.strip()
-    if stripped and stripped != phrase:
-        candidates.append(stripped)
-
-    for cand in candidates:
-        start = _find_case_insensitive(original_text, cand, cursor)
-        if start == -1:
-            start = _find_case_insensitive(original_text, cand, 0)
+    for cand in _phrase_candidates(phrase):
+        start = _find_case_insensitive(haystack, cand, cursor)
         if start != -1:
+            logger.debug("Matched %r via exact candidate %r at %d", phrase, cand, start)
             return (start, start + len(cand))
 
-    norm_text = _normalize_for_match(original_text)
-    norm_phrase = _normalize_for_match(phrase)
-    if norm_text != original_text or norm_phrase != phrase:
-        for cand in (norm_phrase, norm_phrase.strip()):
-            if not cand:
-                continue
-            start = _find_case_insensitive(norm_text, cand, cursor)
-            if start == -1:
-                start = _find_case_insensitive(norm_text, cand, 0)
-            if start != -1:
-                return (start, start + len(cand))
+    pattern = _flexible_whitespace_pattern(phrase.strip())
+    if pattern is not None:
+        match = pattern.search(haystack, cursor)
+        if match is not None:
+            logger.debug(
+                "Matched %r via flexible whitespace at %d", phrase, match.start()
+            )
+            return (match.start(), match.end())
 
+    if log_failure:
+        logger.warning(
+            "Could not find %s in text (cursor=%d): %r", label, cursor, phrase
+        )
     return None
+
+
+def _spans_overlap(a: tuple[int, int], b: tuple[int, int]) -> bool:
+    return not (a[1] <= b[0] or b[1] <= a[0])
+
+
+def _all_spans_in_text(
+    haystack: str, phrase: str, *, label: str = "phrase"
+) -> list[tuple[int, int]]:
+    """Return every non-overlapping occurrence of *phrase* in *haystack*."""
+    spans: list[tuple[int, int]] = []
+    cursor = 0
+    while cursor < len(haystack):
+        span = _find_span_in_text(
+            haystack, phrase, cursor, label=label, log_failure=False
+        )
+        if span is None:
+            break
+        spans.append(span)
+        cursor = span[0] + 1
+    return spans
+
+
+def _assign_non_overlapping_spans(
+    haystack: str,
+    segments: list[BiasedSegment],
+    phrase_attr: str,
+    start_field: str,
+    end_field: str,
+    *,
+    label: str,
+) -> list[BiasedSegment]:
+    """Map each segment to the first unused span of its phrase in *haystack*.
+
+    Model segment order is not always left-to-right in the text. A linear cursor
+    walk leaves later segments unmatched once the cursor reaches EOF.
+    """
+    used: list[tuple[int, int]] = []
+    enriched: list[BiasedSegment] = []
+
+    for seg in segments:
+        phrase = getattr(seg, phrase_attr, "")
+        if not phrase:
+            enriched.append(seg)
+            continue
+
+        chosen: tuple[int, int] | None = None
+        for span in _all_spans_in_text(haystack, phrase, label=label):
+            if not any(_spans_overlap(span, u) for u in used):
+                chosen = span
+                break
+
+        if chosen is None:
+            logger.warning("Could not find %s in text: %r", label, phrase)
+            enriched.append(seg)
+            continue
+
+        used.append(chosen)
+        enriched.append(
+            seg.model_copy(update={start_field: chosen[0], end_field: chosen[1]})
+        )
+
+    return enriched
 
 
 def compute_offsets(
     original_text: str, segments: list[BiasedSegment]
 ) -> list[BiasedSegment]:
-    """Compute character start/end offsets for each biased segment.
-
-    Walks the original text with a cursor so that duplicate phrases
-    are matched in order of appearance, not just the first occurrence.
-
-    Parameters
-    ----------
-    original_text : str
-        The original input text.
-    segments : list[BiasedSegment]
-        Parsed segments from the LLM (without offsets).
-
-    Returns
-    -------
-    list[BiasedSegment]
-        Segments with start/end fields populated, sorted by start offset.
-
-    """
-    cursor = 0
-    enriched = []
-
-    for seg in segments:
-        phrase = seg.original
-        if not phrase:
-            continue
-
-        span = _find_span_in_text(original_text, phrase, cursor)
-        if span is None:
-            logger.warning("Could not find segment in text: '%s'", phrase)
-            enriched.append(seg)
-            continue
-
-        start, end = span
-        enriched.append(seg.model_copy(update={"start": start, "end": end}))
-        cursor = end
-
+    """Compute character start/end offsets for each biased segment."""
+    enriched = _assign_non_overlapping_spans(
+        original_text,
+        segments,
+        "original",
+        "start",
+        "end",
+        label="segment",
+    )
     enriched.sort(key=lambda s: s.start if s.start is not None else 0)
-    return enriched
+    return deduplicate_by_span(enriched)
+
+
+def compute_replacement_offsets(
+    unbiased_text: str, segments: list[BiasedSegment]
+) -> list[BiasedSegment]:
+    """Compute character offsets for each replacement inside *unbiased_text*."""
+    return _assign_non_overlapping_spans(
+        unbiased_text,
+        segments,
+        "replacement",
+        "replacement_start",
+        "replacement_end",
+        label="replacement",
+    )
+
+
+def deduplicate_by_span(segments: list[BiasedSegment]) -> list[BiasedSegment]:
+    """Drop segments that share the same (start, end) after offset assignment.
+
+    The parser already merges identical ``original`` strings; this catches
+    near-duplicates (whitespace variants) that still map to the same span.
+    """
+    seen: set[tuple[int, int]] = set()
+    unique: list[BiasedSegment] = []
+    for seg in segments:
+        if seg.start is None or seg.end is None:
+            unique.append(seg)
+            continue
+        key = (seg.start, seg.end)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(seg)
+    return unique

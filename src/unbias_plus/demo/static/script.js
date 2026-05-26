@@ -21,6 +21,9 @@
    const MAX_COLD_START_RETRIES = 10; // 10 × 5 s = 50 s window for uvicorn to start
    let coldStartRetries = 0;
    let _activeAnalysisController = null; // AbortController for the in-flight stream
+   // Preserved across stream → final render so a bad server parse does not wipe highlights.
+   let _lastStreamingSegments = [];
+   let _lastStreamedUnbiased = "";
    // ============================================================
    // INLINE ERROR BANNER
    // ============================================================
@@ -157,6 +160,8 @@
      let serverConnected = false; // true once HTTP 200 received — model is up, may just be busy
      let accumulated = "";
      let streamingSegments = [];
+     _lastStreamingSegments = [];
+     _lastStreamedUnbiased = "";
      let lastStreamedUnbiased = "";
      let resultRendered = false;
      let streamLoadingDismissed = false;
@@ -210,22 +215,35 @@
              firstTokenReceived = true;
              clearInterval(timerInterval);
            }
+
            tokenCount++;
            accumulated += payload.t;
            if (labelEl) labelEl.textContent = `Analyzing... (${tokenCount} tokens)`;
-           const newSegs = parseNewSegments(accumulated, streamingSegments.length, text);
+
+           // Strip <think> block before parsing — vLLM may emit it even with enable_thinking:false
+           let cleanAccumulated = accumulated;
+           if (cleanAccumulated.includes("</think>")) {
+             cleanAccumulated = cleanAccumulated.split("</think>").pop().trim();
+           } else if (cleanAccumulated.includes("<think>")) {
+             cleanAccumulated = ""; // still inside think block, nothing to parse yet
+           }
+
+           const newSegs = parseNewSegments(cleanAccumulated, streamingSegments.length, text);
+
            if (newSegs.length > 0) {
              streamingSegments = streamingSegments.concat(newSegs);
+             _lastStreamingSegments = streamingSegments;
              renderStreamingPartial(text, streamingSegments);
            }
            // unbiased_text is last in the schema; the server only sends {"result":...}
            // after the full stream ends — extract the string from partial JSON so the
            // UnBiased panel fills as it streams instead of staying empty until max_tokens.
-           const ub = parseUnbiasedTextField(accumulated);
+           const ub = parseUnbiasedTextField(cleanAccumulated);
            const unbiasedGrew = ub && ub.text.length > 0 && ub.text !== lastStreamedUnbiased;
            const segmentsJustAdded = newSegs.length > 0;
            if (ub && ub.text.length > 0 && (unbiasedGrew || segmentsJustAdded)) {
              lastStreamedUnbiased = ub.text;
+             _lastStreamedUnbiased = ub.text;
              resultsEl.classList.remove("hidden");
              document.querySelector(".panels")?.classList.remove("hidden");
              // Same green replacement marks as final renderResults — not plain escapeHtml,
@@ -405,6 +423,58 @@
    // objects from the biased_segments array using brace counting,
    // skips already-rendered ones, computes offsets client-side.
    // ============================================================
+   function findNextSpan(inputText, phrase, cursor) {
+     if (!phrase) return null;
+     const lower = inputText.toLowerCase();
+     const needle = phrase.toLowerCase();
+     const start = lower.indexOf(needle, cursor);
+     if (start === -1) return null;
+     return { start, end: start + phrase.length };
+   }
+   /** Match phrase in haystack from cursor (mirrors server offset logic). */
+   function findNextSpanFlexible(haystack, phrase, cursor) {
+     if (!phrase) return null;
+     const candidates = [];
+     const seen = new Set();
+     for (const cand of [phrase, phrase.trim()]) {
+       if (cand && !seen.has(cand)) {
+         seen.add(cand);
+         candidates.push(cand);
+       }
+     }
+     for (const cand of candidates) {
+       const span = findNextSpan(haystack, cand, cursor);
+       if (span) return span;
+     }
+     const tokens = phrase.trim().split(/\s+/).filter(Boolean);
+     if (tokens.length > 0) {
+       const pattern = new RegExp(
+         tokens.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+"),
+         "i"
+       );
+       const m = haystack.slice(cursor).match(pattern);
+       if (m && m.index !== undefined) {
+         const start = cursor + m.index;
+         return { start, end: start + m[0].length };
+       }
+     }
+     return null;
+   }
+   /** Assign replacement_start/end client-side when streaming (before server result). */
+   function attachReplacementOffsets(unbiased, segments) {
+     let cursor = 0;
+     return segments.map(seg => {
+       if (!seg.replacement) return seg;
+       if (seg.replacement_start != null && seg.replacement_end != null) {
+         cursor = Math.max(cursor, seg.replacement_end);
+         return seg;
+       }
+       const span = findNextSpanFlexible(unbiased, seg.replacement, cursor);
+       if (!span) return seg;
+       cursor = span.end;
+       return { ...seg, replacement_start: span.start, replacement_end: span.end };
+     });
+   }
    function parseNewSegments(raw, alreadyParsed, inputText) {
      const marker = '"biased_segments"';
      const markerIdx = raw.indexOf(marker);
@@ -414,6 +484,7 @@
      const segments = [];
      let i = arrStart + 1;
      let segsParsed = 0;
+     let offsetCursor = 0;
      while (i < raw.length) {
        // Skip whitespace
        while (i < raw.length && /\s/.test(raw[i])) i++;
@@ -431,11 +502,11 @@
        const objStr = raw.slice(i, j + 1);
        try {
          const seg = JSON.parse(objStr);
+         const span = findNextSpan(inputText, seg.original, offsetCursor);
+         if (span) offsetCursor = span.end;
          if (segsParsed >= alreadyParsed) {
-           // Compute client-side offsets
-           const start = inputText.indexOf(seg.original);
-           seg.start = start >= 0 ? start : null;
-           seg.end   = start >= 0 ? start + seg.original.length : null;
+           seg.start = span ? span.start : null;
+           seg.end   = span ? span.end : null;
            segments.push(seg);
          }
          segsParsed++;
@@ -460,14 +531,73 @@
      attachMarkTooltips(segments);
      renderSegmentCards(segments);
    }
+   function countHighlightedSegments(segments) {
+     return segments.filter(s => s.start != null && s.end != null).length;
+   }
+   /** Fill missing offsets from the streaming pass (e.g. after max_tokens truncate). */
+   function mergeSegmentOffsets(serverSegs, streamSegs) {
+     if (!streamSegs?.length) return serverSegs;
+     const byOriginal = new Map();
+     streamSegs.forEach(s => {
+       if (s.original) byOriginal.set(s.original, s);
+     });
+     return serverSegs.map(seg => {
+       if (seg.start != null && seg.end != null) return seg;
+       const st = byOriginal.get(seg.original);
+       if (!st) return seg;
+       return {
+         ...seg,
+         start: st.start,
+         end: st.end,
+         replacement_start: seg.replacement_start ?? st.replacement_start,
+         replacement_end: seg.replacement_end ?? st.replacement_end,
+       };
+     });
+   }
+   /** Prefer stream list when the final server parse lost most offsets. */
+   function buildDisplaySegments(serverSegs, streamSegs) {
+     const merged = mergeSegmentOffsets(serverSegs, streamSegs);
+     const streamOk = countHighlightedSegments(streamSegs);
+     const mergedOk = countHighlightedSegments(merged);
+     if (streamOk > mergedOk) {
+       const byOriginal = new Map(serverSegs.map(s => [s.original, s]));
+       return streamSegs.map(ss => {
+         const srv = byOriginal.get(ss.original);
+         return srv
+           ? {
+               ...ss,
+               severity: srv.severity,
+               bias_type: srv.bias_type,
+               reasoning: srv.reasoning,
+               replacement: srv.replacement || ss.replacement,
+               start: ss.start,
+               end: ss.end,
+               replacement_start: srv.replacement_start ?? ss.replacement_start,
+               replacement_end: srv.replacement_end ?? ss.replacement_end,
+             }
+           : ss;
+       });
+     }
+     return merged;
+   }
+   function pickUnbiasedText(serverText, streamText) {
+     if (!streamText) return serverText;
+     if (!serverText) return streamText;
+     return serverText.length >= streamText.length ? serverText : streamText;
+   }
    // ============================================================
    // RENDER RESULTS (final — called on result event)
    // ============================================================
    function renderResults(data) {
-     const { original_text, unbiased_text, bias_found, biased_segments } = data;
+     const { original_text, bias_found, biased_segments } = data;
+     const unbiased_text = pickUnbiasedText(data.unbiased_text, _lastStreamedUnbiased);
+     const segments = buildDisplaySegments(
+       biased_segments || [],
+       _lastStreamingSegments
+     );
      resultsEl.classList.remove("hidden");
      resultsEl.scrollIntoView({ behavior: "smooth", block: "start" });
-     if (!bias_found || biased_segments.length === 0) {
+     if (!bias_found || segments.length === 0) {
        document.querySelector(".summary-bar").classList.add("hidden");
        document.querySelector(".panels").classList.add("hidden");
        document.querySelector(".breakdown-section").classList.add("hidden");
@@ -478,11 +608,11 @@
      document.querySelector(".panels").classList.remove("hidden");
      document.querySelector(".breakdown-section").classList.remove("hidden");
      noBiasEl.classList.add("hidden");
-    renderSummary(biased_segments);
-    highlightEl.innerHTML = buildHighlightedHTML(original_text, biased_segments);
-    attachMarkTooltips(biased_segments);
-    unbiasedEl.innerHTML  = buildUnbiasedHTML(original_text, unbiased_text, biased_segments);
-    renderSegmentCards(biased_segments);
+    renderSummary(segments);
+    highlightEl.innerHTML = buildHighlightedHTML(original_text, segments);
+    attachMarkTooltips(segments);
+    unbiasedEl.innerHTML  = buildUnbiasedHTML(original_text, unbiased_text, segments);
+    renderSegmentCards(segments);
   }
    // ============================================================
    // SUMMARY BAR
@@ -613,12 +743,22 @@
    // UNBIASED HTML BUILDER
    // ============================================================
   function buildUnbiasedHTML(original, unbiased, segments) {
-    const replacements = segments.map(s => s.replacement).filter(Boolean);
-    let html = escapeHtmlText(unbiased);
-    replacements.forEach((rep) => {
-      if (!rep) return;
-      const escaped = escapeHtmlText(rep);
-      html = html.replace(escaped, `<mark class="replaced-green">${escaped}</mark>`);
+    const withOffsets = attachReplacementOffsets(unbiased, segments);
+    const sorted = withOffsets
+      .filter(s => s.replacement_start != null && s.replacement_end != null)
+      .sort((a, b) => a.replacement_start - b.replacement_start);
+    if (sorted.length === 0) {
+      return escapeHtmlText(unbiased);
+    }
+    let html = "";
+    let cursor = 0;
+    sorted.forEach((seg) => {
+      const { replacement_start: start, replacement_end: end } = seg;
+      if (start < cursor) return;
+      if (start > cursor) html += escapeHtmlText(unbiased.slice(cursor, start));
+      html += `<mark class="replaced-green">${escapeHtmlText(unbiased.slice(start, end))}</mark>`;
+      cursor = end;
     });
+    if (cursor < unbiased.length) html += escapeHtmlText(unbiased.slice(cursor));
     return html;
   }

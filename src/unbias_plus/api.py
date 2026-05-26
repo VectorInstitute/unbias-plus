@@ -16,9 +16,9 @@ from pydantic import BaseModel
 
 from unbias_plus.model import DEFAULT_MODEL
 from unbias_plus.parser import parse_llm_output
-from unbias_plus.pipeline import UnBiasPlus
+from unbias_plus.pipeline import UnBiasPlus, finalize_result
 from unbias_plus.prompt import build_messages
-from unbias_plus.schema import BiasResult, compute_offsets
+from unbias_plus.schema import BiasResult
 
 
 DEMO_DIR = Path(__file__).parent / "demo"
@@ -284,14 +284,15 @@ def analyze(request: Request, body: AnalyzeRequest) -> BiasResult:
                 messages=build_messages(body.text),
                 max_tokens=4096,
                 temperature=0,
-                extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+                stop=["<|im_end|>", "<|endoftext|>"],
+                extra_body={
+                    "chat_template_kwargs": {"enable_thinking": False},
+                    "stop_token_ids": [151645, 151643],
+                },
             )
             raw = completion.choices[0].message.content or ""
             result = parse_llm_output(raw)
-            segments = compute_offsets(body.text, result.biased_segments)
-            return result.model_copy(
-                update={"biased_segments": segments, "original_text": body.text}
-            )
+            return finalize_result(body.text, result)
         assert pipe is not None
         return cast(BiasResult, pipe.analyze(body.text))
     except ValueError as e:
@@ -313,13 +314,7 @@ def _sse_result_line_or_none(raw_output: str, original_text: str) -> str | None:
         result = parse_llm_output(raw_output)
     except ValueError:
         return None
-    segments_with_offsets = compute_offsets(original_text, result.biased_segments)
-    final = result.model_copy(
-        update={
-            "biased_segments": segments_with_offsets,
-            "original_text": original_text,
-        }
-    )
+    final = finalize_result(original_text, result)
     return (
         "data: " + json.dumps({"result": json.loads(final.model_dump_json())}) + "\n\n"
     )
@@ -401,13 +396,7 @@ def analyze_stream(request: Request, body: AnalyzeRequest) -> StreamingResponse:
                         return
 
             result = parse_llm_output(raw_output)
-            segments_with_offsets = compute_offsets(text, result.biased_segments)
-            final = result.model_copy(
-                update={
-                    "biased_segments": segments_with_offsets,
-                    "original_text": text,
-                }
-            )
+            final = finalize_result(text, result)
             yield (
                 "data: "
                 + json.dumps({"result": json.loads(final.model_dump_json())})
