@@ -248,12 +248,19 @@
   margin: 1.5rem 0 1rem;
 }
 
+.up-hero__badges,
+.up-hero__badges p,
 .up-hero p:has(img) {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  margin-top: 1rem;
+  margin: 1rem 0 0;
   align-items: center;
+}
+
+.up-hero__badges a {
+  display: inline-flex;
+  line-height: 0;
 }
 
 
@@ -611,6 +618,8 @@
 /* ---- Polish: hero badges row -------------------------------------------- */
 .up-hero img[alt^="PyPI"],
 .up-hero img[alt^="Open"],
+.up-hero img[alt^="Dataset"],
+.up-hero img[alt^="Leaderboard"],
 .up-hero img[alt^="License"] {
   vertical-align: middle;
 }

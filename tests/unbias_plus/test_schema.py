@@ -3,7 +3,12 @@
 import pytest
 from pydantic import ValidationError
 
-from unbias_plus.schema import BiasedSegment, BiasResult
+from unbias_plus.schema import (
+    BiasedSegment,
+    BiasResult,
+    compute_offsets,
+    compute_replacement_offsets,
+)
 
 
 def test_biased_segment_valid() -> None:
@@ -98,3 +103,79 @@ def test_bias_result_unbiased_empty_segments() -> None:
     )
     assert result.bias_found is False
     assert result.biased_segments == []
+
+
+def test_compute_replacement_offsets_from_diff() -> None:
+    """Replacement highlights follow the actual rewrite, not the replacement field."""
+    original = (
+        "When the nursing staff raised concerns about the new schedule, it was the male doctor "
+        "who stepped in to explain the situation clearly. The nurses, mostly women, had been "
+        "overreacting as usual — their complaints driven more by feelings than by facts. "
+        "Hospital management agreed that having a man in charge helped bring some much-needed "
+        "rationality to what had become a needlessly emotional debate."
+    )
+    unbiased = (
+        "When the nursing staff raised concerns about the new schedule, it was the male doctor "
+        "who stepped in to explain the situation clearly. The nurses, mostly women, had been "
+        "expressing concerns as usual — their concerns based on personal perspectives. "
+        "Hospital management agreed that having a man in charge helped bring some much-needed "
+        "rationality to what had become an emotional discussion."
+    )
+    segments = [
+        BiasedSegment(
+            original="overreacting as usual",
+            replacement="expressing concerns",
+            severity="medium",
+            bias_type="loaded language",
+            reasoning="",
+        ),
+        BiasedSegment(
+            original="their complaints driven more by feelings than by facts",
+            replacement="their concerns were based on personal perspectives",
+            severity="medium",
+            bias_type="framing bias",
+            reasoning="",
+        ),
+        BiasedSegment(
+            original="needlessly emotional debate",
+            replacement="emotional discussion",
+            severity="medium",
+            bias_type="loaded language",
+            reasoning="",
+        ),
+    ]
+
+    with_offsets = compute_offsets(original, segments)
+    with_replacements = compute_replacement_offsets(original, unbiased, with_offsets)
+
+    seg1, seg2, seg3 = with_replacements
+    assert unbiased[seg1.replacement_start : seg1.replacement_end] == (
+        "expressing concerns as usual"
+    )
+    assert (
+        unbiased[seg2.replacement_start : seg2.replacement_end]
+        == "their concerns based on personal perspectives."
+    )
+    assert (
+        unbiased[seg3.replacement_start : seg3.replacement_end]
+        == "an emotional discussion."
+    )
+
+
+def test_compute_replacement_offsets_identical_text() -> None:
+    """No replacement spans when original and unbiased text match."""
+    text = "This text is neutral."
+    segments = [
+        BiasedSegment(
+            original="neutral",
+            replacement="neutral",
+            severity="low",
+            bias_type="",
+            reasoning="",
+            start=10,
+            end=17,
+        )
+    ]
+    result = compute_replacement_offsets(text, text, segments)
+    assert result[0].replacement_start is None
+    assert result[0].replacement_end is None

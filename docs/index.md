@@ -17,11 +17,11 @@ hide:
 [GitHub](https://github.com/VectorInstitute/unbias-plus){ .md-button }
 </div>
 
-[![PyPI version](https://img.shields.io/pypi/v/unbias-plus.svg)](https://pypi.org/project/unbias-plus/)
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1FlUSeFFXr3VeADiStOIzX7hOV6IlliC8?usp=sharing)
-[![Dataset](https://img.shields.io/badge/🤗%20Dataset-UnBias+-orange)](https://huggingface.co/datasets/vector-institute/unbias-plus-dataset)
-[![Leaderboard](https://img.shields.io/badge/🤗%20Leaderboard-UnBias+-blue)](https://huggingface.co/spaces/vector-institute/UnBias-Plus-Leaderboard)
-[![License: Vector Institute](https://img.shields.io/badge/License-Vector%20Institute-003049.svg)](https://github.com/VectorInstitute/unbias-plus/blob/unbias-pretrained/LICENSE.md)
+<div class="up-hero__badges" markdown>
+
+[![PyPI version](https://img.shields.io/pypi/v/unbias-plus.svg)](https://pypi.org/project/unbias-plus/) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1FlUSeFFXr3VeADiStOIzX7hOV6IlliC8?usp=sharing) [![Dataset](https://img.shields.io/badge/🤗%20Dataset-UnBias+-orange)](https://huggingface.co/datasets/vector-institute/unbias-plus-dataset) [![Leaderboard](https://img.shields.io/badge/🤗%20Leaderboard-UnBias+-blue)](https://huggingface.co/spaces/vector-institute/UnBias-Plus-Leaderboard) [![License: Vector Institute](https://img.shields.io/badge/License-Vector%20Institute-003049.svg)](https://github.com/VectorInstitute/unbias-plus/blob/unbias-pretrained/LICENSE.md)
+
+</div>
 
 </div>
 
