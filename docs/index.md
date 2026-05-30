@@ -19,6 +19,8 @@ hide:
 
 [![PyPI version](https://img.shields.io/pypi/v/unbias-plus.svg)](https://pypi.org/project/unbias-plus/)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1FlUSeFFXr3VeADiStOIzX7hOV6IlliC8?usp=sharing)
+[![Dataset](https://img.shields.io/badge/🤗%20Dataset-UnBias+-orange)](https://huggingface.co/datasets/vector-institute/unbias-plus-dataset)
+[![Leaderboard](https://img.shields.io/badge/🤗%20Leaderboard-UnBias+-blue)](https://huggingface.co/spaces/vector-institute/UnBias-Plus-Leaderboard)
 [![License: Vector Institute](https://img.shields.io/badge/License-Vector%20Institute-003049.svg)](https://github.com/VectorInstitute/unbias-plus/blob/unbias-pretrained/LICENSE.md)
 
 </div>
@@ -160,8 +162,8 @@ For setup details, deployment patterns, and advanced usage, see the [User Guide]
 ## Walkthroughs
 
 Tours of the demo UI you get when you run `unbias-plus --serve`:
-[:material-volume-off: Silent walkthrough](https://drive.google.com/file/d/1aNh0bqeA2rTZ-uKi_cfrljo_UHP1M4Uq/view?usp=sharing) &middot;
-[:material-volume-high: Voiced walkthrough](https://drive.google.com/file/d/1uPiLQ5GZKQH7cBeuV2QQeituxFPC6zTK/view?usp=sharing)
+[:material-volume-off: Silent walkthrough](https://drive.google.com/file/d/1luJNsMkoimMRBD5WaznpX3zw1-bX2ZvB/view?usp=sharing) &middot;
+[:material-volume-high: Voiced walkthrough](https://drive.google.com/file/d/1A7_on6kN5w1uYztvmwkvG7AyBX78tEG0/view?usp=sharing)
 
 ---
 
