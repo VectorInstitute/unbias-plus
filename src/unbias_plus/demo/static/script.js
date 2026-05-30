@@ -462,20 +462,153 @@
      }
      return null;
    }
-   /** Assign replacement_start/end client-side when streaming (before server result). */
-   function attachReplacementOffsets(unbiased, segments) {
-     let cursor = 0;
-     return segments.map(seg => {
-       if (!seg.replacement) return seg;
-       if (seg.replacement_start != null && seg.replacement_end != null) {
-         cursor = Math.max(cursor, seg.replacement_end);
-         return seg;
+   /** Map original indices onto the rewrite (mirrors server boundary alignment). */
+   function wordStart(text, pos) {
+     pos = Math.min(Math.max(pos, 0), text.length);
+     while (pos > 0 && !/\s/.test(text[pos - 1])) pos--;
+     return pos;
+   }
+   function wordEnd(text, pos) {
+     pos = Math.min(Math.max(pos, 0), text.length);
+     while (pos < text.length && !/\s/.test(text[pos])) pos++;
+     return pos;
+   }
+   function buildOrigToUnbMap(original, unbiased) {
+     const opcodes = getDiffOpcodes(original, unbiased);
+     const n = original.length;
+     const map = new Array(n + 1).fill(0);
+     map[n] = unbiased.length;
+     for (const [tag, i1, i2, j1, j2] of opcodes) {
+       if (tag === "equal") {
+         for (let k = 0; k < i2 - i1; k++) map[i1 + k] = j1 + k;
+         if (i2 <= n) map[i2] = j2;
+       } else if (tag === "replace") {
+         const olen = i2 - i1;
+         const ulen = j2 - j1;
+         for (let k = 0; k < olen; k++) map[i1 + k] = j1 + (olen ? Math.floor((k * ulen) / olen) : 0);
+         if (i2 <= n) map[i2] = j2;
+       } else if (tag === "delete") {
+         for (let k = i1; k < i2; k++) map[k] = j1;
+         if (i2 <= n) map[i2] = j1;
+       } else if (tag === "insert") {
+         if (i1 <= n) map[i1] = j1;
        }
-       const span = findNextSpanFlexible(unbiased, seg.replacement, cursor);
+     }
+     return map;
+   }
+   function findReplacementSpanInUnbiased(unbiased, replacement, cursor) {
+     if (!replacement) return null;
+     let span = findNextSpanFlexible(unbiased, replacement, cursor);
+     if (span) return [span.start, span.end];
+     const tokens = replacement.trim().split(/\s+/);
+     const drop = new Set(["were", "was", "is", "are", "a", "an", "the"]);
+     for (let idx = 0; idx < tokens.length; idx++) {
+       const reduced = tokens.slice(idx).join(" ");
+       span = findNextSpanFlexible(unbiased, reduced, cursor);
+       if (span) return [span.start, span.end];
+     }
+     const reduced = tokens.filter(t => !drop.has(t.toLowerCase())).join(" ");
+     if (reduced) {
+       span = findNextSpanFlexible(unbiased, reduced, cursor);
+       if (span) return [span.start, span.end];
+     }
+     return null;
+   }
+   function boundaryReplacementSpan(original, unbiased, segStart, segEnd, origToUnb) {
+     const uStart = wordStart(unbiased, origToUnb[segStart]);
+     const uEnd = wordEnd(unbiased, origToUnb[segEnd]);
+     if (uEnd <= uStart) return null;
+     const origLen = segEnd - segStart;
+     const unbLen = uEnd - uStart;
+     if (origLen > 0 && unbLen > origLen * 3 + 40) return null;
+     return [uStart, uEnd];
+   }
+   /** Assign replacement_start/end (mirrors server boundary + fallback search). */
+   function attachReplacementOffsets(original, unbiased, segments) {
+     if (!original || !unbiased || original === unbiased) return segments;
+     const origToUnb = buildOrigToUnbMap(original, unbiased);
+     const used = [];
+     return segments.map(seg => {
+       let span = null;
+       if (seg.start != null && seg.end != null) {
+         span = boundaryReplacementSpan(original, unbiased, seg.start, seg.end, origToUnb);
+       }
+       if (!span && seg.replacement) {
+         const cursor = seg.start != null ? origToUnb[seg.start] : 0;
+         span = findReplacementSpanInUnbiased(unbiased, seg.replacement, cursor);
+       }
        if (!span) return seg;
-       cursor = span.end;
-       return { ...seg, replacement_start: span.start, replacement_end: span.end };
+       // Clip to avoid overlapping marks (keep the non-overlapping tail).
+       for (const [s, e] of used) {
+         if (!(span[1] <= s || span[0] >= e) && span[0] < e) {
+           span = [e, span[1]];
+         }
+       }
+       if (span[1] <= span[0]) return seg;
+       used.push(span);
+       return {
+         ...seg,
+         replacement_start: span[0],
+         replacement_end: span[1],
+       };
      });
+   }
+   function findLongestMatch(a, aLow, aHigh, b, bLow, bHigh) {
+     let bestSize = 0;
+     let bestA = aLow;
+     let bestB = bLow;
+     let j2len = new Map();
+     for (let i = aLow; i < aHigh; i++) {
+       const newJ2len = new Map();
+       for (let j = bLow; j < bHigh; j++) {
+         if (a[i] === b[j]) {
+           const k = (j2len.get(j - 1) || 0) + 1;
+           newJ2len.set(j, k);
+           if (k > bestSize) {
+             bestSize = k;
+             bestA = i - k + 1;
+             bestB = j - k + 1;
+           }
+         }
+       }
+       j2len = newJ2len;
+     }
+     return { aStart: bestA, bStart: bestB, size: bestSize };
+   }
+   function getDiffOpcodes(a, b) {
+     if (a === b) return [["equal", 0, a.length, 0, b.length]];
+     const opcodes = [];
+     function diff(aOff, aEnd, bOff, bEnd) {
+       while (aOff < aEnd && bOff < bEnd && a[aOff] === b[bOff]) {
+         aOff++;
+         bOff++;
+       }
+       while (aOff < aEnd && bOff < bEnd && a[aEnd - 1] === b[bEnd - 1]) {
+         aEnd--;
+         bEnd--;
+       }
+       if (aOff >= aEnd || bOff >= bEnd) {
+         if (aOff < aEnd) opcodes.push(["delete", aOff, aEnd, bOff, bOff]);
+         else if (bOff < bEnd) opcodes.push(["insert", aOff, aOff, bOff, bEnd]);
+         return;
+       }
+       const match = findLongestMatch(a, aOff, aEnd, b, bOff, bEnd);
+       if (match.size === 0) {
+         opcodes.push(["replace", aOff, aEnd, bOff, bEnd]);
+         return;
+       }
+       diff(aOff, match.aStart, bOff, match.bStart);
+       opcodes.push([
+         "equal",
+         match.aStart,
+         match.aStart + match.size,
+         match.bStart,
+         match.bStart + match.size,
+       ]);
+       diff(match.aStart + match.size, aEnd, match.bStart + match.size, bEnd);
+     }
+     diff(0, a.length, 0, b.length);
+     return opcodes;
    }
    function parseNewSegments(raw, alreadyParsed, inputText) {
      const marker = '"biased_segments"';
@@ -536,8 +669,8 @@
    function countHighlightedSegments(segments) {
      return segments.filter(s => s.start != null && s.end != null).length;
    }
-   /** Fill missing offsets from the streaming pass (e.g. after max_tokens truncate). */
-   function mergeSegmentOffsets(serverSegs, streamSegs) {
+   /** Fill missing original offsets from the streaming pass only (never override server). */
+   function mergeMissingOriginalOffsets(serverSegs, streamSegs) {
      if (!streamSegs?.length) return serverSegs;
      const byOriginal = new Map();
      streamSegs.forEach(s => {
@@ -547,59 +680,23 @@
        if (seg.start != null && seg.end != null) return seg;
        const st = byOriginal.get(seg.original);
        if (!st) return seg;
-       return {
-         ...seg,
-         start: st.start,
-         end: st.end,
-         replacement_start: seg.replacement_start ?? st.replacement_start,
-         replacement_end: seg.replacement_end ?? st.replacement_end,
-       };
+       return { ...seg, start: st.start, end: st.end };
      });
-   }
-   /** Prefer stream list when the final server parse lost most offsets. */
-   function buildDisplaySegments(serverSegs, streamSegs) {
-     const merged = mergeSegmentOffsets(serverSegs, streamSegs);
-     const streamOk = countHighlightedSegments(streamSegs);
-     const mergedOk = countHighlightedSegments(merged);
-     if (streamOk > mergedOk) {
-       const byOriginal = new Map(serverSegs.map(s => [s.original, s]));
-       return streamSegs.map(ss => {
-         const srv = byOriginal.get(ss.original);
-         return srv
-           ? {
-               ...ss,
-               severity: srv.severity,
-               bias_type: srv.bias_type,
-               reasoning: srv.reasoning,
-               replacement: srv.replacement || ss.replacement,
-               start: ss.start,
-               end: ss.end,
-               replacement_start: srv.replacement_start ?? ss.replacement_start,
-               replacement_end: srv.replacement_end ?? ss.replacement_end,
-             }
-           : ss;
-       });
-     }
-     return merged;
-   }
-   function pickUnbiasedText(serverText, streamText) {
-     if (!streamText) return serverText;
-     if (!serverText) return streamText;
-     return serverText.length >= streamText.length ? serverText : streamText;
    }
    // ============================================================
    // RENDER RESULTS (final — called on result event)
    // ============================================================
    function renderResults(data) {
-     const { original_text, bias_found, biased_segments } = data;
-     const unbiased_text = pickUnbiasedText(data.unbiased_text, _lastStreamedUnbiased);
-     const segments = buildDisplaySegments(
-       biased_segments || [],
+     const original_text = data.original_text;
+     // Offsets are computed against the server parse — never swap in stream text.
+     const unbiased_text = data.unbiased_text || _lastStreamedUnbiased || "";
+     const segments = mergeMissingOriginalOffsets(
+       data.biased_segments || [],
        _lastStreamingSegments
      );
      resultsEl.classList.remove("hidden");
      resultsEl.scrollIntoView({ behavior: "smooth", block: "start" });
-     if (!bias_found || segments.length === 0) {
+     if (!data.bias_found || segments.length === 0) {
        document.querySelector(".summary-bar").classList.add("hidden");
        document.querySelector(".panels").classList.add("hidden");
        document.querySelector(".breakdown-section").classList.add("hidden");
@@ -745,7 +842,7 @@
    // UNBIASED HTML BUILDER
    // ============================================================
   function buildUnbiasedHTML(original, unbiased, segments) {
-    const withOffsets = attachReplacementOffsets(unbiased, segments);
+    const withOffsets = attachReplacementOffsets(original, unbiased, segments);
     const sorted = withOffsets
       .filter(s => s.replacement_start != null && s.replacement_end != null)
       .sort((a, b) => a.replacement_start - b.replacement_start);

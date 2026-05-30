@@ -4,6 +4,7 @@
 [![unit tests](https://github.com/VectorInstitute/unbias-plus/actions/workflows/unit_tests.yml/badge.svg)](https://github.com/VectorInstitute/unbias-plus/actions/workflows/unit_tests.yml)
 [![integration tests](https://github.com/VectorInstitute/unbias-plus/actions/workflows/integration_tests.yml/badge.svg)](https://github.com/VectorInstitute/unbias-plus/actions/workflows/integration_tests.yml)
 [![docs](https://github.com/VectorInstitute/unbias-plus/actions/workflows/docs.yml/badge.svg)](https://github.com/VectorInstitute/unbias-plus/actions/workflows/docs.yml)
+[![Leaderboard](https://img.shields.io/badge/🤗%20Leaderboard-UnBias+-blue)](https://huggingface.co/spaces/vector-institute/UnBias-Plus-Leaderboard)
 [![codecov](https://codecov.io/github/VectorInstitute/unbias-plus/graph/badge.svg?token=83MYFZ3UPA)](https://codecov.io/github/VectorInstitute/unbias-plus)
 [![License: Vector Institute](https://img.shields.io/badge/License-Vector%20Institute-003049.svg)](./LICENSE.md)
 [![Contact](https://img.shields.io/badge/Contact-shaina.raza%40vectorinstitute.ai-green)](mailto:shaina.raza@vectorinstitute.ai)
@@ -172,9 +173,8 @@ json_str = pipe.analyze_to_json("...")   # pretty-printed JSON string
 
 ## Training
 
-The Qwen3-8B checkpoint shipped with the demo was fine-tuned in two stages
-— SFT followed by GRPO post-training — on the
-[vector-institute/Unbias-plus](https://huggingface.co/datasets/vector-institute/Unbias-plus)
+The Qwen3-8B checkpoint shipped with the demo was fine-tuned with SFT
+[vector-institute/Unbias-plus](https://huggingface.co/datasets/vector-institute/unbias-plus-dataset)
 dataset on HuggingFace.
 
 Standalone scripts that reproduce both stages live in [`training/`](training/),
