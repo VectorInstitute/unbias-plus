@@ -194,6 +194,8 @@ and resource sizing.
 
 ## 👥 Team
 
+
+
 Developed by the **AI Engineering** team at the [Vector Institute](https://vectorinstitute.ai).
 
 For research collaborations, partnerships, or technical inquiries, please contact **Shaina Raza, PhD** at shaina.raza@vectorinstitute.ai.
