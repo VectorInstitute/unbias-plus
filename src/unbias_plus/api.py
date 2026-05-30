@@ -10,7 +10,7 @@ from typing import Any, AsyncGenerator, Generator, cast
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -178,6 +178,16 @@ app = FastAPI(
 
 if (DEMO_DIR / "static").exists():
     app.mount("/static", StaticFiles(directory=DEMO_DIR / "static"), name="static")
+
+FAVICON_PATH = DEMO_DIR / "static" / "favicon-48x48.svg"
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon() -> FileResponse:
+    """Serve the demo favicon for browsers that request /favicon.ico by default."""
+    if not FAVICON_PATH.exists():
+        raise HTTPException(status_code=404, detail="Favicon not found.")
+    return FileResponse(FAVICON_PATH, media_type="image/svg+xml")
 
 
 @app.get("/", response_class=HTMLResponse, response_model=None)

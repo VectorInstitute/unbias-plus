@@ -1,5 +1,6 @@
 """Data schemas for unbias-plus output."""
 
+import difflib
 import logging
 import re
 
@@ -342,18 +343,195 @@ def compute_offsets(
     return deduplicate_by_span(enriched)
 
 
-def compute_replacement_offsets(
-    unbiased_text: str, segments: list[BiasedSegment]
-) -> list[BiasedSegment]:
-    """Compute character offsets for each replacement inside *unbiased_text*."""
-    return _assign_non_overlapping_spans(
-        unbiased_text,
-        segments,
-        "replacement",
-        "replacement_start",
-        "replacement_end",
-        label="replacement",
+def _word_start(text: str, pos: int) -> int:
+    pos = min(max(pos, 0), len(text))
+    while pos > 0 and not text[pos - 1].isspace():
+        pos -= 1
+    return pos
+
+
+def _word_end(text: str, pos: int) -> int:
+    pos = min(max(pos, 0), len(text))
+    while pos < len(text) and not text[pos].isspace():
+        pos += 1
+    return pos
+
+
+def _build_orig_to_unb_map(original_text: str, unbiased_text: str) -> list[int]:
+    """Map each original index (plus end sentinel) to an unbiased index."""
+    matcher = difflib.SequenceMatcher(
+        None, original_text, unbiased_text, autojunk=False
     )
+    n = len(original_text)
+    mapping = [0] * (n + 1)
+    mapping[n] = len(unbiased_text)
+
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == "equal":
+            for k in range(i2 - i1):
+                mapping[i1 + k] = j1 + k
+            if i2 <= n:
+                mapping[i2] = j2
+        elif tag == "replace":
+            olen = i2 - i1
+            ulen = j2 - j1
+            for k in range(olen):
+                mapping[i1 + k] = j1 + (k * ulen // olen if olen else 0)
+            if i2 <= n:
+                mapping[i2] = j2
+        elif tag == "delete":
+            for k in range(i1, i2):
+                mapping[k] = j1
+            if i2 <= n:
+                mapping[i2] = j1
+        elif tag == "insert":
+            if i1 <= n:
+                mapping[i1] = j1
+
+    return mapping
+
+
+def _find_replacement_span_in_unbiased(
+    unbiased_text: str,
+    replacement: str,
+    *,
+    cursor: int = 0,
+) -> tuple[int, int] | None:
+    """Locate *replacement* in *unbiased_text* with flexible matching."""
+    if not replacement:
+        return None
+    span = _find_span_in_text(
+        unbiased_text, replacement, cursor, label="replacement", log_failure=False
+    )
+    if span is not None:
+        return span
+
+    tokens = replacement.split()
+    drop = {"were", "was", "is", "are", "a", "an", "the"}
+    for idx in range(len(tokens)):
+        reduced = " ".join(tokens[idx:])
+        if reduced:
+            span = _find_span_in_text(
+                unbiased_text,
+                reduced,
+                cursor,
+                label="replacement",
+                log_failure=False,
+            )
+            if span is not None:
+                return span
+    reduced = " ".join(t for t in tokens if t.lower() not in drop)
+    if reduced and reduced != replacement:
+        span = _find_span_in_text(
+            unbiased_text,
+            reduced,
+            cursor,
+            label="replacement",
+            log_failure=False,
+        )
+        if span is not None:
+            return span
+    return None
+
+
+def _boundary_replacement_span(
+    original_text: str,
+    unbiased_text: str,
+    seg_start: int,
+    seg_end: int,
+    orig_to_unb: list[int],
+) -> tuple[int, int] | None:
+    """Map a biased segment's original span to the full rewrite region."""
+    u_start = _word_start(unbiased_text, orig_to_unb[seg_start])
+    u_end = _word_end(unbiased_text, orig_to_unb[seg_end])
+    if u_end <= u_start:
+        return None
+
+    orig_len = seg_end - seg_start
+    unb_len = u_end - u_start
+    if orig_len > 0 and unb_len > orig_len * 3 + 40:
+        return None
+    return (u_start, u_end)
+
+
+def compute_replacement_offsets(
+    original_text: str,
+    unbiased_text: str,
+    segments: list[BiasedSegment],
+) -> list[BiasedSegment]:
+    """Compute highlight spans in *unbiased_text* for each biased segment.
+
+    Primary strategy: align segment ``[start, end)`` boundaries from the
+    original text onto the rewrite so the full neutralized region is
+    highlighted. Falls back to flexible ``replacement`` string search when
+    alignment fails.
+    """
+    if original_text == unbiased_text:
+        return segments
+
+    orig_to_unb = _build_orig_to_unb_map(original_text, unbiased_text)
+    used: list[tuple[int, int]] = []
+    ordered = sorted(
+        enumerate(segments),
+        key=lambda item: (item[1].start is None, item[1].start or 0),
+    )
+    updates: dict[int, tuple[int, int]] = {}
+
+    for orig_idx, seg in ordered:
+        span: tuple[int, int] | None = None
+
+        if seg.start is not None and seg.end is not None:
+            span = _boundary_replacement_span(
+                original_text, unbiased_text, seg.start, seg.end, orig_to_unb
+            )
+
+        if span is None and seg.replacement:
+            cursor = orig_to_unb[seg.start] if seg.start is not None else 0
+            span = _find_replacement_span_in_unbiased(
+                unbiased_text, seg.replacement, cursor=cursor
+            )
+
+        if span is None:
+            logger.warning(
+                "No replacement span for segment %r at [%s:%s)",
+                seg.original,
+                seg.start,
+                seg.end,
+            )
+            continue
+
+        for u in used:
+            if not (span[1] <= u[0] or span[0] >= u[1]) and span[0] < u[1]:
+                span = (u[1], span[1])
+        if span[1] <= span[0]:
+            if seg.replacement:
+                span = _find_replacement_span_in_unbiased(
+                    unbiased_text,
+                    seg.replacement,
+                    cursor=used[-1][1] if used else 0,
+                )
+            if span is None or span[1] <= span[0]:
+                continue
+
+        used.append(span)
+        updates[orig_idx] = span
+
+    enriched: list[BiasedSegment] = []
+    for idx, seg in enumerate(segments):
+        span = updates.get(idx)
+        if span is None:
+            enriched.append(seg)
+            continue
+        enriched.append(
+            seg.model_copy(
+                update={
+                    "replacement_start": span[0],
+                    "replacement_end": span[1],
+                }
+            )
+        )
+
+    return enriched
 
 
 def deduplicate_by_span(segments: list[BiasedSegment]) -> list[BiasedSegment]:

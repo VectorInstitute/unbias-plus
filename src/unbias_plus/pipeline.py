@@ -143,7 +143,7 @@ class UnBiasPlus:
 def finalize_result(text: str, result: BiasResult) -> BiasResult:
     """Attach original text and character offsets for each biased segment."""
     segments = compute_offsets(text, result.biased_segments)
-    segments = compute_replacement_offsets(result.unbiased_text, segments)
+    segments = compute_replacement_offsets(text, result.unbiased_text, segments)
     return result.model_copy(
         update={
             "biased_segments": segments,
