@@ -69,3 +69,5 @@ jobs:
             PYSEC-2025-216
             PYSEC-2025-217
             PYSEC-2025-218
+            # pip PYSEC-2026-196: entry-point install path; CI-audit only, low risk.
+            PYSEC-2026-196
