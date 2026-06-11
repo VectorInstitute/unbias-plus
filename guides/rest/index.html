@@ -8,29 +8,31 @@
       
       
       
-        <link rel="canonical" href="https://vectorinstitute.github.io/unbias-plus/">
+        <link rel="canonical" href="https://vectorinstitute.github.io/unbias-plus/guides/rest/">
       
       
+        <link rel="prev" href="../cli/">
       
-        <link rel="next" href="overview/">
+      
+        <link rel="next" href="../python/">
       
       
         
       
       
-      <link rel="icon" href="assets/favicon-48x48.svg">
+      <link rel="icon" href="../../assets/favicon-48x48.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
-        <title>unbias-plus</title>
+        <title>REST API - unbias-plus</title>
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -49,11 +51,11 @@
       
     
     
-      <link rel="stylesheet" href="assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
     
-      <link rel="stylesheet" href="stylesheets/extra.css">
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
     
-    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -78,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#dont-just-flag-biaslocate-it-explain-it-fix-it" class="md-skip">
+        <a href="#rest-api" class="md-skip">
           Skip to content
         </a>
       
@@ -92,9 +94,9 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="." title="unbias-plus" class="md-header__button md-logo" aria-label="unbias-plus" data-md-component="logo">
+    <a href="../.." title="unbias-plus" class="md-header__button md-logo" aria-label="unbias-plus" data-md-component="logo">
       
-<img src="assets/vector-logo-black.svg" alt="logo">
+<img src="../../assets/vector-logo-black.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -111,7 +113,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Home
+              REST API
             
           </span>
         </div>
@@ -222,11 +224,9 @@
   
   
   
-    
   
-  
-    <li class="md-tabs__item md-tabs__item--active">
-      <a href="." class="md-tabs__link">
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
         
   
   
@@ -247,7 +247,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="overview/" class="md-tabs__link">
+        <a href="../../overview/" class="md-tabs__link">
           
   
   
@@ -267,7 +267,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="how_it_works/" class="md-tabs__link">
+      <a href="../../how_it_works/" class="md-tabs__link">
         
   
   
@@ -284,11 +284,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="guides/install/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../install/" class="md-tabs__link">
           
   
   
@@ -310,7 +312,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="api/" class="md-tabs__link">
+        <a href="../../api/" class="md-tabs__link">
           
   
   
@@ -330,7 +332,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="faq/" class="md-tabs__link">
+      <a href="../../faq/" class="md-tabs__link">
         
   
   
@@ -354,9 +356,7 @@
           
             
               
-                
-              
-              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" hidden>
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
                 <div class="md-sidebar__scrollwrap">
                   <div class="md-sidebar__inner">
                     
@@ -367,9 +367,9 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="." title="unbias-plus" class="md-nav__button md-logo" aria-label="unbias-plus" data-md-component="logo">
+    <a href="../.." title="unbias-plus" class="md-nav__button md-logo" aria-label="unbias-plus" data-md-component="logo">
       
-<img src="assets/vector-logo-black.svg" alt="logo">
+<img src="../../assets/vector-logo-black.svg" alt="logo">
 
     </a>
     unbias-plus
@@ -393,37 +393,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Home
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="." class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -439,59 +412,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#walkthroughs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Walkthroughs
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#continue-exploring" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Continue exploring
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#about" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        About
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -561,7 +481,7 @@
   
   
     <li class="md-nav__item">
-      <a href="overview/" class="md-nav__link">
+      <a href="../../overview/" class="md-nav__link">
         
   
   
@@ -589,7 +509,7 @@
   
   
     <li class="md-nav__item">
-      <a href="quickstart/" class="md-nav__link">
+      <a href="../../quickstart/" class="md-nav__link">
         
   
   
@@ -624,7 +544,7 @@
   
   
     <li class="md-nav__item">
-      <a href="how_it_works/" class="md-nav__link">
+      <a href="../../how_it_works/" class="md-nav__link">
         
   
   
@@ -648,8 +568,10 @@
       
   
   
+    
   
   
+  
     
     
       
@@ -665,19 +587,22 @@
     
     
       
+        
+        
+      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
         
           
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
             
   
   
@@ -695,7 +620,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -713,7 +638,7 @@
   
   
     <li class="md-nav__item">
-      <a href="guides/install/" class="md-nav__link">
+      <a href="../install/" class="md-nav__link">
         
   
   
@@ -741,7 +666,7 @@
   
   
     <li class="md-nav__item">
-      <a href="guides/cli/" class="md-nav__link">
+      <a href="../cli/" class="md-nav__link">
         
   
   
@@ -766,10 +691,19 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="guides/rest/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -785,6 +719,7 @@
   
 
       </a>
+      
     </li>
   
 
@@ -797,7 +732,7 @@
   
   
     <li class="md-nav__item">
-      <a href="guides/python/" class="md-nav__link">
+      <a href="../python/" class="md-nav__link">
         
   
   
@@ -890,7 +825,7 @@
   
   
     <li class="md-nav__item">
-      <a href="api/" class="md-nav__link">
+      <a href="../../api/" class="md-nav__link">
         
   
   
@@ -918,7 +853,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/dev/" class="md-nav__link">
+      <a href="../../reference/dev/" class="md-nav__link">
         
   
   
@@ -953,7 +888,7 @@
   
   
     <li class="md-nav__item">
-      <a href="faq/" class="md-nav__link">
+      <a href="../../faq/" class="md-nav__link">
         
   
   
@@ -981,9 +916,7 @@
             
             
               
-                
-              
-              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" hidden>
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
                 <div class="md-sidebar__scrollwrap">
                   <div class="md-sidebar__inner">
                     
@@ -994,47 +927,6 @@
   
     
   
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#walkthroughs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Walkthroughs
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#continue-exploring" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Continue exploring
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#about" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        About
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
   
 </nav>
                   </div>
@@ -1048,85 +940,53 @@
               <article class="md-content__inner md-typeset">
                 
                   
-  
-
-
-
-  
-  
-
-
-<div class="up-hero">
-<div class="up-hero__banner">
-<h1 id="dont-just-flag-biaslocate-it-explain-it-fix-it">Don't just flag bias.<br><span class="up-hero__accent">Locate it. Explain it. Fix it.</span><a class="headerlink" href="#dont-just-flag-biaslocate-it-explain-it-fix-it" title="Permanent link">&para;</a></h1>
-<p class="up-hero__lede">
-<strong>UnBias-Plus</strong> (<code>unbias-plus</code>) is an open-source Python package for bias detection and debiasing in text. Every flag returns the exact phrase, the bias type, a severity rating, a 1&ndash;2 sentence rationale, and a neutral rewrite &mdash; as a structured, validated object you can drop into any pipeline.
-</p>
-</div>
-<div class="up-hero__cta">
-<p><a class="md-button md-button--primary" href="https://unbias-plus.vectorinstitute.ai/">Try the live demo <span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg></span></a>
-<a class="md-button" href="https://github.com/VectorInstitute/unbias-plus">GitHub</a></p>
-</div>
-<div class="up-hero__badges">
-<p><a href="https://pypi.org/project/unbias-plus/"><img alt="PyPI version" src="https://img.shields.io/pypi/v/unbias-plus.svg" /></a> <a href="https://colab.research.google.com/drive/1FlUSeFFXr3VeADiStOIzX7hOV6IlliC8?usp=sharing"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a> <a href="https://huggingface.co/datasets/vector-institute/unbias-plus-dataset"><img alt="Dataset" src="https://img.shields.io/badge/🤗%20Dataset-UnBias+-orange" /></a> <a href="https://huggingface.co/spaces/vector-institute/UnBias-Plus-Leaderboard"><img alt="Leaderboard" src="https://img.shields.io/badge/🤗%20Leaderboard-UnBias+-blue" /></a> <a href="https://github.com/VectorInstitute/unbias-plus/blob/main/LICENSE.md"><img alt="License: Vector Institute" src="https://img.shields.io/badge/License-Vector%20Institute-003049.svg" /></a></p>
-</div>
-</div>
-<h2 id="walkthroughs">Walkthroughs<a class="headerlink" href="#walkthroughs" title="Permanent link">&para;</a></h2>
-<p>Tours of the demo UI you get when you run <code>unbias-plus --serve</code>:
-<a href="https://drive.google.com/file/d/1luJNsMkoimMRBD5WaznpX3zw1-bX2ZvB/view?usp=sharing"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 4 9.91 6.09 12 8.18M4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.26c-.67.51-1.42.93-2.25 1.17v2.07c1.38-.32 2.63-.95 3.68-1.81L19.73 21 21 19.73l-9-9M19 12c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.9 8.9 0 0 0 21 12c0-4.28-3-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71m-2.5 0c0-1.77-1-3.29-2.5-4.03v2.21l2.45 2.45c.05-.2.05-.42.05-.63"/></svg></span> Silent walkthrough</a> &middot;
-<a href="https://drive.google.com/file/d/1A7_on6kN5w1uYztvmwkvG7AyBX78tEG0/view?usp=sharing"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.84-5 6.7v2.07c4-.91 7-4.49 7-8.77s-3-7.86-7-8.77M16.5 12c0-1.77-1-3.29-2.5-4.03V16c1.5-.71 2.5-2.24 2.5-4M3 9v6h4l5 5V4L7 9z"/></svg></span> Voiced walkthrough</a></p>
-<hr />
-<h2 id="continue-exploring">Continue exploring<a class="headerlink" href="#continue-exploring" title="Permanent link">&para;</a></h2>
-<div class="grid cards">
-<ul>
-<li>
-<p><a href="overview/"><strong>What it does <span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg></span></strong></a></p>
-<p>Worked example, three capabilities, and where teams use UnBias-Plus.</p>
-</li>
-<li>
-<p><a href="quickstart/"><strong>Quickstart <span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg></span></strong></a></p>
-<p>Install and run your first analysis in about 30 seconds.</p>
-</li>
-<li>
-<p><a href="how_it_works/"><strong>How it works <span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg></span></strong></a></p>
-<p>The pipeline: prompt &rarr; fine-tuned model &rarr; parser &rarr; validated <code>BiasResult</code>.</p>
-</li>
-<li>
-<p><a href="guides/install/"><strong>Installation <span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg></span></strong></a></p>
-<p>Install, CLI, REST API, Python API, and development setup.</p>
-</li>
-<li>
-<p><a href="api/"><strong>API Reference <span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg></span></strong></a></p>
-<p>Auto-generated reference for every public class and function in <code>unbias_plus</code>.</p>
-</li>
-<li>
-<p><a href="faq/"><strong>FAQ <span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg></span></strong></a></p>
-<p>Privacy, supported languages, training data, scope, and limitations.</p>
-</li>
-</ul>
-</div>
-<hr />
-<h2 id="about">About<a class="headerlink" href="#about" title="Permanent link">&para;</a></h2>
-<p>Built by the AI Engineering team at the <a href="https://vectorinstitute.ai">Vector Institute</a>, led by <a href="mailto:shaina.raza@vectorinstitute.ai">Shaina Raza, PhD</a>. Released under the <a href="https://github.com/VectorInstitute/unbias-plus/blob/main/LICENSE.md">Vector Institute License</a>.</p>
-<p>For collaboration or licensing inquiries, email Shaina. For bugs and feature requests, use <a href="https://github.com/VectorInstitute/unbias-plus/issues">GitHub Issues</a>.</p>
-<details class="note">
-<summary>Acknowledgements</summary>
-<p>Resources used in preparing this research are provided, in part, by the Province of Ontario, the Government of Canada through CIFAR, and companies sponsoring the Vector Institute. This research is also supported by the European Union's Horizon Europe research and innovation programme under the <strong>AIXPERT</strong> project (Grant Agreement No. 101214389).</p>
-</details>
-
-
-
-
-
 
 
   
   
 
 
+<h1 id="rest-api">REST API<a class="headerlink" href="#rest-api" title="Permanent link">&para;</a></h1>
+<p>Start the server with <code>unbias-plus --serve</code>. The demo web UI is at <code>http://localhost:8000/</code>; the same host and port serve the API.</p>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>GET /health</strong></td>
+<td>Returns <code>{"status": "ok", "model": "&lt;model_name_or_path&gt;"}</code>.</td>
+</tr>
+<tr>
+<td><strong>POST /analyze</strong></td>
+<td>Body: <code>{"text": "Your text here"}</code>. Returns a JSON object matching the <code>BiasResult</code> schema.</td>
+</tr>
+</tbody>
+</table>
+<p>Example with <code>curl</code>:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8000/analyze<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">     </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">     </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;text&quot;: &quot;Women are too emotional to lead.&quot;}&#39;</span>
+</span></code></pre></div>
+<p>Programmatic server start:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">unbias_plus.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">serve</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">serve</span><span class="p">()</span>  <span class="c1"># default model, port 8000</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Or: serve(&quot;path/to/model&quot;, port=8000, load_in_4bit=False)</span>
+</span></code></pre></div>
+<p>The default model is <code>vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-Legacy</code> (see <code>DEFAULT_MODEL</code> in <code>unbias_plus.model</code>).</p>
 
 
-  
+
+
+
+
+
+
+
 
 
 
@@ -1150,19 +1010,33 @@
   
     
       
-        
-      
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../cli/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Command line">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Command line
+              </div>
+            </div>
+          </a>
         
         
           
-          <a href="overview/" class="md-footer__link md-footer__link--next" aria-label="Next: What it does">
+          <a href="../python/" class="md-footer__link md-footer__link--next" aria-label="Next: Python API">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                What it does
+                Python API
               </div>
             </div>
             <div class="md-footer__button md-icon">
@@ -1180,7 +1054,7 @@
   <div class="md-footer-vector">
     <a href="https://vectorinstitute.ai" target="_blank" rel="noopener">
       <img
-        src="assets/vector-logo.svg"
+        src="../../assets/vector-logo.svg"
         alt="Vector Institute Logo"
         height="24"
       />
@@ -1218,11 +1092,11 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["content.code.annotate", "content.code.copy", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.tabs", "navigation.top", "navigation.sections", "search.suggest", "search.highlight", "toc.follow"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.annotate", "content.code.copy", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.tabs", "navigation.top", "navigation.sections", "search.suggest", "search.highlight", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
 
-      <script src="assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
 <script>
