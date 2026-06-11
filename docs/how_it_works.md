@@ -27,7 +27,7 @@ A system prompt fixes the bias categories, segment rules, and the JSON output sc
 <div class="up-flow__step" markdown>
 **Model**{ .up-flow__title }
 
-Fine-tuned `Qwen3-8B-UnBias-Plus-SFT-Instruct` generates the structured JSON. 4-bit quantization is optional.
+Fine-tuned `Qwen3-8B-UnBias-Plus-SFT-Instruct-Legacy` generates the structured JSON. 4-bit quantization is optional.
 </div>
 
 <div class="up-flow__arrow">→</div>
@@ -169,7 +169,7 @@ All three expose the same `BiasResult` shape. In local mode, CLI and Python call
 
 ## Performance notes
 
-- **Default model**: [`vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct`](https://huggingface.co/vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct), fine-tuned from Qwen3-8B for this task.
+- **Default model**: [`vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-Legacy`](https://huggingface.co/vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-Legacy), fine-tuned from Qwen3-8B for this task.
 - **VRAM**: roughly 16 GB at BF16. Pass `load_in_4bit=True` (or `--load-in-4bit` on the CLI) to fit on smaller GPUs, at the cost of some replacement quality.
 - **Input limits**: model context is 8,192 tokens. REST additionally enforces `MAX_INPUT_CHARS` (default `5000`, configurable via environment variable). CLI and Python do not enforce a fixed character cap; practical limits come from model context and available memory.
 - **CPU**: supported via `device="cpu"`, but inference is slow. GPU is recommended for any real workload.
@@ -180,7 +180,7 @@ All three expose the same `BiasResult` shape. In local mode, CLI and Python call
 
 <div class="grid cards" markdown>
 
--   [__User Guide :material-arrow-right:__](user_guide.md)
+-   [__Installation :material-arrow-right:__](guides/install.md)
 
     Install and run UnBias-Plus locally &mdash; CLI, REST, or Python.
 

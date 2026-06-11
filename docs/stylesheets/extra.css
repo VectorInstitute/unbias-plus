@@ -182,19 +182,31 @@
 /* ---- Hero --------------------------------------------------------------- */
 .up-hero {
   position: relative;
-  padding: 4rem 0 2.5rem;
+  padding: 0 0 0.75rem;
 }
-/* ---- Background updated to new vector's cobalt-magenta ---------------------------------------------- */
-.up-hero::before {
+
+.up-hero__banner {
+  position: relative;
+  padding: 4rem 0 2rem;
+}
+
+.up-hero__banner::before {
   content: "";
   position: absolute;
-  inset: -1.5rem -8vw auto -8vw;
-  height: 70%;
+  top: -1.5rem;
+  left: -8vw;
+  right: -8vw;
+  bottom: 0;
   background:
-  linear-gradient(rgba(255,255,255,0.40), rgba(255,255,255,0.40)),
-  url("../assets/Magenta-Cobalt_01.png") center/cover no-repeat;
+    linear-gradient(rgba(255, 255, 255, 0.40), rgba(255, 255, 255, 0.40)),
+    url("../assets/Magenta-Cobalt_01.png") center/cover no-repeat;
   pointer-events: none;
   z-index: 0;
+}
+
+.up-hero__banner > * {
+  position: relative;
+  z-index: 1;
 }
 
 .up-hero > * {
@@ -245,7 +257,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  margin: 1.5rem 0 1rem;
+  margin: 1.25rem 0 0.75rem;
 }
 
 .up-hero__badges,
@@ -254,8 +266,17 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  margin: 1rem 0 0;
+  margin: 0.5rem 0 0;
   align-items: center;
+}
+
+.up-hero__badges p {
+  margin: 0;
+}
+
+/* Tighten content immediately after the home hero */
+.up-hero + h2 {
+  margin-top: 1.25rem;
 }
 
 .up-hero__badges a {
@@ -624,10 +645,9 @@
   vertical-align: middle;
 }
 
-/* Tighten the rule below the hero so the diff doesn't feel detached */
-.up-hero + hr,
-.up-hero ~ hr:first-of-type {
-  margin-top: 1.25rem;
+/* Tighten hr below hero on pages that still use one (e.g. overview) */
+.up-hero + hr {
+  margin-top: 0.75rem;
 }
 
 /* ---- Karbon (display / headlines) — full licensed family ---------------- */

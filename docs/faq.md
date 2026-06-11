@@ -1,6 +1,6 @@
 # FAQ
 
-Common questions about how UnBias-Plus works, what it does and does not do, and how to use it safely. For technical details, see [How it works](how_it_works.md). For installation and usage, see the [User Guide](user_guide.md).
+Common questions about how UnBias-Plus works, what it does and does not do, and how to use it safely. For technical details, see [How it works](how_it_works.md). For installation and usage, see [Installation](guides/install.md).
 
 ---
 
@@ -44,7 +44,7 @@ We welcome scrutiny and user feedback as part of our ongoing research and commit
 
 UnBias-Plus is fine-tuned on a curated dataset of English-language news articles assembled by the Vector Institute. Each article in the training set includes expert-annotated bias labels, segment-level annotations identifying biased phrases, and human-written neutral rewrites that preserve the original meaning.
 
-The dataset spans a broad range of news topics and outlets to reflect real-world reporting styles, and was reviewed through multiple human-in-the-loop iterations to improve labeling consistency. Because the training data is news-focused and primarily English, the model performs best on journalistic text. For dataset and model details, see the [model card on Hugging Face](https://huggingface.co/vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct).
+The dataset spans a broad range of news topics and outlets to reflect real-world reporting styles, and was reviewed through multiple human-in-the-loop iterations to improve labeling consistency. Because the training data is news-focused and primarily English, the model performs best on journalistic text. For dataset and model details, see the [model card on Hugging Face](https://huggingface.co/vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-Legacy).
 
 ### Does UnBias-Plus detect misinformation or AI-generated content?
 
@@ -60,7 +60,11 @@ UnBias-Plus is currently trained and optimized for English text. It may produce 
 
 The web demo accepts up to 5,000 characters per submission, which is suitable for short articles, paragraphs, or excerpts. The model performs best on news-style articles under that limit.
 
-For longer documents, full articles, or batch processing, install the open-source package directly. It supports the command line, a Python API, and a self-hosted REST API, giving you full control over input length and processing volume. See the [User Guide](user_guide.md) to get started.
+For longer documents, full articles, or batch processing, install the open-source package directly. It supports the command line, a Python API, and a self-hosted REST API, giving you full control over input length and processing volume. See [Installation](guides/install.md) to get started.
+
+!!! tip "Working with long documents"
+    The default model targets article-length input. For long or dense
+    text, use the larger model, or chunk the document, so coverage isn't lost to truncation.
 
 ---
 
@@ -68,7 +72,7 @@ For longer documents, full articles, or batch processing, install the open-sourc
 
 ### Where can I access the code?
 
-The full UnBias-Plus codebase is available on [GitHub](https://github.com/VectorInstitute/unbias-plus). It is built for researchers, developers, journalists, and educators who want to integrate bias detection into newsroom tools, academic research, content platforms, hiring reviews, or media literacy projects. The tool can be used as a Python package, a self-hosted REST API, or a command-line interface. See the [User Guide](user_guide.md) for installation and usage.
+The full UnBias-Plus codebase is available on [GitHub](https://github.com/VectorInstitute/unbias-plus). It is built for researchers, developers, journalists, and educators who want to integrate bias detection into newsroom tools, academic research, content platforms, hiring reviews, or media literacy projects. The tool can be used as a Python package, a self-hosted REST API, or a command-line interface. See [Installation](guides/install.md) for installation and usage.
 
 !!! note "On third-party use"
 

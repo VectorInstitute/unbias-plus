@@ -29,7 +29,8 @@ class UnBiasModel:
     ----------
     model_name_or_path : str | Path
         HuggingFace model ID or local path to the model.
-        Defaults to 'vector-institute/Qwen3-8B-UnBias-Plus-SFT'.
+        Defaults to ``DEFAULT_MODEL``
+        (``vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-Legacy``).
     device : str | None, optional
         Device to run on ('cuda' or 'cpu').
         Auto-detects if not provided.

@@ -26,9 +26,18 @@ markdown_extensions:
       permalink: true
 nav:
   - Home: index.md
+  - Start here:
+      - What it does: overview.md
+      - Quickstart: quickstart.md
   - How it works: how_it_works.md
-  - User Guide: user_guide.md
-  - API Reference: api.md
+  - Guides:
+      - Installation: guides/install.md
+      - Command line: guides/cli.md
+      - REST API: guides/rest.md
+      - Python API: guides/python.md
+  - Reference:
+      - API Reference: api.md
+      - Development: reference/dev.md
   - FAQ: faq.md
 plugins:
   - search
@@ -49,6 +58,7 @@ plugins:
             show_symbol_type_heading: true
             show_symbol_type_toc: true
 repo_url: https://github.com/VectorInstitute/unbias-plus
+edit_uri: edit/main/docs/
 repo_name: VectorInstitute/unbias-plus
 site_name: unbias-plus
 site_url: https://vectorinstitute.github.io/unbias-plus/
