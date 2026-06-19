@@ -82,4 +82,4 @@ The full UnBias-Plus codebase is available on [GitHub](https://github.com/Vector
 
 ## Feedback
 
-Share your experience through our [feedback form](https://docs.google.com/forms/d/e/1FAIpQLSfmYHzgOYBvWMvNiumfP8Xql-2VUNkmu8fw6LsZ-0evNQ8eSQ/viewform?usp=header) &mdash; it takes about a minute. For bug reports and feature requests, please use [GitHub Issues](https://github.com/VectorInstitute/unbias-plus/issues).
+Share your experience through our [feedback form](https://vectorinstitute.ai/unbias-feedback/) &mdash; it takes about a minute. For bug reports and feature requests, please use [GitHub Issues](https://github.com/VectorInstitute/unbias-plus/issues).
