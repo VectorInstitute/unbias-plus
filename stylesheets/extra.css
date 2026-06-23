@@ -97,6 +97,19 @@
   justify-content: space-between;
   align-items: center;
 }
+
+.md-footer-disclaimer {
+  padding: 0.75rem 0.8rem 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.md-footer-disclaimer .legal-disclaimer {
+  font-size: 0.65rem;
+  line-height: 1.6;
+  color: #999;
+  margin: 0;
+  text-align: justify;
+}
 /*buttons updated rounded*/
 .md-button,
 .md-button--primary {
