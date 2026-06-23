@@ -265,14 +265,23 @@
     .capabilities li:nth-child(3) .cap-dot { background:var(--teal); }
 
     /* ─── Footer (solid black — brand locked) ─── */
-    footer {
-      position:relative; z-index:10; padding:20px clamp(20px,5vw,56px); background:var(--ink); border-top:none;
-      display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:12px;
+    .site-footer {
+      position:relative; z-index:10; padding:20px 0; background:var(--ink); border-top:none;
+      display:grid; grid-template-columns:1fr min(1200px, 100%) 1fr;
+      text-align:center;
       font-size:12px; color:rgba(255,255,255,0.45);
     }
-    footer span { text-align:center; }
-    footer a { color:rgba(255,255,255,0.65); border-bottom:1px solid rgba(255,255,255,0.2); transition:all 0.18s ease; }
-    footer a:hover { color:#ffffff; border-color:#ffffff; }
+    .site-footer a { color:rgba(255,255,255,0.65); border-bottom:1px solid rgba(255,255,255,0.2); transition:all 0.18s ease; }
+    .site-footer a:hover { color:#ffffff; border-color:#ffffff; }
+    .legal-disclaimer {
+      grid-column:2; width:100%; box-sizing:border-box; padding:0 64px;
+      font-size:0.65rem; line-height:1.6; color:#999; max-width:none;
+      margin:0 0 0.75rem 0; text-align:justify;
+    }
+    .site-footer-copyright {
+      grid-column:2; width:100%; box-sizing:border-box; padding:0 64px;
+      font-size:0.75rem; color:#999; text-align:center;
+    }
 
     @keyframes rise { from{opacity:0;transform:translateY(14px);} to{opacity:1;transform:translateY(0);} }
 
@@ -288,6 +297,8 @@
       .actions { flex-wrap:wrap; gap:14px; }
       .capabilities { gap:16px; }
       .demo-rewrite { font-size:0.60em; }
+      .legal-disclaimer,
+      .site-footer-copyright { padding:0 24px; }
       /* proof row stacks vertically on small screens; arrow rotates to point down */
       .proof { grid-template-columns:1fr; gap:14px; text-align:left; }
       .proof-arrow { transform:rotate(90deg); justify-self:start; }
@@ -398,8 +409,9 @@
     </div><!-- /hero -->
   </main>
 
-  <footer>
-    <span>Copyright © 2026, Built by the AI Engineering team at the Vector Institute.</span>
+  <footer class="site-footer">
+    <p class="legal-disclaimer">This tool is for informational purposes only and Vector Institute is not, by means of this tool, rendering professional advice or services or providing an opinion of any kind on any subject. No one should act upon or refrain from acting upon the information contained in this tool without obtaining the advice of a qualified professional advisor. You are urged to contact a qualified professional advisor for guidance. Vector Institute does not warrant or guarantee the accuracy, currency, usefulness, or completeness of the information contained in this tool, which may include information obtained from third party sources. Vector Institute shall not have any responsibility or owe any duty to any person in respect of this tool or be responsible for any loss whatsoever sustained by any person who relies on this tool.<br><br>All content in this tool is either created by Vector Institute, or otherwise used with permission and is protected by copyright. All rights are reserved. No part of this tool may be reproduced without the prior written permission of Vector Institute. © The Vector Institute for Artificial Intelligence.</p>
+    <p class="site-footer-copyright">Copyright © 2026, Vector AI Engineering</p>
   </footer>
 
   <script src="https://cdn.weglot.com/weglot.min.js"></script>
