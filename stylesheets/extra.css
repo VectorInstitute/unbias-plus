@@ -103,12 +103,25 @@
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.md-footer-disclaimer .bias-definition,
 .md-footer-disclaimer .legal-disclaimer {
   font-size: 0.65rem;
   line-height: 1.6;
   color: #999;
-  margin: 0;
   text-align: justify;
+}
+
+.md-footer-disclaimer .bias-definition {
+  margin: 0 0 0.75rem 0;
+}
+
+.md-footer-disclaimer .bias-definition strong {
+  color: rgba(255, 255, 255, 0.65);
+  font-weight: 600;
+}
+
+.md-footer-disclaimer .legal-disclaimer {
+  margin: 0;
 }
 /*buttons updated rounded*/
 .md-button,
