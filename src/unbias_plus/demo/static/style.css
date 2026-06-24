@@ -900,6 +900,7 @@ mark.replaced-green {
   header { padding: 20px 24px; gap: 12px; }
   .vector-logo { height: 44px; }
   main { padding: 40px 24px 80px; }
+  .bias-definition,
   .legal-disclaimer,
   .site-footer-copyright { padding: 0 24px; }
   .input-footer { flex-wrap: wrap; gap: 12px; }
@@ -939,6 +940,7 @@ mark.replaced-green {
   flex-shrink: 0;
 }
 
+.bias-definition,
 .legal-disclaimer {
   grid-column: 2;
   width: 100%;
@@ -948,8 +950,20 @@ mark.replaced-green {
   line-height: 1.6;
   color: #999;
   max-width: none;
-  margin: 0 0 0.75rem 0;
   text-align: justify;
+}
+
+.bias-definition {
+  margin: 0 0 0.75rem 0;
+}
+
+.bias-definition strong {
+  color: rgba(255, 255, 255, 0.65);
+  font-weight: 600;
+}
+
+.legal-disclaimer {
+  margin: 0 0 0.75rem 0;
 }
 
 .site-footer-copyright {
