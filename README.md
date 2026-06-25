@@ -1,5 +1,6 @@
 # unbias-plus
 [![website](https://img.shields.io/badge/website-ff00ff)](https://vectorinstitute.github.io/unbias-plus/)
+[![arXiv](https://img.shields.io/badge/arXiv-2606.23412-b31b1b.svg)](https://arxiv.org/abs/2606.23412)
 [![code checks](https://github.com/VectorInstitute/unbias-plus/actions/workflows/code_checks.yml/badge.svg)](https://github.com/VectorInstitute/unbias-plus/actions/workflows/code_checks.yml)
 [![unit tests](https://github.com/VectorInstitute/unbias-plus/actions/workflows/unit_tests.yml/badge.svg)](https://github.com/VectorInstitute/unbias-plus/actions/workflows/unit_tests.yml)
 [![integration tests](https://github.com/VectorInstitute/unbias-plus/actions/workflows/integration_tests.yml/badge.svg)](https://github.com/VectorInstitute/unbias-plus/actions/workflows/integration_tests.yml)
