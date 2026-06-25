@@ -1,6 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-TKS44BQ126"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-TKS44BQ126');
+  </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="/static/favicon-48x48.svg" type="image/svg+xml" sizes="48x48" />
@@ -35,7 +43,7 @@
       />
     </a>
     <a class="feedback-trigger-btn" id="feedback-trigger-btn"
-       href="https://docs.google.com/forms/d/e/1FAIpQLSfmYHzgOYBvWMvNiumfP8Xql-2VUNkmu8fw6LsZ-0evNQ8eSQ/viewform"
+       href="https://vectorinstitute.ai/unbias-feedback/"
        target="_blank" rel="noopener noreferrer"
        title="Give feedback (opens in a new tab)">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -175,7 +183,11 @@
       <span id="tooltip-replacement"></span>
     </div>
   </div>
-  <footer class="site-footer">Copyright © 2026, Vector AI Engineering</footer>
+  <footer class="site-footer">
+    <p class="bias-definition"><strong>How We Define Bias</strong> UnBias-Plus defines bias as language patterns that systematically favour or disadvantage particular groups, viewpoints, or interpretations. Our model reflects one rigorous approach to bias detection, primarily trained on English-language journalistic content with expert annotation. We recognize that bias is complex, context-dependent, and culturally situated, and that our definition may not capture every perspective. We are committed to continuously learning and expanding the tool to encompass broader and more inclusive forms of bias over time.</p>
+    <p class="legal-disclaimer">This tool is for informational purposes only and Vector Institute is not, by means of this tool, rendering professional advice or services or providing an opinion of any kind on any subject. No one should act upon or refrain from acting upon the information contained in this tool without obtaining the advice of a qualified professional advisor. You are urged to contact a qualified professional advisor for guidance. Vector Institute does not warrant or guarantee the accuracy, currency, usefulness, or completeness of the information contained in this tool, which may include information obtained from third party sources. Vector Institute shall not have any responsibility or owe any duty to any person in respect of this tool or be responsible for any loss whatsoever sustained by any person who relies on this tool.<br><br>All content in this tool is either created by Vector Institute, or otherwise used with permission and is protected by copyright. All rights are reserved. No part of this tool may be reproduced without the prior written permission of Vector Institute. © The Vector Institute for Artificial Intelligence.</p>
+    <p class="site-footer-copyright">Copyright © 2026, Vector AI Engineering</p>
+  </footer>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="/static/script.js"></script>
