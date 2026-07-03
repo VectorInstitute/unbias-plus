@@ -74,6 +74,7 @@ training/wandb/
 
 # Training data (lives on HF hub, not git)
 training/data/
+data/*.jsonl
 
 # Eval results / outputs — not tracked
 eval_results/
