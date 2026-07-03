@@ -1,20 +1,25 @@
 #!/usr/bin/env python
 """Build a 10k article_text subset from VLDBench.
 
-Pipeline:
-  1. clean whitespace (remove newlines / collapse spaces)
-  2. ads & boilerplate removal (line + inline regex)
-  3. exact dedupe
-  4. English-only (langdetect)
-  5. length filter 100-1500 words
-  6. take first 10k that survive
+Pipeline (cheap filters first, expensive ones last):
+  1. ads & boilerplate removal (line + inline regex), whitespace cleaning
+  2. length filter 100-1500 words
+  3. English-only (langdetect)
+  4. exact dedupe
+  5. take first 10k that survive
+
+Run ``python build_vldbench_10k.py --smoke`` for a quick end-to-end check
+(~300 rows scanned, 20 kept, written to separate ``vldbench_smoke.*`` files).
 """
 
+import argparse
 import hashlib
 import json
 import os
 import re
+from collections import Counter
 from pathlib import Path
+from statistics import mean, median
 
 from datasets import load_dataset
 from langdetect import DetectorFactory, LangDetectException, detect
@@ -26,8 +31,6 @@ TARGET = 10_000
 MIN_WORDS, MAX_WORDS = 100, 1500
 # outputs land next to this script; override with VLDBENCH_OUT_DIR
 OUT_DIR = Path(os.environ.get("VLDBENCH_OUT_DIR", Path(__file__).resolve().parent))
-OUT_FILE = OUT_DIR / "vldbench_10k.jsonl"
-STATS_FILE = OUT_DIR / "vldbench_10k.stats.json"
 
 # --- ads / boilerplate patterns ----------------------------------------------
 # Whole-line junk: if a line matches, drop the whole line.
@@ -58,6 +61,7 @@ LINE_PATTERNS = [
     r"^\s*.*(affiliate links?|at no (extra|additional) cost to you|purchases? (made )?through (our|these) links).*$",
     r"^\s*we (independently|may) (review|research|test|earn).*$",
 ]
+LINE_RES = [re.compile(p, re.IGNORECASE) for p in LINE_PATTERNS]
 LINE_RE = re.compile("|".join(f"(?:{p})" for p in LINE_PATTERNS), re.IGNORECASE)
 
 # Inline junk removed anywhere in the text (case-insensitive).
@@ -83,112 +87,219 @@ INLINE_PATTERNS = [
     r"\bClick here to [^.?!]{0,80}?[.?!]",
     r"\b(?:Follow|Reach) (?:us|the author|[A-Z][a-z]+) on (?:Twitter|X|Facebook|Instagram|TikTok|LinkedIn)[^.?!]*[.?!]",
     r"\bThe [A-Z][A-Za-z ]{0,40} is a (?:snappy|quick|daily)[^.?!]*roundup[^.?!]*[.?!]",
-    # boilerplate discovered during post-run audit of the 10k output
+]
+INLINE_RE = re.compile("|".join(f"(?:{p})" for p in INLINE_PATTERNS), re.IGNORECASE)
+
+# Boilerplate discovered during a post-run audit of the 10k output. These
+# fragments only become contiguous after newline collapsing (site footers
+# split across lines), so they are scrubbed after ``clean_whitespace``.
+# Deliberately case-sensitive: the caps variants are unambiguous CTA markers,
+# while e.g. a lowercase "click here for more" sentence could be quoted prose.
+POST_COLLAPSE_PATTERNS = [
     r"CLICK HERE FOR MORE ENTERTAINMENT NEWS",
     r"APP USERS CLICK HERE (?:TO VIEW|FOR) POST",
     r"Upcoming Webinar Join us on .*$",
     r"©\d{4} Nikkei Inc\. All rights reserved\.",
 ]
-INLINE_RE = re.compile("|".join(f"(?:{p})" for p in INLINE_PATTERNS), re.IGNORECASE)
+POST_COLLAPSE_RE = re.compile("|".join(f"(?:{p})" for p in POST_COLLAPSE_PATTERNS))
 
 WS_RE = re.compile(r"\s+")
+WORD_RE = re.compile(r"\b\w+\b")
 
 
-def strip_ads(text: str) -> str:
-    """Drop boilerplate/ad lines and scrub inline promo fragments."""
-    lines = re.split(r"[\r\n]+", text)
-    kept = [ln for ln in lines if ln.strip() and not LINE_RE.match(ln)]
-    return INLINE_RE.sub(" ", "\n".join(kept))
+def strip_ads(text: str, audit: "Counter[str] | None" = None) -> str:
+    """Drop boilerplate/ad lines and scrub inline promo fragments.
+
+    When ``audit`` is given, it accumulates the number of lines dropped per
+    line pattern (keyed by the pattern) and inline substitutions (keyed
+    ``"<inline>"``), so the regexes' real-world hit rates can be reviewed.
+    """
+    kept = []
+    for ln in re.split(r"[\r\n]+", text):
+        if not ln.strip():
+            continue
+        if LINE_RE.match(ln):
+            if audit is not None:
+                audit[_first_matching_line_pattern(ln)] += 1
+            continue
+        kept.append(ln)
+    out, n_inline = INLINE_RE.subn(" ", "\n".join(kept))
+    if audit is not None and n_inline:
+        audit["<inline>"] += n_inline
+    return out
+
+
+def _first_matching_line_pattern(line: str) -> str:
+    """Return the first LINE_PATTERNS entry that matches *line* (for audit)."""
+    for pat in LINE_RES:
+        if pat.match(line):
+            return pat.pattern
+    return "<unknown>"
+
+
+def scrub_post_collapse(text: str, audit: "Counter[str] | None" = None) -> str:
+    """Remove footer boilerplate that is only contiguous after collapsing."""
+    out, n = POST_COLLAPSE_RE.subn(" ", text)
+    if audit is not None and n:
+        audit["<post-collapse>"] += n
+    return WS_RE.sub(" ", out).strip() if n else text
 
 
 def clean_whitespace(text: str) -> str:
     """Collapse all whitespace runs (incl. newlines/tabs/nbsp) to single spaces."""
-    text = text.replace(" ", " ")
+    text = text.replace(" ", " ")
     return WS_RE.sub(" ", text).strip()
 
 
+def count_words(text: str) -> int:
+    """Count word tokens only — punctuation, symbols and URL glue don't count."""
+    return len(WORD_RE.findall(text))
+
+
 def norm_key(text: str) -> str:
-    """Return a case-insensitive content hash used for exact dedupe."""
+    """Return a case-insensitive content hash used for exact dedupe.
+
+    VLDBench is already deduplicated upstream (near-duplicates, syndicated
+    copies and updated versions were handled at dataset construction), so a
+    cheap exact hash is sufficient here — no MinHash/SimHash needed.
+    """
     return hashlib.md5(text.lower().encode("utf-8")).hexdigest()
 
 
-def main() -> None:
-    """Stream VLDBench, apply the cleaning pipeline, and write the 10k JSONL."""
+def reject_reason(text: str, nwords: int, key: str, seen: set[str]) -> str | None:
+    """Return the stats key describing why *text* is rejected, or None to keep.
+
+    Ordered cheapest-first: word-count bounds, then language detection
+    (comparatively expensive), then the dedupe lookup.
+    """
+    if nwords < MIN_WORDS:
+        return "too_short"
+    if nwords > MAX_WORDS:
+        return "too_long"
+    try:
+        if detect(text) != "en":
+            return "non_en"
+    except LangDetectException:
+        return "lang_err"
+    if key in seen:
+        return "dup"
+    return None
+
+
+def main(
+    target: int = TARGET, max_rows: int | None = None, stem: str = "vldbench_10k"
+) -> None:
+    """Stream VLDBench, apply the cleaning pipeline, and write ``<stem>.jsonl``."""
     OUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_file = OUT_DIR / f"{stem}.jsonl"
+    stats_file = OUT_DIR / f"{stem}.stats.json"
+
     ds = load_dataset("vector-institute/VLDBench", split="train", streaming=True)
     ds = ds.select_columns(["unique_id", "article_text"])  # skip image decode
 
     seen: set[str] = set()
-    kept = 0
+    audit: Counter[str] = Counter()
+    kept_lengths: list[int] = []
     stats = {
         "seen_rows": 0,
         "empty": 0,
-        "dup": 0,
-        "non_en": 0,
         "too_short": 0,
         "too_long": 0,
+        "non_en": 0,
         "lang_err": 0,
+        "dup": 0,
         "kept": 0,
     }
 
-    with open(OUT_FILE, "w", encoding="utf-8") as fout:
+    with open(out_file, "w", encoding="utf-8") as fout:
         for row in ds:
+            if max_rows is not None and stats["seen_rows"] >= max_rows:
+                break
             stats["seen_rows"] += 1
             raw = row.get("article_text")
             if not raw or not isinstance(raw, str):
                 stats["empty"] += 1
                 continue
 
-            # 1+2: ads removal (needs line structure), then whitespace cleaning
-            text = clean_whitespace(strip_ads(raw))
+            text = scrub_post_collapse(clean_whitespace(strip_ads(raw, audit)), audit)
             if not text:
                 stats["empty"] += 1
                 continue
 
-            # 3: exact dedupe
+            nwords = count_words(text)
             key = norm_key(text)
-            if key in seen:
-                stats["dup"] += 1
-                continue
-
-            # 4: English-only
-            try:
-                if detect(text) != "en":
-                    stats["non_en"] += 1
-                    continue
-            except LangDetectException:
-                stats["lang_err"] += 1
-                continue
-
-            # 5: length filter 100-1500 words
-            nwords = len(text.split())
-            if nwords < MIN_WORDS:
-                stats["too_short"] += 1
-                continue
-            if nwords > MAX_WORDS:
-                stats["too_long"] += 1
+            reason = reject_reason(text, nwords, key, seen)
+            if reason:
+                stats[reason] += 1
                 continue
 
             seen.add(key)
+            kept_lengths.append(nwords)
             record = {
                 "unique_id": row.get("unique_id"),
                 "article_text": text,
                 "word_count": nwords,
             }
             fout.write(json.dumps(record, ensure_ascii=False) + "\n")
-            kept += 1
-            stats["kept"] = kept
-            if kept % 500 == 0:
-                print(f"  kept={kept}  seen={stats['seen_rows']}", flush=True)
-            if kept >= TARGET:
+            stats["kept"] += 1
+            if stats["kept"] % 500 == 0:
+                print(f"  kept={stats['kept']}  seen={stats['seen_rows']}", flush=True)
+            if stats["kept"] >= target:
                 break
 
-    with open(STATS_FILE, "w", encoding="utf-8") as f:
-        json.dump(stats, f, indent=2)
+    report: dict[str, object] = dict(stats)
+    if kept_lengths:
+        report["kept_word_count_summary"] = {
+            "min": min(kept_lengths),
+            "mean": round(mean(kept_lengths), 1),
+            "median": median(kept_lengths),
+            "max": max(kept_lengths),
+        }
+    # per-pattern hit counts, most frequent first — sanity check that no
+    # pattern is over-triggering on legitimate article content
+    report["boilerplate_removals"] = dict(audit.most_common())
+
+    with open(stats_file, "w", encoding="utf-8") as f:
+        json.dump(report, f, indent=2, ensure_ascii=False)
         f.write("\n")
-    print(f"Wrote {kept} rows -> {OUT_FILE}")
-    print(json.dumps(stats, indent=2))
+    print(f"Wrote {stats['kept']} rows -> {out_file}")
+    print(json.dumps(report, indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--smoke",
+        action="store_true",
+        help="quick end-to-end run (300 rows scanned, 20 kept, vldbench_smoke.* outputs)",
+    )
+    parser.add_argument(
+        "--target", type=int, default=None, help="articles to keep (default 10000)"
+    )
+    parser.add_argument(
+        "--max-rows",
+        type=int,
+        default=None,
+        help="stop after scanning this many source rows",
+    )
+    parser.add_argument(
+        "--stem", default=None, help="output filename stem (default vldbench_10k)"
+    )
+    args = parser.parse_args()
+    if args.smoke:
+        main(
+            target=args.target or 20,
+            max_rows=args.max_rows or 300,
+            stem=args.stem or "vldbench_smoke",
+        )
+    else:
+        main(
+            target=args.target or TARGET,
+            max_rows=args.max_rows,
+            stem=args.stem or "vldbench_10k",
+        )
+    # All outputs are written and closed at this point. Skip interpreter
+    # finalization: tearing down the HF streaming iterator's pyarrow/torch
+    # threads at shutdown aborts with a GIL error in some environments,
+    # which would turn a fully successful run into exit code 134.
+    os._exit(0)

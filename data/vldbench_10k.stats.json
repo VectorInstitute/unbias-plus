@@ -1,10 +1,40 @@
 {
-  "seen_rows": 11650,
+  "seen_rows": 11802,
   "empty": 3,
-  "dup": 0,
-  "non_en": 3,
   "too_short": 0,
-  "too_long": 1644,
+  "too_long": 1799,
+  "non_en": 0,
   "lang_err": 0,
-  "kept": 10000
+  "dup": 0,
+  "kept": 10000,
+  "kept_word_count_summary": {
+    "min": 303,
+    "mean": 868.3,
+    "median": 854.0,
+    "max": 1500
+  },
+  "boilerplate_removals": {
+    "^\\s*adverti[sz]e?ment\\.?\\s*$": 3780,
+    "<inline>": 2258,
+    "^\\s*(story )?continues? below( advertisement)?\\.?\\s*$": 2007,
+    "^\\s*(related|related stories?|related articles?|more|also read|read also|recommended|trending|most read|editor'?s picks?)\\s*:?.*$": 1662,
+    "^\\s*(click|tap) here.*$": 445,
+    "^\\s*(read|see) ?more\\b.*$": 411,
+    "^\\s*(share|tweet|pin) this.*$": 221,
+    "^\\s*follow (us|@|.*on (twitter|x|facebook|instagram|tiktok|linkedin|youtube)).*$": 112,
+    "^\\s*(watch|video|listen|photos?|gallery|slideshow)\\s*:.*$": 88,
+    "^\\s*sign up (for|to).*newsletter.*$": 85,
+    "^\\s*(contact us|email us|reach (us|out)).*$": 56,
+    "^\\s*subscribe( to| now| today).*$": 43,
+    "^\\s*.*(affiliate links?|at no (extra|additional) cost to you|purchases? (made )?through (our|these) links).*$": 37,
+    "^\\s*(photo|image|picture|credit|source)\\s*:.*$": 29,
+    "^\\s*(get|join) .*(newsletter|our free).*$": 22,
+    "<post-collapse>": 21,
+    "^\\s*https?://\\S+\\s*$": 8,
+    "^\\s*download (the|our) app.*$": 5,
+    "^\\s*(leave a comment|comments?|view comments)\\s*$": 3,
+    "^\\s*(copyright|©|\\(c\\))\\s*\\d{0,4}.*$": 2,
+    "^\\s*(reuters|ap|afp|getty images|associated press|bloomberg)\\s*$": 1,
+    "^\\s*sponsored( content| by .*)?\\.?\\s*$": 1
+  }
 }
