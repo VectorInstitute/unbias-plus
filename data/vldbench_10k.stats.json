@@ -1,0 +1,10 @@
+{
+  "seen_rows": 11650,
+  "empty": 3,
+  "dup": 0,
+  "non_en": 3,
+  "too_short": 0,
+  "too_long": 1644,
+  "lang_err": 0,
+  "kept": 10000
+}
