@@ -18,6 +18,7 @@ from build_vldbench_10k import (
     reject_reason,
     scrub_post_collapse,
     strip_ads,
+    strip_quotes,
 )
 
 
@@ -96,6 +97,14 @@ def test_reject_reason_language_and_dedupe() -> None:
     assert reject_reason(EN_TEXT, count_words(EN_TEXT), key, seen) == "dup"
     fr_key = norm_key(FR_TEXT)
     assert reject_reason(FR_TEXT, count_words(FR_TEXT), fr_key, seen) == "non_en"
+
+
+def test_strip_quotes_removes_all_quote_variants() -> None:
+    audit: Counter[str] = Counter()
+    text = "She said “no”, he said 'yes', «maybe», ‚so‛ — don’t `quote` me"
+    out = strip_quotes(text, audit)
+    assert out == "She said no, he said yes, maybe, so — dont quote me"
+    assert audit["<quotes>"] == 11
 
 
 def test_scrub_post_collapse_removes_footer_ctas() -> None:

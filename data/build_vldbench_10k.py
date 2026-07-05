@@ -2,7 +2,8 @@
 """Build a 10k article_text subset from VLDBench.
 
 Pipeline (cheap filters first, expensive ones last):
-  1. ads & boilerplate removal (line + inline regex), whitespace cleaning
+  1. ads & boilerplate removal (line + inline regex), quote stripping,
+     whitespace cleaning
   2. length filter 100-1500 words
   3. English-only (langdetect)
   4. exact dedupe
@@ -103,6 +104,11 @@ POST_COLLAPSE_PATTERNS = [
 ]
 POST_COLLAPSE_RE = re.compile("|".join(f"(?:{p})" for p in POST_COLLAPSE_PATTERNS))
 
+# Every straight/curly/angled single- and double-quote character. Stripped
+# (replaced with nothing, not a space) so contractions collapse to one token
+# ("don't" -> "dont") instead of splitting in two.
+QUOTES_RE = re.compile(r"[\"'`´“”‘’„‟‚‛«»‹›]")
+
 WS_RE = re.compile(r"\s+")
 WORD_RE = re.compile(r"\b\w+\b")
 
@@ -135,6 +141,18 @@ def _first_matching_line_pattern(line: str) -> str:
         if pat.match(line):
             return pat.pattern
     return "<unknown>"
+
+
+def strip_quotes(text: str, audit: "Counter[str] | None" = None) -> str:
+    """Remove all quote characters (see ``QUOTES_RE``).
+
+    Runs after ``strip_ads`` so the ad regexes see the original text, and
+    before ``clean_whitespace`` so any leftover space runs get collapsed.
+    """
+    out, n = QUOTES_RE.subn("", text)
+    if audit is not None and n:
+        audit["<quotes>"] += n
+    return out
 
 
 def scrub_post_collapse(text: str, audit: "Counter[str] | None" = None) -> str:
@@ -221,7 +239,9 @@ def main(
                 stats["empty"] += 1
                 continue
 
-            text = scrub_post_collapse(clean_whitespace(strip_ads(raw, audit)), audit)
+            text = scrub_post_collapse(
+                clean_whitespace(strip_quotes(strip_ads(raw, audit), audit)), audit
+            )
             if not text:
                 stats["empty"] += 1
                 continue
