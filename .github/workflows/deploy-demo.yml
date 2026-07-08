@@ -3,7 +3,7 @@ name: Deploy UnBias Plus
 # Trigger on pushes to main that touch relevant files, or manually.
 on:
   push:
-    branches: [main, deploy,unbias-pretrained]
+    branches: [main]
     paths:
       - 'src/unbias_plus/**'
       - 'Dockerfile'

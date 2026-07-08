@@ -526,7 +526,7 @@ def train_model(
     eval_ds = split["test"]
     logger.info("  Train: %d | Eval: %d", len(train_ds), len(eval_ds))
 
-    callbacks = [EpochReporter()]
+    callbacks: list[TrainerCallback] = [EpochReporter()]
     try:
         trainer = SFTTrainer(
             model=model,
@@ -537,7 +537,7 @@ def train_model(
             callbacks=callbacks,
         )
     except TypeError:
-        trainer = SFTTrainer(
+        trainer = SFTTrainer(  # type: ignore[call-arg]
             model=model,
             train_dataset=train_ds,
             eval_dataset=eval_ds,
@@ -553,7 +553,7 @@ def train_model(
     from transformers.trainer_utils import get_last_checkpoint  # noqa: PLC0415
 
     last_ckpt = None
-    if os.path.isdir(training_args.output_dir):
+    if training_args.output_dir is not None and os.path.isdir(training_args.output_dir):
         last_ckpt = get_last_checkpoint(training_args.output_dir)
 
     if last_ckpt is not None:
