@@ -17,6 +17,7 @@ import logging
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any
 
 from annotator import annotate_one
 from client import get_client
@@ -38,7 +39,8 @@ logging.basicConfig(
 log = logging.getLogger("annotate")
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments for the annotation pipeline."""
     parser = argparse.ArgumentParser(
         description="Bias annotation pipeline with checkpointing and resume."
     )
@@ -62,7 +64,8 @@ def parse_args():
     return parser.parse_args()
 
 
-def main():
+def main() -> None:
+    """Run the annotation pipeline: resume, annotate, checkpoint, summarize."""
     args = parse_args()
     client = get_client()
 
@@ -73,7 +76,7 @@ def main():
 
     os.makedirs(os.path.dirname(args.output) or ".", exist_ok=True)
 
-    records_by_index = {}
+    records_by_index: dict[int, dict[str, Any]] = {}
     if os.path.exists(args.output):
         for record in load_jsonl(args.output):
             records_by_index[record["index"]] = record
@@ -84,11 +87,7 @@ def main():
         if "annotation_error" not in record
     }
 
-    todo = [
-        (idx, rows[idx])
-        for idx in range(target_count)
-        if idx not in done
-    ]
+    todo = [(idx, rows[idx]) for idx in range(target_count) if idx not in done]
 
     log.info(
         f"Input rows: {len(rows)} | target: {target_count} | "
@@ -108,7 +107,7 @@ def main():
     failed = 0
     start_time = time.monotonic()
 
-    def checkpoint():
+    def checkpoint() -> None:
         write_jsonl_atomic(
             [records_by_index[idx] for idx in sorted(records_by_index)],
             args.output,

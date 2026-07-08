@@ -4,9 +4,9 @@ import json
 import logging
 import random
 import time
+from typing import Any
 
-from json_repair import repair_json
-
+from annotation_prompts import ANNOTATE_SYSTEM_PROMPT, ANNOTATE_TOOL
 from cleaning import DOUBLE_QUOTES, strip_quotes
 from config import (
     BASE_SLEEP,
@@ -17,14 +17,19 @@ from config import (
     VALID_BIAS_TYPES,
     VALID_SEGMENT_SEVERITY,
 )
-from prompts import ANNOTATE_SYSTEM_PROMPT, ANNOTATE_TOOL
+from json_repair import repair_json
 
 
 log = logging.getLogger("annotate")
 
 
-def call_tool(client, article_text):
-    last_error = None
+def call_tool(client: Any, article_text: str) -> dict[str, Any]:
+    """Call the model and return the parsed ``submit_bias_annotation`` args.
+
+    Retries with exponential backoff on any failure, repairing malformed JSON
+    when possible. Raises the last error if all attempts fail.
+    """
+    last_error: Exception = RuntimeError("call_tool made no attempts")
 
     for attempt in range(1, MAX_RETRIES + 1):
         try:
@@ -52,9 +57,10 @@ def call_tool(client, article_text):
             raw_args = tool_calls[0].function.arguments
 
             try:
-                return json.loads(raw_args)
+                parsed: dict[str, Any] = json.loads(raw_args)
             except json.JSONDecodeError:
-                return json.loads(repair_json(raw_args))
+                parsed = json.loads(repair_json(raw_args))
+            return parsed
 
         except Exception as error:
             last_error = error
@@ -69,7 +75,17 @@ def call_tool(client, article_text):
     raise last_error
 
 
-def find_unique_unused_span(text, original, used_spans, search_from=0):
+def find_unique_unused_span(
+    text: str,
+    original: str,
+    used_spans: list[tuple[int, int]],
+    search_from: int = 0,
+) -> int | None:
+    """Locate ``original`` in ``text`` at an offset not already claimed.
+
+    Returns the chosen start offset, or ``None`` if the phrase is missing or
+    every occurrence is already used by an earlier segment.
+    """
     matches = []
     start = 0
 
@@ -81,8 +97,7 @@ def find_unique_unused_span(text, original, used_spans, search_from=0):
 
         end = start + len(original)
         overlaps = any(
-            start < used_end and end > used_start
-            for used_start, used_end in used_spans
+            start < used_end and end > used_start for used_start, used_end in used_spans
         )
 
         if not overlaps:
@@ -127,9 +142,13 @@ def find_unique_unused_span(text, original, used_spans, search_from=0):
     return matches[0]
 
 
-def build_segments(raw_segments, article_text):
-    segments = []
-    used_spans = []
+def build_segments(
+    raw_segments: list[dict[str, Any]],
+    article_text: str,
+) -> list[dict[str, Any]]:
+    """Validate and resolve raw segments into located, ordered spans."""
+    segments: list[dict[str, Any]] = []
+    used_spans: list[tuple[int, int]] = []
     search_from = 0
 
     for segment in raw_segments:
@@ -175,7 +194,13 @@ def build_segments(raw_segments, article_text):
     return sorted(segments, key=lambda segment: segment["char_start"])
 
 
-def build_record(idx, unique_id, article_text, parsed):
+def build_record(
+    idx: int,
+    unique_id: str,
+    article_text: str,
+    parsed: dict[str, Any],
+) -> dict[str, Any]:
+    """Validate a parsed model response and assemble the output record."""
     severity = parsed.get("severity")
     raw_segments = parsed.get("biased_segments", [])
     unbiased_text = parsed.get("unbiased_text")
@@ -210,7 +235,13 @@ def build_record(idx, unique_id, article_text, parsed):
     }
 
 
-def annotate_one(client, idx, row, sleep=DEFAULT_CALL_SLEEP):
+def annotate_one(
+    client: Any,
+    idx: int,
+    row: dict[str, Any],
+    sleep: float = DEFAULT_CALL_SLEEP,
+) -> dict[str, Any]:
+    """Annotate a single row, returning a record (or an error record)."""
     unique_id = row["unique_id"]
     raw_article_text = row["article_text"]
     article_text = strip_quotes(raw_article_text)

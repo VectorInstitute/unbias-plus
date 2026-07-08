@@ -10,5 +10,6 @@ SINGLE_QUOTES = re.compile(
 
 
 def strip_quotes(text: str) -> str:
+    """Remove double and edge single quote characters from ``text``."""
     text = DOUBLE_QUOTES.sub("", text)
     return SINGLE_QUOTES.sub("", text)

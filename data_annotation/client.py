@@ -6,7 +6,8 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 
-def get_client():
+def get_client() -> OpenAI:
+    """Build an OpenAI client from ``OPENAI_API_KEY`` (and optional base URL)."""
     load_dotenv()
 
     api_key = os.getenv("OPENAI_API_KEY")
