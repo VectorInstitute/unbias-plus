@@ -663,6 +663,21 @@
   function withoutNoOpSegments(segments) {
     return (segments || []).filter(s => !isNoOpSegment(s));
   }
+  // Normalise a segment's severity to low/medium/high. Mirrors the server-side
+  // BiasedSegment.severity validator so a raw integer streamed from vLLM (e.g.
+  // "severity": 5) is bucketed live instead of crashing .toLowerCase().
+  function bucketSegmentSeverity(v) {
+    const allowed = new Set(["low", "medium", "high"]);
+    if (typeof v === "string") {
+      const n = v.trim().toLowerCase();
+      if (allowed.has(n)) return n;
+    } else if (typeof v === "number" && Number.isFinite(v)) {
+      if (v >= 6) return "high";
+      if (v >= 3) return "medium";
+      return "low";
+    }
+    return "medium";
+  }
   function parseNewSegments(raw, alreadyParsed, inputText) {
      const marker = '"biased_segments"';
      const markerIdx = raw.indexOf(marker);
@@ -689,14 +704,15 @@
        if (depth !== 0) break; // incomplete object, wait for more tokens
        const objStr = raw.slice(i, j + 1);
        try {
-         const seg = JSON.parse(objStr);
-         const span = findNextSpan(inputText, seg.original, offsetCursor);
-         if (span) offsetCursor = span.end;
-         if (segsParsed >= alreadyParsed) {
-           seg.start = span ? span.start : null;
-           seg.end   = span ? span.end : null;
-           segments.push(seg);
-         }
+        const seg = JSON.parse(objStr);
+        seg.severity = bucketSegmentSeverity(seg.severity);
+        const span = findNextSpan(inputText, seg.original, offsetCursor);
+        if (span) offsetCursor = span.end;
+        if (segsParsed >= alreadyParsed) {
+          seg.start = span ? span.start : null;
+          seg.end   = span ? span.end : null;
+          segments.push(seg);
+        }
          segsParsed++;
        } catch { /* incomplete JSON, stop */ break; }
        i = j + 1;
