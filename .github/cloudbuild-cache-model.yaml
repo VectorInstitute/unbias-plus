@@ -28,15 +28,14 @@ steps:
   args:
   - -c
   - |
-    # Authenticated + hf_xet gives parallel chunked transfer against HF's
-    # Xet CDN (faster and avoids the anonymous rate-limit/CDN signature
-    # errors hit by the plain HTTP fallback used when hf_xet is absent).
-    pip install -q "huggingface_hub[hf_xet]>=0.23"
+    # Authenticated requests get HF's normal (non-anonymous) rate limit,
+    # avoiding the 403/CDN-signature errors anonymous requests hit.
+    pip install -q "huggingface_hub>=0.23"
     python3 -c "
     from huggingface_hub import snapshot_download; import os
     model = os.environ['_MODEL']
     print(f'Downloading {model} ...')
-    snapshot_download(model, cache_dir='/workspace/hf-cache', token=os.environ['HF_TOKEN'], max_workers=8)
+    snapshot_download(model, cache_dir='/workspace/hf-cache', token=os.environ['HF_TOKEN'])
     print('Download complete.')
     "
 
