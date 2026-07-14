@@ -566,6 +566,39 @@ def compute_replacement_offsets(
     return enriched
 
 
+def _normalize_for_equality(s: str) -> str:
+    """Normalise a phrase for original-vs-replacement comparison.
+
+    Collapses whitespace, folds typographic quotes/dashes to ASCII, and
+    casefolds so trivially-identical phrases compare equal despite the model's
+    typography or spacing drift.
+    """
+    return _collapse_whitespace(_normalize_for_match(s)).casefold()
+
+
+def drop_unchanged_segments(segments: list[BiasedSegment]) -> list[BiasedSegment]:
+    """Drop segments whose replacement is identical to the original phrase.
+
+    Under vLLM stochasticity the model occasionally flags a span but returns a
+    replacement equal to the original (no actual edit). There is nothing to
+    highlight, so these add noise and are removed. Segments with an empty
+    replacement are kept: an empty replacement means "delete the phrase", which
+    is a genuine edit.
+    """
+    kept: list[BiasedSegment] = []
+    for seg in segments:
+        replacement = seg.replacement.strip()
+        if replacement and _normalize_for_equality(seg.original) == (
+            _normalize_for_equality(replacement)
+        ):
+            logger.debug(
+                "Dropping no-op segment (replacement == original): %r", seg.original
+            )
+            continue
+        kept.append(seg)
+    return kept
+
+
 def deduplicate_by_span(segments: list[BiasedSegment]) -> list[BiasedSegment]:
     """Drop segments that share the same (start, end) after offset assignment.
 
