@@ -45,6 +45,7 @@ dependencies = [
     "datasets>=2.18.0",
     "safetensors>=0.4.0",
     "jsonlines>=4.0.0",
+    "json-repair>=0.30.0",
     # Validation
     "pydantic>=2.0.0",
     "pydantic-settings>=2.11.0",
@@ -62,6 +63,7 @@ dependencies = [
     "google-cloud-bigquery>=3.0.0",
     "pillow>=12.2.0",
     "cryptography>=48.0.1",
+    "scikit-learn>=1.7.2",
 ]
 
 [project.urls]
@@ -74,7 +76,10 @@ train = [
     "trl>=0.22.0",
     "unsloth[colab-new]",
     "unsloth-zoo>=2025.10.10,<2026.3.1",
-    "flash-attn>=2.7.0",
+    # Pinned: 2.8.x is broken against torch 2.6 (imports fine but Unsloth
+    # reports FA2 as unavailable). 2.7.3 ships a prebuilt wheel that works.
+    "flash-attn==2.7.3",
+    "wandb>=0.18.0",
 ]
 
 
@@ -91,6 +96,11 @@ dev = [
     "ruff>=0.3.0",
     "mypy>=1.8.0",
     "types-PyYAML>=6.0.0",
+    "types-requests>=2.31.0",
+    "types-python-dateutil>=2.8.0",
+    "types-decorator>=5.1.0",
+    "types-tabulate>=0.9.0",
+    "types-ujson>=5.0.0",
     "pre-commit>=3.0.0",
     "pip>=26.0",
     "pip-audit>=2.7.3",
@@ -147,14 +157,23 @@ warn_unused_ignores = true
 strict_equality = true
 mypy_path = ["src", "training"]
 
-# Heavy GPU/training-only dependencies aren't installed in every environment
-# (CI runs `uv sync --no-extra train`, dev clones may or may not). The override
-# tells mypy to treat them as Any when missing, and use real types when present
-# — which keeps the per-environment behaviour symmetric and avoids the
-# "unused type: ignore" trap from `warn_unused_ignores`.
+# datasets is a core dependency (always installed): treat it as Any only when
+# it happens to be missing from a given environment.
 [[tool.mypy.overrides]]
-module = ["unsloth", "unsloth.*", "trl", "trl.*", "datasets", "datasets.*"]
+module = ["datasets", "datasets.*"]
 ignore_missing_imports = true
+
+# trl and unsloth are train-only extras. CI runs `uv sync --no-extra train`, so
+# they're absent there, while dev clones may have them installed. `follow_imports
+# = "skip"` makes mypy treat them as Any in BOTH cases, so type checking of the
+# training scripts is identical everywhere. This deliberately ignores the trl
+# trainer's signature (SFTTrainer/SFTConfig), which otherwise raises errors only
+# when trl is installed, and also avoids the "unused type: ignore" trap from
+# `warn_unused_ignores`.
+[[tool.mypy.overrides]]
+module = ["unsloth", "unsloth.*", "trl", "trl.*", "wandb", "wandb.*"]
+ignore_missing_imports = true
+follow_imports = "skip"
 
 [tool.ruff]
 line-length = 88

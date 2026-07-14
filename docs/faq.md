@@ -44,7 +44,7 @@ We welcome scrutiny and user feedback as part of our ongoing research and commit
 
 UnBias-Plus is fine-tuned on a curated dataset of English-language news articles assembled by the Vector Institute. Each article in the training set includes expert-annotated bias labels, segment-level annotations identifying biased phrases, and human-written neutral rewrites that preserve the original meaning.
 
-The dataset spans a broad range of news topics and outlets to reflect real-world reporting styles, and was reviewed through multiple human-in-the-loop iterations to improve labeling consistency. Because the training data is news-focused and primarily English, the model performs best on journalistic text. For dataset and model details, see the [model card on Hugging Face](https://huggingface.co/vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-Legacy).
+The dataset spans a broad range of news topics and outlets to reflect real-world reporting styles, and was reviewed through multiple human-in-the-loop iterations to improve labeling consistency. Because the training data is news-focused and primarily English, the model performs best on journalistic text. For dataset and model details, see the [model card on Hugging Face](https://huggingface.co/vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-V2).
 
 ### Does UnBias-Plus detect misinformation or AI-generated content?
 

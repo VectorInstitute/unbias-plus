@@ -14,7 +14,7 @@ from transformers import (
 )
 
 
-DEFAULT_MODEL = "vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-Legacy"
+DEFAULT_MODEL = "vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-V2"
 MAX_SEQ_LENGTH = 8192
 
 
@@ -30,7 +30,7 @@ class UnBiasModel:
     model_name_or_path : str | Path
         HuggingFace model ID or local path to the model.
         Defaults to ``DEFAULT_MODEL``
-        (``vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-Legacy``).
+        (``vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-V2``).
     device : str | None, optional
         Device to run on ('cuda' or 'cpu').
         Auto-detects if not provided.
@@ -38,7 +38,7 @@ class UnBiasModel:
         Load model in 4-bit quantization via bitsandbytes.
         Reduces VRAM to ~3GB (4B) or ~5GB (8B). Default is False.
     max_new_tokens : int, optional
-        Maximum number of new tokens to generate. Default 2048.
+        Maximum number of new tokens to generate. Default 8096.
     enable_thinking : bool, optional
         Enable Qwen3 chain-of-thought thinking mode. Only supported
         by Qwen3 models — do not set for other models. Default is False.
@@ -59,7 +59,7 @@ class UnBiasModel:
         model_name_or_path: str | Path = DEFAULT_MODEL,
         device: str | None = None,
         load_in_4bit: bool = False,
-        max_new_tokens: int = 2048,
+        max_new_tokens: int = 8096,
         enable_thinking: bool = False,
         thinking_budget: int = 512,
     ) -> None:
@@ -104,6 +104,9 @@ class UnBiasModel:
             quantization_config=quantization_config,
         )
         self.model.eval()
+        # Avoid HF warning: generation_config.max_length fights with max_new_tokens.
+        if getattr(self.model, "generation_config", None) is not None:
+            self.model.generation_config.max_length = None
 
     def generate(self, messages: list[dict]) -> str:
         """Run inference on a list of chat messages and return the raw output.

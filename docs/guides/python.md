@@ -3,12 +3,12 @@
 ```python
 from unbias_plus import UnBiasPlus, BiasResult, BiasedSegment
 
-pipe = UnBiasPlus()  # default: vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-Legacy
+pipe = UnBiasPlus()  # default: vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-V2
 result = pipe.analyze("Women are too emotional to lead.")
 
 # Result fields
 print(result.binary_label)    # "biased" | "unbiased"
-print(result.severity)         # 1-5 (article-level)
+print(result.severity)         # 0-10 (article-level)
 print(result.bias_found)       # bool
 print(result.unbiased_text)   # full neutral rewrite
 
@@ -22,6 +22,6 @@ data     = pipe.analyze_to_dict("...")   # plain dict
 json_str = pipe.analyze_to_json("...")   # pretty-printed JSON string
 ```
 
-`UnBiasPlus()` defaults to `max_new_tokens=4096`. The underlying `UnBiasModel` class defaults to `2048` when constructed directly.
+`UnBiasPlus()` and `UnBiasModel` both default to `max_new_tokens=8096`.
 
 For the full `BiasResult` schema, see [How it works](../how_it_works.md#the-structured-output-is-the-point) or the [API Reference](../api.md).

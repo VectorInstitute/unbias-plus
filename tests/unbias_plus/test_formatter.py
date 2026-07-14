@@ -21,13 +21,13 @@ def test_format_cli_contains_label(sample_result: BiasResult) -> None:
 def test_format_cli_contains_original(sample_result: BiasResult) -> None:
     """Test format_cli output contains the original biased phrase."""
     output = format_cli(sample_result)
-    assert "Sharia-obsessed fanatics" in output
+    assert sample_result.biased_segments[0].original in output
 
 
 def test_format_cli_contains_replacement(sample_result: BiasResult) -> None:
     """Test format_cli output contains the replacement phrase."""
     output = format_cli(sample_result)
-    assert "extremist groups" in output
+    assert sample_result.biased_segments[0].replacement in output
 
 
 def test_format_cli_contains_unbiased_text(sample_result: BiasResult) -> None:

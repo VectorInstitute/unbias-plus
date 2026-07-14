@@ -533,6 +533,34 @@ textarea:focus {
   color: var(--text);
 }
 
+.global-severity {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 4px 12px;
+  border-radius: 20px;
+  margin-left: 4px;
+}
+
+.global-severity.sev-strong {
+  background: var(--high-bg);
+  color: var(--high);
+  border: 1px solid var(--high-border);
+}
+
+.global-severity.sev-moderate {
+  background: var(--medium-bg);
+  color: var(--medium);
+  border: 1px solid var(--medium-border);
+}
+
+.global-severity.sev-limited {
+  background: var(--low-bg);
+  color: var(--low);
+  border: 1px solid var(--low-border);
+}
+
 .severity-pills { display: flex; gap: 8px; }
 
 .pill {

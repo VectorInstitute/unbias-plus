@@ -11,6 +11,7 @@
    const highlightEl   = document.getElementById("highlighted-text");
    const unbiasedEl    = document.getElementById("unbiased-text");
    const segCountEl    = document.getElementById("segment-count");
+   const globalSevEl   = document.getElementById("global-severity");
    const pillsEl       = document.getElementById("severity-pills");
    const segListEl     = document.getElementById("segment-list");
    const noBiasEl      = document.getElementById("no-bias");
@@ -154,6 +155,10 @@
      segListEl.innerHTML   = "";
      pillsEl.innerHTML     = "";
      segCountEl.textContent = "0 segments";
+     if (globalSevEl) {
+       globalSevEl.textContent = "";
+       globalSevEl.className = "global-severity hidden";
+     }
      noBiasEl.classList.add("hidden");
      unbiasedEl.innerHTML = "";
      const labelEl = document.querySelector(".loading-label");
@@ -438,7 +443,7 @@
      if (!phrase) return null;
      const candidates = [];
      const seen = new Set();
-     for (const cand of [phrase, phrase.trim()]) {
+     for (const cand of [phrase.trim(), phrase]) {
        if (cand && !seen.has(cand)) {
          seen.add(cand);
          candidates.push(cand);
@@ -514,13 +519,24 @@
      }
      return null;
    }
-   function boundaryReplacementSpan(original, unbiased, segStart, segEnd, origToUnb) {
+   function boundaryReplacementSpan(original, unbiased, segStart, segEnd, origToUnb, replacement) {
      const uStart = wordStart(unbiased, origToUnb[segStart]);
      const uEnd = wordEnd(unbiased, origToUnb[segEnd]);
      if (uEnd <= uStart) return null;
      const origLen = segEnd - segStart;
      const unbLen = uEnd - uStart;
+     // Reject wildly expanded spans (JS diff can leave map holes → start at 0).
      if (origLen > 0 && unbLen > origLen * 3 + 40) return null;
+     if (replacement) {
+       const slice = unbiased.slice(uStart, uEnd).toLowerCase();
+       const needle = replacement.trim().toLowerCase();
+       if (needle && !slice.includes(needle) && !needle.includes(slice.trim())) {
+         return null;
+       }
+       // Ghost span from doc start: mapped start far before the real replacement.
+       const found = unbiased.toLowerCase().indexOf(needle);
+       if (found !== -1 && uStart < found - 2) return null;
+     }
      return [uStart, uEnd];
    }
    /** Assign replacement_start/end (mirrors server boundary + fallback search). */
@@ -529,9 +545,21 @@
      const origToUnb = buildOrigToUnbMap(original, unbiased);
      const used = [];
      return segments.map(seg => {
+       // Prefer server offsets when present (Python SequenceMatcher is reliable).
+       if (
+         seg.replacement_start != null &&
+         seg.replacement_end != null &&
+         seg.replacement_end > seg.replacement_start
+       ) {
+         const span = [seg.replacement_start, seg.replacement_end];
+         used.push(span);
+         return seg;
+       }
        let span = null;
        if (seg.start != null && seg.end != null) {
-         span = boundaryReplacementSpan(original, unbiased, seg.start, seg.end, origToUnb);
+         span = boundaryReplacementSpan(
+           original, unbiased, seg.start, seg.end, origToUnb, seg.replacement
+         );
        }
        if (!span && seg.replacement) {
          const cursor = seg.start != null ? origToUnb[seg.start] : 0;
@@ -694,9 +722,18 @@
        data.biased_segments || [],
        _lastStreamingSegments
      );
+     // Prefer streamed segments if the final payload lost them (parser glitch).
+     const finalSegments =
+       segments.length > 0 ? segments : (_lastStreamingSegments || []);
+     const severity = Number(data.severity ?? 0);
+     const biasFound =
+       data.bias_found === true ||
+       data.binary_label === "biased" ||
+       finalSegments.length > 0 ||
+       severity > 0;
      resultsEl.classList.remove("hidden");
      resultsEl.scrollIntoView({ behavior: "smooth", block: "start" });
-     if (!data.bias_found || segments.length === 0) {
+     if (!biasFound || finalSegments.length === 0) {
        document.querySelector(".summary-bar").classList.add("hidden");
        document.querySelector(".panels").classList.add("hidden");
        document.querySelector(".breakdown-section").classList.add("hidden");
@@ -707,19 +744,34 @@
      document.querySelector(".panels").classList.remove("hidden");
      document.querySelector(".breakdown-section").classList.remove("hidden");
      noBiasEl.classList.add("hidden");
-    renderSummary(segments);
-    highlightEl.innerHTML = buildHighlightedHTML(original_text, segments);
-    attachMarkTooltips(segments);
-    unbiasedEl.innerHTML  = buildUnbiasedHTML(original_text, unbiased_text, segments);
-    renderSegmentCards(segments);
+    renderSummary(finalSegments, severity);
+    highlightEl.innerHTML = buildHighlightedHTML(original_text, finalSegments);
+    attachMarkTooltips(finalSegments);
+    unbiasedEl.innerHTML  = buildUnbiasedHTML(original_text, unbiased_text, finalSegments);
+    renderSegmentCards(finalSegments);
   }
    // ============================================================
    // SUMMARY BAR
    // ============================================================
-   function renderSummary(segments) {
+   function renderSummary(segments, globalSeverity) {
      segCountEl.textContent = `${segments.length} segment${segments.length !== 1 ? "s" : ""}`;
+     if (globalSevEl) {
+       const score = Number(globalSeverity);
+       if (Number.isFinite(score) && score > 0) {
+         globalSevEl.textContent = `Severity ${score}/10`;
+         globalSevEl.className = "global-severity " + (
+           score >= 6 ? "sev-strong" : score >= 3 ? "sev-moderate" : "sev-limited"
+         );
+       } else {
+         globalSevEl.textContent = "";
+         globalSevEl.className = "global-severity hidden";
+       }
+     }
      const counts = { high: 0, medium: 0, low: 0 };
-     segments.forEach(s => { if (counts[s.severity] !== undefined) counts[s.severity]++; });
+     segments.forEach(s => {
+       const sev = (s.severity || "").toLowerCase();
+       if (counts[sev] !== undefined) counts[sev]++;
+     });
      pillsEl.innerHTML = "";
      ["high", "medium", "low"].forEach(sev => {
        if (counts[sev] > 0) {
@@ -740,7 +792,8 @@
      let html   = "";
      let cursor = 0;
      sorted.forEach((seg, idx) => {
-       const { start, end, severity } = seg;
+       const { start, end } = seg;
+       const severity = (seg.severity || "medium").toLowerCase();
        if (start < cursor) return;
        if (start > cursor) html += escapeHtml(text.slice(cursor, start));
        html += `<mark class="severity-${severity}" data-seg-idx="${idx}" tabindex="0">${escapeHtml(text.slice(start, end))}</mark>`;
@@ -775,8 +828,9 @@
      const seg = segments.filter(s => s.start != null).sort((a, b) => a.start - b.start)[idx];
      if (!seg) return;
      const sevEl = document.getElementById("tooltip-severity");
-     sevEl.textContent = seg.severity.toUpperCase();
-     sevEl.className   = `tooltip-severity sev-${seg.severity}`;
+     const severity = (seg.severity || "medium").toLowerCase();
+     sevEl.textContent = severity.toUpperCase();
+     sevEl.className   = `tooltip-severity sev-${severity}`;
      document.getElementById("tooltip-type").textContent        = seg.bias_type   || "";
      document.getElementById("tooltip-reasoning").textContent   = seg.reasoning   || "";
      document.getElementById("tooltip-replacement").textContent = seg.replacement || "";
@@ -803,9 +857,10 @@
      segListEl.innerHTML = "";
      segments.forEach((seg) => {
        const card = document.createElement("div");
-       card.className = `segment-card sev-${seg.severity}`;
+       const severity = (seg.severity || "medium").toLowerCase();
+       card.className = `segment-card sev-${severity}`;
        card.innerHTML = `
-         <span class="seg-badge sev-${seg.severity}">${seg.severity}</span>
+         <span class="seg-badge sev-${severity}">${severity}</span>
          <div class="seg-content">
            <span class="seg-original">"${escapeHtmlText(seg.original)}"</span>
            <span class="seg-type">${escapeHtmlText(seg.bias_type || "")}</span>
