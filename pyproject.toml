@@ -241,7 +241,7 @@ convention = "numpy"
 max-doc-length = 88
 
 [tool.pytest.ini_options]
-testpaths = ["tests/unbias_plus", "tests/training"]
+testpaths = ["tests/unbias_plus", "tests/training", "tests/data"]
 python_files = ["test_*.py"]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
@@ -260,3 +260,8 @@ omit = ["tests/*", "*__init__.py"]
 name = "flash-attn"
 version = "2.7.3"
 requires-dist = ["einops", "torch>=2.0.0"]
+
+# "ment" appears as a token inside the ad-filtering regexes
+# (adverti[sz]e?ment) in data/build_vldbench_10k.py — not a typo of "meant".
+[tool.typos.default.extend-words]
+ment = "ment"
