@@ -255,10 +255,11 @@
              document.querySelector(".panels")?.classList.remove("hidden");
              // Same green replacement marks as final renderResults — not plain escapeHtml,
              // or highlights would only appear after the stream ends.
-             unbiasedEl.innerHTML =
-               streamingSegments.length > 0
-                 ? buildUnbiasedHTML(text, ub.text, streamingSegments)
-                 : escapeHtml(ub.text);
+            const displaySegs = withoutNoOpSegments(streamingSegments);
+            unbiasedEl.innerHTML =
+              displaySegs.length > 0
+                ? buildUnbiasedHTML(text, ub.text, displaySegs)
+                : escapeHtml(ub.text);
            }
           // Neutral rewrite JSON string is closed — hide spinner and re-enable
           // the button immediately. The stream may still drain the final
@@ -638,7 +639,31 @@
      diff(0, a.length, 0, b.length);
      return opcodes;
    }
-   function parseNewSegments(raw, alreadyParsed, inputText) {
+   // Normalise a phrase for original-vs-replacement comparison. Mirrors
+  // schema._normalize_for_equality: fold curly quotes/dashes to ASCII,
+  // collapse whitespace, and lowercase.
+  function normalizeForEquality(s) {
+    return (s || "")
+      .replace(/[\u201c\u201d]/g, '"')
+      .replace(/[\u2018\u2019]/g, "'")
+      .replace(/[\u2013\u2014]/g, "-")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+  }
+  // A segment is a no-op when its replacement equals the original — there is
+  // nothing to change, so it is not shown. An empty replacement means "delete
+  // the phrase" (a real edit) and is kept. Mirrors the server-side
+  // schema.drop_unchanged_segments so the demo matches the API.
+  function isNoOpSegment(seg) {
+    const replacement = (seg.replacement || "").trim();
+    if (!replacement) return false;
+    return normalizeForEquality(seg.original) === normalizeForEquality(replacement);
+  }
+  function withoutNoOpSegments(segments) {
+    return (segments || []).filter(s => !isNoOpSegment(s));
+  }
+  function parseNewSegments(raw, alreadyParsed, inputText) {
      const marker = '"biased_segments"';
      const markerIdx = raw.indexOf(marker);
      if (markerIdx === -1) return [];
@@ -683,17 +708,19 @@
    // ============================================================
    // PARTIAL RENDER (called as each streaming segment arrives)
    // ============================================================
-   function renderStreamingPartial(inputText, segments) {
-     resultsEl.classList.remove("hidden");
-     document.querySelector(".summary-bar").classList.remove("hidden");
-     document.querySelector(".panels").classList.remove("hidden");
-     document.querySelector(".breakdown-section").classList.remove("hidden");
-     noBiasEl.classList.add("hidden");
-     renderSummary(segments);
-     highlightEl.innerHTML = buildHighlightedHTML(inputText, segments);
-     attachMarkTooltips(segments);
-     renderSegmentCards(segments);
-   }
+  function renderStreamingPartial(inputText, segments) {
+    const display = withoutNoOpSegments(segments);
+    if (display.length === 0) return;
+    resultsEl.classList.remove("hidden");
+    document.querySelector(".summary-bar").classList.remove("hidden");
+    document.querySelector(".panels").classList.remove("hidden");
+    document.querySelector(".breakdown-section").classList.remove("hidden");
+    noBiasEl.classList.add("hidden");
+    renderSummary(display);
+    highlightEl.innerHTML = buildHighlightedHTML(inputText, display);
+    attachMarkTooltips(display);
+    renderSegmentCards(display);
+  }
    function countHighlightedSegments(segments) {
      return segments.filter(s => s.start != null && s.end != null).length;
    }
@@ -714,24 +741,29 @@
    // ============================================================
    // RENDER RESULTS (final — called on result event)
    // ============================================================
-   function renderResults(data) {
-     const original_text = data.original_text;
-     // Offsets are computed against the server parse — never swap in stream text.
-     const unbiased_text = data.unbiased_text || _lastStreamedUnbiased || "";
-     const segments = mergeMissingOriginalOffsets(
-       data.biased_segments || [],
-       _lastStreamingSegments
-     );
-     // Prefer streamed segments if the final payload lost them (parser glitch).
-     const finalSegments =
-       segments.length > 0 ? segments : (_lastStreamingSegments || []);
-     const severity = Number(data.severity ?? 0);
-     const biasFound =
-       data.bias_found === true ||
-       data.binary_label === "biased" ||
-       finalSegments.length > 0 ||
-       severity > 0;
-     resultsEl.classList.remove("hidden");
+  function renderResults(data) {
+    const original_text = data.original_text;
+    // Offsets are computed against the server parse — never swap in stream text.
+    const unbiased_text = data.unbiased_text || _lastStreamedUnbiased || "";
+    const serverSegments = withoutNoOpSegments(
+      mergeMissingOriginalOffsets(data.biased_segments || [], _lastStreamingSegments)
+    );
+    const severity = Number(data.severity ?? 0);
+    // The server is authoritative about whether bias exists. Only fall back to
+    // streamed segments when the server reports bias but lost the list (parser
+    // glitch) — never to resurrect no-op segments the server intentionally
+    // dropped (which would otherwise reappear when the server returns none).
+    const serverSaysBiased =
+      data.bias_found === true ||
+      data.binary_label === "biased" ||
+      severity > 0 ||
+      serverSegments.length > 0;
+    const finalSegments =
+      serverSegments.length > 0
+        ? serverSegments
+        : (serverSaysBiased ? withoutNoOpSegments(_lastStreamingSegments || []) : []);
+    const biasFound = serverSaysBiased && finalSegments.length > 0;
+    resultsEl.classList.remove("hidden");
      resultsEl.scrollIntoView({ behavior: "smooth", block: "start" });
      if (!biasFound || finalSegments.length === 0) {
        document.querySelector(".summary-bar").classList.add("hidden");
@@ -769,7 +801,7 @@
      }
      const counts = { high: 0, medium: 0, low: 0 };
      segments.forEach(s => {
-       const sev = (s.severity || "").toLowerCase();
+       const sev = String(s.severity || "").toLowerCase();
        if (counts[sev] !== undefined) counts[sev]++;
      });
      pillsEl.innerHTML = "";
@@ -793,7 +825,7 @@
      let cursor = 0;
      sorted.forEach((seg, idx) => {
        const { start, end } = seg;
-       const severity = (seg.severity || "medium").toLowerCase();
+       const severity = String(seg.severity || "medium").toLowerCase();
        if (start < cursor) return;
        if (start > cursor) html += escapeHtml(text.slice(cursor, start));
        html += `<mark class="severity-${severity}" data-seg-idx="${idx}" tabindex="0">${escapeHtml(text.slice(start, end))}</mark>`;
@@ -828,7 +860,7 @@
      const seg = segments.filter(s => s.start != null).sort((a, b) => a.start - b.start)[idx];
      if (!seg) return;
      const sevEl = document.getElementById("tooltip-severity");
-     const severity = (seg.severity || "medium").toLowerCase();
+     const severity = String(seg.severity || "medium").toLowerCase();
      sevEl.textContent = severity.toUpperCase();
      sevEl.className   = `tooltip-severity sev-${severity}`;
      document.getElementById("tooltip-type").textContent        = seg.bias_type   || "";
@@ -857,7 +889,7 @@
      segListEl.innerHTML = "";
      segments.forEach((seg) => {
        const card = document.createElement("div");
-       const severity = (seg.severity || "medium").toLowerCase();
+       const severity = String(seg.severity || "medium").toLowerCase();
        card.className = `segment-card sev-${severity}`;
        card.innerHTML = `
          <span class="seg-badge sev-${severity}">${severity}</span>

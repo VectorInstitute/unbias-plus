@@ -87,18 +87,33 @@ class BiasedSegment(BaseModel):
     replacement_start: int | None = None
     replacement_end: int | None = None
 
-    @field_validator("severity")
+    @field_validator("severity", mode="before")
     @classmethod
-    def validate_severity(cls, v: str) -> str:
-        """Validate and normalise segment severity to low/medium/high."""
+    def validate_severity(cls, v: object) -> str:
+        """Validate and normalise segment severity to low/medium/high.
+
+        Accepts:
+          - str 'low' | 'medium' | 'high'  (correct model output)
+          - int 0-10  (model confused segment vs. global severity scale;
+            bucketed the same way the global score is bucketed elsewhere)
+          - anything else — defaults to 'medium'
+        """
         allowed = {"low", "medium", "high"}
-        normalized = v.lower().strip()
-        if normalized not in allowed:
+        if isinstance(v, str):
+            normalized = v.lower().strip()
+            if normalized in allowed:
+                return normalized
+        elif isinstance(v, (int, float)) and not isinstance(v, bool):
             logger.warning(
-                "Unexpected segment severity '%s', defaulting to 'medium'", v
+                "Segment severity returned as int '%s', coerced by bucket", v
             )
-            return "medium"
-        return normalized
+            if v >= 6:
+                return "high"
+            if v >= 3:
+                return "medium"
+            return "low"
+        logger.warning("Unexpected segment severity '%s', defaulting to 'medium'", v)
+        return "medium"
 
 
 class BiasResult(BaseModel):
@@ -549,6 +564,39 @@ def compute_replacement_offsets(
         )
 
     return enriched
+
+
+def _normalize_for_equality(s: str) -> str:
+    """Normalise a phrase for original-vs-replacement comparison.
+
+    Collapses whitespace, folds typographic quotes/dashes to ASCII, and
+    casefolds so trivially-identical phrases compare equal despite the model's
+    typography or spacing drift.
+    """
+    return _collapse_whitespace(_normalize_for_match(s)).casefold()
+
+
+def drop_unchanged_segments(segments: list[BiasedSegment]) -> list[BiasedSegment]:
+    """Drop segments whose replacement is identical to the original phrase.
+
+    Under vLLM stochasticity the model occasionally flags a span but returns a
+    replacement equal to the original (no actual edit). There is nothing to
+    highlight, so these add noise and are removed. Segments with an empty
+    replacement are kept: an empty replacement means "delete the phrase", which
+    is a genuine edit.
+    """
+    kept: list[BiasedSegment] = []
+    for seg in segments:
+        replacement = seg.replacement.strip()
+        if replacement and _normalize_for_equality(seg.original) == (
+            _normalize_for_equality(replacement)
+        ):
+            logger.debug(
+                "Dropping no-op segment (replacement == original): %r", seg.original
+            )
+            continue
+        kept.append(seg)
+    return kept
 
 
 def deduplicate_by_span(segments: list[BiasedSegment]) -> list[BiasedSegment]:

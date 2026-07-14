@@ -11,6 +11,7 @@ from unbias_plus.schema import (
     BiasResult,
     compute_offsets,
     compute_replacement_offsets,
+    drop_unchanged_segments,
 )
 
 
@@ -144,9 +145,29 @@ class UnBiasPlus:
 
 
 def finalize_result(text: str, result: BiasResult) -> BiasResult:
-    """Attach original text and character offsets for each biased segment."""
-    segments = compute_offsets(text, result.biased_segments)
+    """Attach original text and character offsets for each biased segment.
+
+    Segments whose replacement equals the original are dropped as no-ops. If no
+    segments survive, the result is reconciled to a clean unbiased state
+    (severity 0, no bias, rewrite == original) since, per the model contract,
+    an empty ``biased_segments`` means there is no bias to report or rewrite.
+    """
+    segments = drop_unchanged_segments(result.biased_segments)
+    segments = compute_offsets(text, segments)
     segments = compute_replacement_offsets(text, result.unbiased_text, segments)
+
+    if not segments:
+        return result.model_copy(
+            update={
+                "biased_segments": [],
+                "binary_label": "unbiased",
+                "bias_found": False,
+                "severity": 0,
+                "unbiased_text": text,
+                "original_text": text,
+            }
+        )
+
     return result.model_copy(
         update={
             "biased_segments": segments,
