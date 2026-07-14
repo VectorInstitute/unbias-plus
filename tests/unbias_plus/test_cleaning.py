@@ -6,7 +6,10 @@ from unbias_plus.cleaning import prepare_input, strip_quotes
 def test_strip_quotes_removes_ascii_and_curly_doubles() -> None:
     """Double quotes of common styles are removed."""
     assert strip_quotes('He said "false" claims.') == "He said false claims."
-    assert strip_quotes("She said \u201cmisleading\u201d news.") == "She said misleading news."
+    assert (
+        strip_quotes("She said \u201cmisleading\u201d news.")
+        == "She said misleading news."
+    )
 
 
 def test_strip_quotes_removes_edge_singles_keeps_apostrophes() -> None:
