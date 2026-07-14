@@ -50,6 +50,7 @@ jobs:
               - 'pyproject.toml'
             vllm:
               - 'Dockerfile.vllm'
+              - '.github/cloudbuild-cache-model.yaml'
 
       # On workflow_dispatch, treat everything as changed so a full
       # redeploy is triggered regardless of which files differ.
