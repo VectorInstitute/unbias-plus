@@ -77,3 +77,10 @@ jobs:
             # pydantic-settings GHSA-4xgf-cpjx-pc3j: symlink path traversal in
             # NestedSecretsSettingsSource. We don't use secrets_nested_subdir=True.
             GHSA-4xgf-cpjx-pc3j
+            PYSEC-2026-2132
+            PYSEC-2026-2253
+            PYSEC-2026-2254
+            PYSEC-2026-2255
+            PYSEC-2026-2256
+            PYSEC-2026-2257
+            CVE-2026-5241
