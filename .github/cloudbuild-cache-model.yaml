@@ -8,6 +8,15 @@
 # Required substitutions:
 #   _MODEL  — HuggingFace model ID (e.g. vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct)
 #   _BUCKET — GCS bucket name (e.g. unbias-plus-model-cache)
+#
+# Requires a "hf-token" secret in Secret Manager (HuggingFace read token),
+# with roles/secretmanager.secretAccessor granted to the Cloud Build
+# service account.
+
+availableSecrets:
+  secretManager:
+  - versionName: projects/unbias-toolkit/secrets/hf-token/versions/latest
+    env: 'HF_TOKEN'
 
 steps:
 - name: 'python:3.11-slim'
@@ -15,16 +24,19 @@ steps:
   entrypoint: bash
   env:
   - '_MODEL=${_MODEL}'
-  - 'HF_HUB_DISABLE_XET=1'
+  secretEnv: ['HF_TOKEN']
   args:
   - -c
   - |
-    pip install -q "huggingface_hub>=0.23"
+    # Authenticated + hf_xet gives parallel chunked transfer against HF's
+    # Xet CDN (faster and avoids the anonymous rate-limit/CDN signature
+    # errors hit by the plain HTTP fallback used when hf_xet is absent).
+    pip install -q "huggingface_hub[hf_xet]>=0.23"
     python3 -c "
     from huggingface_hub import snapshot_download; import os
     model = os.environ['_MODEL']
     print(f'Downloading {model} ...')
-    snapshot_download(model, cache_dir='/workspace/hf-cache')
+    snapshot_download(model, cache_dir='/workspace/hf-cache', token=os.environ['HF_TOKEN'], max_workers=8)
     print('Download complete.')
     "
 
