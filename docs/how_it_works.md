@@ -27,7 +27,7 @@ A system prompt fixes the bias categories, segment rules, and the JSON output sc
 <div class="up-flow__step" markdown>
 **Model**{ .up-flow__title }
 
-Fine-tuned `Qwen3-8B-UnBias-Plus-SFT-Instruct-Legacy` generates the structured JSON. 4-bit quantization is optional.
+Fine-tuned `Qwen3-8B-UnBias-Plus-SFT-Instruct-V2` generates the structured JSON. 4-bit quantization is optional.
 </div>
 
 <div class="up-flow__arrow">→</div>
@@ -56,13 +56,9 @@ The system prompt defines a tight contract. Severity scales, segment rules, and 
 
 ```text
 ## BIAS TYPES
-- loaded language             : words with strong emotional connotations
-- dehumanizing framing        : language that strips dignity from groups
-- false generalizations       : sweeping statements ("they always", "all of them")
-- framing bias                : selective wording that implies a viewpoint
-- euphemism/dysphemism        : softening or hardening language
-- politically charged terminology : labels used to provoke rather than describe
-- sensationalism              : exaggerated language to evoke emotional responses
+- dehumanizing_language, sensationalism, opinion_as_fact,
+  stereotypical_association, unsupported_generalization,
+  euphemism, informational_bias, loaded_language
 
 ## SEGMENT RULES
 - "original" MUST be the EXACT substring as it appears in the input.
@@ -71,14 +67,13 @@ The system prompt defines a tight contract. Severity scales, segment rules, and 
 
 ## OUTPUT SCHEMA (return ONLY valid JSON, no extra text)
 {
-  "binary_label": "biased" | "unbiased",
-  "severity": 1-5,
-  "bias_found": true | false,
+  "severity": 0-10,
   "biased_segments": [...],
   "unbiased_text": "Full rewritten neutral article"
 }
 ```
 
+`binary_label` and `bias_found` are derived downstream from severity (severity > 0 => biased).
 Two design choices follow from this contract:
 
 !!! note "Exact substrings, not paraphrases"
@@ -99,17 +94,17 @@ Every public method ultimately returns a `BiasResult`. The schema is small enoug
 class BiasedSegment(BaseModel):
     original: str          # exact substring from input
     replacement: str       # neutral alternative
-    severity: str          # "low" | "medium" | "high"
-    bias_type: str         # usually one core category; may be merged (e.g. "A / B")
+    severity: str          # "low" | "medium" | "high" (normalized)
+    bias_type: str         # e.g. loaded_language, stereotypical_association
     reasoning: str         # 1-2 sentence explanation
     start: int | None      # character offset (computed)
     end: int | None        # character offset (computed)
 
 
 class BiasResult(BaseModel):
-    binary_label: str               # "biased" | "unbiased"
-    severity: int                   # 1-5 (article-level)
-    bias_found: bool
+    binary_label: str               # "biased" | "unbiased" (derived)
+    severity: int                   # 0-10 (article-level)
+    bias_found: bool                # derived from severity / segments
     biased_segments: list[BiasedSegment]
     unbiased_text: str              # full neutral rewrite
     original_text: str | None
@@ -169,7 +164,7 @@ All three expose the same `BiasResult` shape. In local mode, CLI and Python call
 
 ## Performance notes
 
-- **Default model**: [`vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-Legacy`](https://huggingface.co/vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-Legacy), fine-tuned from Qwen3-8B for this task.
+- **Default model**: [`vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-V2`](https://huggingface.co/vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-V2), fine-tuned from Qwen3-8B for this task.
 - **VRAM**: roughly 16 GB at BF16. Pass `load_in_4bit=True` (or `--load-in-4bit` on the CLI) to fit on smaller GPUs, at the cost of some replacement quality.
 - **Input limits**: model context is 8,192 tokens. REST additionally enforces `MAX_INPUT_CHARS` (default `5000`, configurable via environment variable). CLI and Python do not enforce a fixed character cap; practical limits come from model context and available memory.
 - **CPU**: supported via `device="cpu"`, but inference is slow. GPU is recommended for any real workload.

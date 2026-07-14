@@ -1,21 +1,18 @@
-"""Prompt templates for the unbias-plus LLM.
+"""System prompt and tool schema for the bias annotator."""
 
-The model returns plain JSON with ``severity``, ``biased_segments``, and
-``unbiased_text``. ``binary_label`` and ``bias_found`` are not requested;
-they are derived from ``severity`` (severity > 0 => biased) downstream.
-"""
+from textwrap import dedent
 
-from __future__ import annotations
+from config import VALID_BIAS_TYPES, VALID_SEGMENT_SEVERITY
 
 
-SYSTEM_PROMPT = """
+ANNOTATE_SYSTEM_PROMPT = dedent("""
 You are a conservative span-level bias annotator.
 
 Given an article, identify material biased language, assign one article-level
 severity score, and produce a neutral rewrite that changes only flagged text.
 
-Return the result only as a single valid JSON object in the shape described
-under `## Output`. Do not write anything outside the JSON object.
+Return the result only through `submit_bias_annotation`. Do not write anything
+outside the tool call.
 
 ## Scope
 
@@ -172,70 +169,57 @@ content and removes only the bias.
   dehumanizing, inflammatory, sensationalized, or exaggerated wording in
   `unbiased_text`.
 
-## Output
 
-Return exactly one JSON object with this shape and nothing else:
+Before submitting, audit the entire article from beginning to end, including
+the final paragraphs. Verify that all originals match the article exactly,
+segments do not overlap, replacements are neutral and grammatically correct,
+`unbiased_text` reflects them, and no toxic, offensive, hateful, abusive,
+inflammatory, sensationalized, or exaggerated wording remains.
+""").strip()
 
-{
-  "severity": <integer 0-10>,
-  "biased_segments": [
-    {
-      "original": "<exact substring of the article>",
-      "replacement": "<neutral rewrite of that span, or empty string>",
-      "severity": "Low" | "Medium" | "High",
-      "bias_type": "<one type from the bias types above>",
-      "reasoning": "<short, specific explanation of the linguistic cue>"
-    }
-  ],
-  "unbiased_text": "<full neutral rewrite of the article>"
+
+ANNOTATE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "submit_bias_annotation",
+        "description": "Submit the bias annotation and neutral rewrite.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "severity": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10,
+                },
+                "biased_segments": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "original": {"type": "string"},
+                            "replacement": {"type": "string"},
+                            "severity": {
+                                "type": "string",
+                                "enum": VALID_SEGMENT_SEVERITY,
+                            },
+                            "bias_type": {
+                                "type": "string",
+                                "enum": VALID_BIAS_TYPES,
+                            },
+                            "reasoning": {"type": "string"},
+                        },
+                        "required": [
+                            "original",
+                            "replacement",
+                            "severity",
+                            "bias_type",
+                            "reasoning",
+                        ],
+                    },
+                },
+                "unbiased_text": {"type": "string"},
+            },
+            "required": ["severity", "biased_segments", "unbiased_text"],
+        },
+    },
 }
-
-Do not add any other fields. Do not output `binary_label` or `bias_found`; they
-are derived from `severity`. Do not wrap the JSON in markdown fences or add any
-commentary.
-
-Before returning the JSON, audit the entire article from beginning to end,
-including the final paragraphs. Verify that all originals match the article
-exactly, segments do not overlap, replacements are neutral and grammatically
-correct, `unbiased_text` reflects them, and no toxic, offensive, hateful,
-abusive, inflammatory, sensationalized, or exaggerated wording remains.
-""".strip()
-
-USER_TEMPLATE = (
-    "Analyze the following article for bias and return the result "
-    "in the required JSON format.\n\n"
-    "ARTICLE:\n{article}"
-)
-
-
-def build_messages(text: str) -> list[dict]:
-    """Build the chat messages list for the LLM given input text.
-
-    Formats the system prompt and user text into the messages format
-    required by the model's chat template.
-
-    Parameters
-    ----------
-    text : str
-        The input text to analyze for bias.
-
-    Returns
-    -------
-    list[dict]
-        List of ``{"role": ..., "content": ...}`` dicts ready for
-        ``tokenizer.apply_chat_template()``.
-
-    Examples
-    --------
-    >>> messages = build_messages("Women are too emotional to lead.")
-    >>> messages[0]["role"]
-    'system'
-    >>> messages[1]["role"]
-    'user'
-    >>> "Women are too emotional to lead." in messages[1]["content"]
-    True
-    """
-    return [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": USER_TEMPLATE.format(article=text)},
-    ]

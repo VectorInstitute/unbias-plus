@@ -13,7 +13,7 @@ Bias detection and debiasing in text: identify biased segments, classify severit
 
 ## Overview
 
-Input text → analysis → validated `BiasResult`: binary label (biased/unbiased), overall severity (1–5), `biased_segments` (original phrase, replacement, severity, bias type, reasoning, character offsets), and full `unbiased_text`. Entry points: CLI (`unbias-plus`), REST API (FastAPI + demo UI), or Python (`UnBiasPlus`).
+Input text → analysis → validated `BiasResult`: binary label (biased/unbiased), overall severity (0–10), `biased_segments` (original phrase, replacement, severity, bias type, reasoning, character offsets), and full `unbiased_text`. Entry points: CLI (`unbias-plus`), REST API (FastAPI + demo UI), or Python (`UnBiasPlus`).
 
 **Project structure:**
 ```
@@ -41,10 +41,10 @@ unbias-plus/
 ## Features
 
 - **Bias detection**: Identifies biased phrases in text and returns them as segments with character-level offsets for highlighting.
-- **Classification**: Binary label (biased/unbiased), per-segment severity (low/medium/high), and bias type (e.g. loaded language, framing).
+- **Classification**: Binary label (biased/unbiased), per-segment severity (low/medium/high), and bias type (e.g. `loaded_language`, `stereotypical_association`).
 - **Reasoning**: Each segment includes an explanation of why it is considered biased.
 - **Debiasing**: Per-segment neutral replacements and a full rewritten `unbiased_text`.
-- **Structured output**: Pydantic-validated `BiasResult` with `binary_label`, `severity` (1–5), `biased_segments`, and `unbiased_text`.
+- **Structured output**: Pydantic-validated `BiasResult` with `binary_label`, `severity` (0–10), `biased_segments`, and `unbiased_text`.
 - **Demo UI**: `--serve` launches a FastAPI server that also serves a visual web interface at `http://localhost:8000`.
 - **CLI**: Analyze from command line with `--text`, `--file`, or start the API + UI with `--serve`. Optional 4-bit quantization and JSON output.
 - **REST API**: FastAPI server with `/health` and `/analyze` (POST JSON `{"text": "..."}`). Model loaded at startup via lifespan.
@@ -156,7 +156,7 @@ pipe = UnBiasPlus("your-hf-model-id", load_in_4bit=False)
 result = pipe.analyze("Women are too emotional to lead.")
 
 print(result.binary_label)   # "biased" | "unbiased"
-print(result.severity)       # 1–5
+print(result.severity)       # 0–10
 print(result.bias_found)     # bool
 
 for seg in result.biased_segments:

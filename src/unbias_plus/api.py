@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from unbias_plus.cleaning import prepare_input
 from unbias_plus.model import DEFAULT_MODEL
 from unbias_plus.parser import parse_llm_output
 from unbias_plus.pipeline import UnBiasPlus, finalize_result
@@ -31,6 +32,9 @@ VLLM_MODEL_NAME = os.environ.get("VLLM_MODEL_NAME", "unbias-plus")
 # Service-level key for the Vector proxy gateway — never exposed to end users.
 VLLM_API_KEY = os.environ.get("VLLM_API_KEY", "EMPTY")
 MAX_INPUT_CHARS = int(os.environ.get("MAX_INPUT_CHARS", "5000"))
+# Must leave room for the prompt inside vLLM --max-model-len (default 8192).
+# 8096 + any prompt (>0) exceeds 8192 and returns HTTP 400.
+MAX_NEW_TOKENS = int(os.environ.get("MAX_NEW_TOKENS", "4096"))
 # Cloud project for BigQuery feedback storage (auto-set by Cloud Run).
 GCP_PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "unbias-toolkit")
 _BQ_DATASET = "unbias_plus"
@@ -282,17 +286,18 @@ def analyze(request: Request, body: AnalyzeRequest) -> BiasResult:
     pipe = getattr(request.app.state, "pipe", None)
     if vllm_client is None and pipe is None:
         raise HTTPException(status_code=500, detail="Model not loaded.")
-    if len(body.text) > MAX_INPUT_CHARS:
+    text = prepare_input(body.text)
+    if len(text) > MAX_INPUT_CHARS:
         raise HTTPException(
             status_code=422,
-            detail=f"Input too long: {len(body.text)} chars (max {MAX_INPUT_CHARS}).",
+            detail=f"Input too long: {len(text)} chars (max {MAX_INPUT_CHARS}).",
         )
     try:
         if vllm_client is not None:
             completion = vllm_client.chat.completions.create(
                 model=VLLM_MODEL_NAME,
-                messages=build_messages(body.text),
-                max_tokens=4096,
+                messages=build_messages(text),
+                max_tokens=MAX_NEW_TOKENS,
                 temperature=0,
                 stop=["<|im_end|>", "<|endoftext|>"],
                 extra_body={
@@ -302,29 +307,98 @@ def analyze(request: Request, body: AnalyzeRequest) -> BiasResult:
             )
             raw = completion.choices[0].message.content or ""
             result = parse_llm_output(raw)
-            return finalize_result(body.text, result)
+            return finalize_result(text, result)
         assert pipe is not None
-        return cast(BiasResult, pipe.analyze(body.text))
+        return cast(BiasResult, pipe.analyze(text))
     except ValueError as e:
         raise HTTPException(status_code=422, detail=_safe_error(e)) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=_safe_error(e)) from e
 
 
+def _json_root_is_complete(text: str) -> bool:
+    """Return True if *text* is a single balanced JSON object (brace-depth 0)."""
+    start = text.find("{")
+    if start == -1:
+        return False
+    depth = 0
+    in_string = False
+    escape_next = False
+    for ch in text[start:]:
+        if escape_next:
+            escape_next = False
+            continue
+        if ch == "\\" and in_string:
+            escape_next = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return True
+            if depth < 0:
+                return False
+    return False
+
+
+def _sse_json_candidate(raw_output: str) -> str | None:
+    """Return a closed top-level JSON object from streamed output, or None."""
+    if not raw_output.rstrip().endswith("}"):
+        return None
+
+    text = raw_output.strip()
+    # Strip markdown fences if the model added them.
+    if text.startswith("```"):
+        text = text.split("```", 2)[1] if text.count("```") >= 2 else text
+        text = text.lstrip("json").strip()
+
+    start = text.find("{")
+    end = text.rfind("}")
+    if start == -1 or end <= start:
+        return None
+    candidate = text[start : end + 1]
+    if not _json_root_is_complete(candidate):
+        return None
+    return candidate
+
+
 def _sse_result_line_or_none(raw_output: str, original_text: str) -> str | None:
     """Return the final SSE ``data: {"result":...}`` line if *raw_output* is complete.
 
-    Cheap guard first (trailing ``}``), then :func:`parse_llm_output`. Used to stop
-    streaming as soon as the model has finished the JSON instead of consuming tokens
-    until ``max_tokens``.
+    Only accepts a fully closed JSON object that already includes
+    ``unbiased_text``. Truncation repair is intentionally NOT used here —
+    otherwise a mid-stream ``}`` closing a segment object can be "repaired"
+    into a fake complete result and the stream stops silently.
     """
-    if not raw_output.rstrip().endswith("}"):
+    candidate = _sse_json_candidate(raw_output)
+    if candidate is None:
         return None
+
     try:
-        result = parse_llm_output(raw_output)
+        data = json.loads(candidate)
+    except json.JSONDecodeError:
+        return None
+    required = {"unbiased_text", "severity", "biased_segments"}
+    if not isinstance(data, dict) or not required.issubset(data):
+        return None
+
+    try:
+        result = parse_llm_output(candidate)
     except ValueError:
         return None
     final = finalize_result(original_text, result)
+    print(
+        f"[stream] complete JSON received "
+        f"(severity={final.severity}, segments={len(final.biased_segments)}, "
+        f"chars_out={len(candidate)})",
+        flush=True,
+    )
     return (
         "data: " + json.dumps({"result": json.loads(final.model_dump_json())}) + "\n\n"
     )
@@ -357,13 +431,12 @@ def analyze_stream(request: Request, body: AnalyzeRequest) -> StreamingResponse:
     pipe = getattr(request.app.state, "pipe", None)
     if vllm_client is None and pipe is None:
         raise HTTPException(status_code=500, detail="Model not loaded.")
-    if len(body.text) > MAX_INPUT_CHARS:
+    text = prepare_input(body.text)
+    if len(text) > MAX_INPUT_CHARS:
         raise HTTPException(
             status_code=422,
-            detail=f"Input too long: {len(body.text)} chars (max {MAX_INPUT_CHARS}).",
+            detail=f"Input too long: {len(text)} chars (max {MAX_INPUT_CHARS}).",
         )
-
-    text = body.text
 
     def event_stream() -> Generator[str, None, None]:
         try:
@@ -374,7 +447,7 @@ def analyze_stream(request: Request, body: AnalyzeRequest) -> StreamingResponse:
                 stream = vllm_client.chat.completions.create(
                     model=VLLM_MODEL_NAME,
                     messages=messages,
-                    max_tokens=4096,
+                    max_tokens=MAX_NEW_TOKENS,
                     temperature=0,
                     stream=True,
                     stop=["<|im_end|>", "<|endoftext|>"],
@@ -413,8 +486,10 @@ def analyze_stream(request: Request, body: AnalyzeRequest) -> StreamingResponse:
                 + "\n\n"
             )
         except ValueError as e:
+            print(f"[stream] parse error: {_safe_error(e)}", flush=True)
             yield "data: " + json.dumps({"error": _safe_error(e)}) + "\n\n"
         except Exception as e:
+            print(f"[stream] error: {_safe_error(e)}", flush=True)
             yield "data: " + json.dumps({"error": _safe_error(e)}) + "\n\n"
 
     return StreamingResponse(

@@ -16,8 +16,8 @@ def test_biased_segment_valid() -> None:
     seg = BiasedSegment(
         original="desperate for clicks",
         replacement="seeking audience engagement",
-        severity="medium",
-        bias_type="loaded language",
+        severity="Medium",
+        bias_type="loaded_language",
         reasoning="Pejorative motive attributed without evidence.",
     )
     assert seg.original == "desperate for clicks"
@@ -30,7 +30,7 @@ def test_biased_segment_severity_normalized() -> None:
         original="test",
         replacement="test",
         severity="HIGH",
-        bias_type="test",
+        bias_type="loaded_language",
         reasoning="test",
     )
     assert seg.severity == "high"
@@ -42,7 +42,7 @@ def test_biased_segment_invalid_severity() -> None:
         original="test",
         replacement="test",
         severity="extreme",
-        bias_type="test",
+        bias_type="loaded_language",
         reasoning="test",
     )
     assert seg.severity == "medium"
@@ -51,7 +51,7 @@ def test_biased_segment_invalid_severity() -> None:
 def test_bias_result_valid(sample_result: BiasResult) -> None:
     """Test BiasResult accepts valid input."""
     assert sample_result.binary_label == "biased"
-    assert sample_result.severity == 3
+    assert sample_result.severity == 6
     assert sample_result.bias_found is True
     assert len(sample_result.biased_segments) == 1
 
@@ -60,7 +60,7 @@ def test_bias_result_label_normalized() -> None:
     """Test BiasResult normalizes binary_label to lowercase."""
     result = BiasResult(
         binary_label="BIASED",
-        severity=2,
+        severity=4,
         bias_found=True,
         biased_segments=[],
         unbiased_text="test",
@@ -81,15 +81,28 @@ def test_bias_result_invalid_label() -> None:
 
 
 def test_bias_result_severity_out_of_range() -> None:
-    """Test BiasResult clamps severity > 4 to 4."""
+    """Test BiasResult clamps severity > 10 to 10."""
     result = BiasResult(
         binary_label="biased",
-        severity=6,
+        severity=15,
         bias_found=True,
         biased_segments=[],
         unbiased_text="test",
     )
-    assert result.severity == 4
+    assert result.severity == 10
+
+
+def test_bias_result_severity_accepts_full_scale() -> None:
+    """Test BiasResult accepts full 0-10 severity scale."""
+    for sev in range(0, 11):
+        result = BiasResult(
+            binary_label="biased" if sev > 0 else "unbiased",
+            severity=sev,
+            bias_found=sev > 0,
+            biased_segments=[],
+            unbiased_text="test",
+        )
+        assert result.severity == sev
 
 
 def test_bias_result_unbiased_empty_segments() -> None:
@@ -126,21 +139,21 @@ def test_compute_replacement_offsets_from_diff() -> None:
             original="overreacting as usual",
             replacement="expressing concerns",
             severity="medium",
-            bias_type="loaded language",
+            bias_type="loaded_language",
             reasoning="",
         ),
         BiasedSegment(
             original="their complaints driven more by feelings than by facts",
             replacement="their concerns were based on personal perspectives",
             severity="medium",
-            bias_type="framing bias",
+            bias_type="stereotypical_association",
             reasoning="",
         ),
         BiasedSegment(
             original="needlessly emotional debate",
             replacement="emotional discussion",
             severity="medium",
-            bias_type="loaded language",
+            bias_type="loaded_language",
             reasoning="",
         ),
     ]
@@ -179,3 +192,24 @@ def test_compute_replacement_offsets_identical_text() -> None:
     result = compute_replacement_offsets(text, text, segments)
     assert result[0].replacement_start is None
     assert result[0].replacement_end is None
+
+
+def test_compute_offsets_ignores_leading_space_in_phrase() -> None:
+    """Model originals with a leading space must not highlight the prior char."""
+    text = "to the white engineer even though the Latina developer wrote it."
+    segments = [
+        BiasedSegment(
+            original=" even though the Latina developer wrote it",
+            replacement="even though the developer wrote it",
+            severity="low",
+            bias_type="stereotypical_association",
+            reasoning="test",
+        )
+    ]
+    result = compute_offsets(text, segments)
+    assert result[0].start is not None
+    assert result[0].end is not None
+    assert text[result[0].start : result[0].end] == (
+        "even though the Latina developer wrote it"
+    )
+    assert not text[result[0].start].isspace()

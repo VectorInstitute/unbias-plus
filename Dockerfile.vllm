@@ -1,7 +1,7 @@
 # ============================================================
 # UnBias Plus vLLM Inference Server — GPU Cloud Run Service
 # Base: vllm/vllm-openai (OpenAI-compatible API server)
-# Model: vector-institute/Qwen3-8B-UnBias-Plus-SFT
+# Model: vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-V2
 # GPU: NVIDIA L4 (23 GB VRAM — fits Qwen3-8B in BF16 ~18 GB)
 #
 # Exposes an OpenAI-compatible API at /v1 (chat/completions,
@@ -47,7 +47,7 @@ EXPOSE 8080
 #   --dtype bfloat16              native Qwen3 dtype; faster than fp16 on L4
 #   --enable-chunked-prefill      improves throughput for long prompts
 CMD [ \
-    "--model", "vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-Legacy", \
+    "--model", "vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-V2", \
     "--served-model-name", "unbias-plus", \
     "--port", "8080", \
     "--host", "0.0.0.0", \

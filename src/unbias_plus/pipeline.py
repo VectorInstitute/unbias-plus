@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from unbias_plus.cleaning import prepare_input
 from unbias_plus.formatter import format_cli, format_dict, format_json
 from unbias_plus.model import DEFAULT_MODEL, UnBiasModel
 from unbias_plus.parser import parse_llm_output
@@ -25,13 +26,13 @@ class UnBiasPlus:
     model_name_or_path : str | Path
         HuggingFace model ID or local path to the fine-tuned
         model. Defaults to ``DEFAULT_MODEL``
-        (``vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-Legacy``).
+        (``vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-V2``).
     device : str | None, optional
         Device to run on ('cuda' or 'cpu'). Auto-detected if None.
     load_in_4bit : bool, optional
         Load model in 4-bit quantization. Default is False.
     max_new_tokens : int, optional
-        Maximum tokens to generate. Default is 4096.
+        Maximum tokens to generate. Default is 8096.
 
     Examples
     --------
@@ -48,7 +49,7 @@ class UnBiasPlus:
         model_name_or_path: str | Path = DEFAULT_MODEL,
         device: str | None = None,
         load_in_4bit: bool = False,
-        max_new_tokens: int = 4096,
+        max_new_tokens: int = 8096,
     ) -> None:
         self._model = UnBiasModel(
             model_name_or_path=model_name_or_path,
@@ -87,6 +88,7 @@ class UnBiasPlus:
         True
 
         """
+        text = prepare_input(text)
         messages = build_messages(text)
         raw_output = self._model.generate(messages)
         result = parse_llm_output(raw_output)

@@ -3,7 +3,7 @@ name: Deploy UnBias Plus
 # Trigger on pushes to main that touch relevant files, or manually.
 on:
   push:
-    branches: [main, deploy,unbias-pretrained]
+    branches: [main]
     paths:
       - 'src/unbias_plus/**'
       - 'Dockerfile'
@@ -439,7 +439,7 @@ jobs:
           | **Demo UI** | ${{ steps.deploy.outputs.url }} | Cloud Run CPU, scales to zero |
           | **vLLM API** | https://proxy.vectorinstitute.ai/v1 | Routed via Vector proxy gateway |
           | **Health** | ${{ steps.deploy.outputs.url }}/health | |
-          | **Model** | vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-Legacy | served via vLLM |
+          | **Model** | vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-V2 | served via vLLM |
 
           ---
           *Deployed at $(date -u +"%Y-%m-%d %H:%M:%S UTC")*

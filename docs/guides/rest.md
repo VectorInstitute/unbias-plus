@@ -24,4 +24,4 @@ serve()  # default model, port 8000
 # Or: serve("path/to/model", port=8000, load_in_4bit=False)
 ```
 
-The default model is `vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-Legacy` (see `DEFAULT_MODEL` in `unbias_plus.model`).
+The default model is `vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-V2` (see `DEFAULT_MODEL` in `unbias_plus.model`).

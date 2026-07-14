@@ -10,13 +10,27 @@ from pydantic import BaseModel, field_validator
 logger = logging.getLogger(__name__)
 
 # Maps string severity labels the model may return for global severity
-# to the correct integer scale (0, 2, 3, 4).
+# onto the integer scale (0-10).
 _STR_TO_INT_SEVERITY: dict[str, int] = {
     "none": 0,
-    "low": 2,
-    "medium": 3,
-    "high": 4,
+    "low": 3,
+    "medium": 5,
+    "high": 8,
 }
+
+# Canonical bias type identifiers used by the model.
+VALID_BIAS_TYPES = frozenset(
+    {
+        "loaded_language",
+        "euphemism",
+        "dehumanizing_language",
+        "opinion_as_fact",
+        "unsupported_generalization",
+        "stereotypical_association",
+        "sensationalism",
+        "informational_bias",
+    }
+)
 
 
 class BiasedSegment(BaseModel):
@@ -30,10 +44,10 @@ class BiasedSegment(BaseModel):
         The suggested neutral replacement. Defaults to empty string
         if the model omits it (e.g. under 4-bit quantization).
     severity : str
-        Severity level: 'low', 'medium', or 'high'.
-        Defaults to 'medium' if omitted by the model.
+        Severity level: 'low', 'medium', or 'high' (normalized lowercase
+        for API/UI; model may emit 'Low' | 'Medium' | 'High').
     bias_type : str
-        Type of bias (e.g. 'loaded language', 'framing bias').
+        Type of bias (e.g. ``loaded_language``, ``stereotypical_association``).
     reasoning : str
         Explanation of why this segment is considered biased.
     start : int | None
@@ -52,11 +66,11 @@ class BiasedSegment(BaseModel):
     Examples
     --------
     >>> seg = BiasedSegment(
-    ...     original="Sharia-obsessed fanatics",
-    ...     replacement="extremist groups",
-    ...     severity="high",
-    ...     bias_type="dehumanizing framing",
-    ...     reasoning="Uses inflammatory religious language.",
+    ...     original="flood of migrants",
+    ...     replacement="arrival of migrants",
+    ...     severity="High",
+    ...     bias_type="dehumanizing_language",
+    ...     reasoning="Treats people as a threatening mass.",
     ... )
     >>> seg.severity
     'high'
@@ -93,17 +107,18 @@ class BiasResult(BaseModel):
     Attributes
     ----------
     binary_label : str
-        Overall label: 'biased' or 'unbiased'.
+        Overall label: 'biased' or 'unbiased'. Derived from severity
+        when the model omits it.
     severity : int
         Overall severity score:
-          0 = neutral / no bias
-          2 = recurring biased framing
-          3 = strong persuasive tone
-          4 = inflammatory rhetoric
+          0      = no bias
+          1-5    = limited / low / moderate bias
+          6-10   = strong / recurring / highly distorting bias
         If the model returns a string ('low', 'medium', 'high'),
-        it is coerced to the nearest integer value.
+        it is coerced to a nearby integer on this scale.
     bias_found : bool
-        Whether any bias was detected in the text.
+        Whether any bias was detected in the text. Derived from
+        severity / segments when the model omits it.
     biased_segments : list[BiasedSegment]
         List of biased segments found in the text, each with
         character-level start/end offsets.
@@ -116,7 +131,7 @@ class BiasResult(BaseModel):
     --------
     >>> result = BiasResult(
     ...     binary_label="biased",
-    ...     severity=3,
+    ...     severity=6,
     ...     bias_found=True,
     ...     biased_segments=[],
     ...     unbiased_text="A neutral version of the text.",
@@ -146,12 +161,12 @@ class BiasResult(BaseModel):
     @field_validator("severity", mode="before")
     @classmethod
     def validate_severity(cls, v: int | str) -> int:
-        """Coerce and validate global severity.
+        """Coerce and validate global severity on the 0-10 scale.
 
         Accepts:
-          - int 0, 2, 3, 4  (correct model output)
+          - int 0-10  (correct model output)
           - str 'low', 'medium', 'high', 'none'  (model confused scales)
-          - any other int   (clamped to nearest valid value)
+          - any other int   (clamped into 0-10)
         """
         # String coercion — model confused global vs segment severity scale
         if isinstance(v, str):
@@ -168,17 +183,15 @@ class BiasResult(BaseModel):
             try:
                 v = int(v)
             except ValueError:
-                logger.warning("Unrecognized severity '%s', defaulting to 2", v)
-                return 2
+                logger.warning("Unrecognized severity '%s', defaulting to 3", v)
+                return 3
 
-        # Clamp out-of-range integer values gracefully
-        if v <= 0:
+        # Clamp out-of-range integer values gracefully onto 0-10
+        if v < 0:
             return 0
-        if v in {2, 3, 4}:
-            return v
-        if v == 1:
-            return 2
-        return 4  # anything > 4
+        if v > 10:
+            return 10
+        return int(v)
 
 
 def _find_case_insensitive(text: str, phrase: str, start: int = 0) -> int:
@@ -213,16 +226,20 @@ def _flexible_whitespace_pattern(phrase: str) -> re.Pattern[str] | None:
 
 
 def _phrase_candidates(phrase: str) -> list[str]:
-    """Variants to try in order before flexible-regex matching."""
+    """Variants to try in order before flexible-regex matching.
+
+    Prefer stripped forms first so a model ``original`` with a leading/trailing
+    space does not pull the preceding whitespace into the highlight span.
+    """
     seen: set[str] = set()
     out: list[str] = []
     for cand in (
-        phrase,
         phrase.strip(),
-        _normalize_for_match(phrase),
         _normalize_for_match(phrase).strip(),
         _collapse_whitespace(phrase),
         _collapse_whitespace(_normalize_for_match(phrase)),
+        phrase,
+        _normalize_for_match(phrase),
     ):
         if cand and cand not in seen:
             seen.add(cand)
