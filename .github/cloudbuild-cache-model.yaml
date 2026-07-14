@@ -9,22 +9,12 @@
 #   _MODEL  — HuggingFace model ID (e.g. vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct)
 #   _BUCKET — GCS bucket name (e.g. unbias-plus-model-cache)
 #
-# Requires a "hf-token" secret in Secret Manager (HuggingFace read token),
-# with roles/secretmanager.secretAccessor granted to the Cloud Build
-# runtime service account.
-#
-# The secret is exposed as lowercase "hf_token", not "HF_TOKEN": Cloud
-# Build's substitution engine textually replaces any bare $NAME/${NAME}
-# matching an all-caps (optionally underscore-prefixed) identifier anywhere
-# in this file, even inside quoted step scripts — so an all-caps secretEnv
-# name gets silently clobbered by a substitution value instead of the real
-# secret. Lowercase names are exempt from that scan (same reason the
-# upload step below uses lowercase locals like model_slug/local_dir).
-
-availableSecrets:
-  secretManager:
-  - versionName: projects/unbias-toolkit/secrets/hf-token/versions/latest
-    env: 'hf_token'
+# No auth: authenticated downloads were found to hang indefinitely inside
+# Cloud Build's network specifically (reproduced 3x; the same token worked
+# fine locally every time), so this deliberately stays anonymous. The
+# original failure mode this guarded against was a transient CDN error on
+# one shard a few hours after the model was pushed to HF — snapshot_download
+# resumes from cache_dir, so retrying a few times clears that without auth.
 
 steps:
 - name: 'python:3.11-slim'
@@ -34,32 +24,26 @@ steps:
   - '_MODEL=${_MODEL}'
   - 'HF_HUB_ETAG_TIMEOUT=30'
   - 'HF_HUB_DOWNLOAD_TIMEOUT=30'
-  secretEnv: ['hf_token']
   timeout: '900s'
   args:
   - -c
   - |
     set -x
-    # Diagnostic pre-flight: confirm the token works and that HF's API/CDN
-    # are reachable with a bounded timeout, so a hang here fails fast with
-    # a clear signal instead of silently stalling the whole build.
-    apt-get update -qq && apt-get install -y -qq curl >/dev/null
-    curl -sS --max-time 20 -o /dev/null -w "whoami: %{http_code} in %{time_total}s\n" \
-      -H "Authorization: Bearer $hf_token" https://huggingface.co/api/whoami-v2
-    curl -sS --max-time 20 -o /dev/null -w "model-info: %{http_code} in %{time_total}s\n" \
-      -H "Authorization: Bearer $hf_token" "https://huggingface.co/api/models/${_MODEL}"
-
-    # Authenticated requests get HF's normal (non-anonymous) rate limit,
-    # avoiding the 403/CDN-signature errors anonymous requests hit.
     pip install -q "huggingface_hub>=0.23"
-    python3 -c "
+    ok=0
+    for attempt in 1 2 3 4 5; do
+      python3 -c "
     import socket; socket.setdefaulttimeout(30)
     from huggingface_hub import snapshot_download; import os
     model = os.environ['_MODEL']
-    print(f'Downloading {model} ...')
-    snapshot_download(model, cache_dir='/workspace/hf-cache', token=os.environ['hf_token'])
+    print(f'Downloading {model} (attempt ${attempt}) ...')
+    snapshot_download(model, cache_dir='/workspace/hf-cache')
     print('Download complete.')
-    "
+    " && { ok=1; break; }
+      echo "attempt ${attempt} failed, retrying in 15s..."
+      sleep 15
+    done
+    [ "$ok" -eq 1 ]
 
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
   id: 'upload'
