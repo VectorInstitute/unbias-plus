@@ -37,9 +37,9 @@ steps:
     # a clear signal instead of silently stalling the whole build.
     apt-get update -qq && apt-get install -y -qq curl >/dev/null
     curl -sS --max-time 20 -o /dev/null -w "whoami: %{http_code} in %{time_total}s\n" \
-      -H "Authorization: Bearer ${HF_TOKEN}" https://huggingface.co/api/whoami-v2
+      -H "Authorization: Bearer $HF_TOKEN" https://huggingface.co/api/whoami-v2
     curl -sS --max-time 20 -o /dev/null -w "model-info: %{http_code} in %{time_total}s\n" \
-      -H "Authorization: Bearer ${HF_TOKEN}" "https://huggingface.co/api/models/${_MODEL}"
+      -H "Authorization: Bearer $HF_TOKEN" "https://huggingface.co/api/models/${_MODEL}"
 
     # Authenticated requests get HF's normal (non-anonymous) rate limit,
     # avoiding the 403/CDN-signature errors anonymous requests hit.
