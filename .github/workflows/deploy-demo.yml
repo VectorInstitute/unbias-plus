@@ -238,9 +238,13 @@ jobs:
         if: steps.cache-check.outputs.needs_cache == 'true'
         run: |
           MODEL="${{ steps.model.outputs.id }}"
+          # _HF_TOKEN=unused satisfies gcloud's client-side substitution
+          # validator (it requires every substitution-shaped name in the
+          # config to have a value); the real token is never templated in —
+          # it's injected at runtime from Secret Manager via availableSecrets.
           gcloud builds submit --no-source \
             --project=${{ env.PROJECT_ID }} \
-            --substitutions="_MODEL=${MODEL},_BUCKET=${{ env.MODEL_CACHE_BUCKET }}" \
+            --substitutions="_MODEL=${MODEL},_BUCKET=${{ env.MODEL_CACHE_BUCKET }},_HF_TOKEN=unused" \
             --config=.github/cloudbuild-cache-model.yaml
 
   # ── Deploy vLLM to Cloud Run (GPU) ─────────────────────────────────────────

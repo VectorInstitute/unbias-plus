@@ -6,17 +6,22 @@
 # not support.
 #
 # Required substitutions:
-#   _MODEL  — HuggingFace model ID (e.g. vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct)
-#   _BUCKET — GCS bucket name (e.g. unbias-plus-model-cache)
+#   _MODEL    — HuggingFace model ID (e.g. vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct)
+#   _BUCKET   — GCS bucket name (e.g. unbias-plus-model-cache)
+#   _HF_TOKEN — must be passed (any placeholder value, e.g. "unused") because
+#               gcloud's client-side validator requires every substitution-
+#               shaped name in this file to have a value. The real token is
+#               never templated in — it's injected at runtime from Secret
+#               Manager via availableSecrets/secretEnv below.
 #
 # Requires a "hf-token" secret in Secret Manager (HuggingFace read token),
 # with roles/secretmanager.secretAccessor granted to the Cloud Build
-# service account.
+# runtime service account.
 
 availableSecrets:
   secretManager:
   - versionName: projects/unbias-toolkit/secrets/hf-token/versions/latest
-    env: 'HF_TOKEN'
+    env: '_HF_TOKEN'
 
 steps:
 - name: 'python:3.11-slim'
@@ -26,7 +31,7 @@ steps:
   - '_MODEL=${_MODEL}'
   - 'HF_HUB_ETAG_TIMEOUT=30'
   - 'HF_HUB_DOWNLOAD_TIMEOUT=30'
-  secretEnv: ['HF_TOKEN']
+  secretEnv: ['_HF_TOKEN']
   timeout: '900s'
   args:
   - -c
@@ -37,9 +42,9 @@ steps:
     # a clear signal instead of silently stalling the whole build.
     apt-get update -qq && apt-get install -y -qq curl >/dev/null
     curl -sS --max-time 20 -o /dev/null -w "whoami: %{http_code} in %{time_total}s\n" \
-      -H "Authorization: Bearer $HF_TOKEN" https://huggingface.co/api/whoami-v2
+      -H "Authorization: Bearer $_HF_TOKEN" https://huggingface.co/api/whoami-v2
     curl -sS --max-time 20 -o /dev/null -w "model-info: %{http_code} in %{time_total}s\n" \
-      -H "Authorization: Bearer $HF_TOKEN" "https://huggingface.co/api/models/${_MODEL}"
+      -H "Authorization: Bearer $_HF_TOKEN" "https://huggingface.co/api/models/${_MODEL}"
 
     # Authenticated requests get HF's normal (non-anonymous) rate limit,
     # avoiding the 403/CDN-signature errors anonymous requests hit.
@@ -49,7 +54,7 @@ steps:
     from huggingface_hub import snapshot_download; import os
     model = os.environ['_MODEL']
     print(f'Downloading {model} ...')
-    snapshot_download(model, cache_dir='/workspace/hf-cache', token=os.environ['HF_TOKEN'])
+    snapshot_download(model, cache_dir='/workspace/hf-cache', token=os.environ['_HF_TOKEN'])
     print('Download complete.')
     "
 
