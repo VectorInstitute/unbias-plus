@@ -769,7 +769,7 @@
      }
      const counts = { high: 0, medium: 0, low: 0 };
      segments.forEach(s => {
-       const sev = (s.severity || "").toLowerCase();
+       const sev = String(s.severity || "").toLowerCase();
        if (counts[sev] !== undefined) counts[sev]++;
      });
      pillsEl.innerHTML = "";
@@ -793,7 +793,7 @@
      let cursor = 0;
      sorted.forEach((seg, idx) => {
        const { start, end } = seg;
-       const severity = (seg.severity || "medium").toLowerCase();
+       const severity = String(seg.severity || "medium").toLowerCase();
        if (start < cursor) return;
        if (start > cursor) html += escapeHtml(text.slice(cursor, start));
        html += `<mark class="severity-${severity}" data-seg-idx="${idx}" tabindex="0">${escapeHtml(text.slice(start, end))}</mark>`;
@@ -828,7 +828,7 @@
      const seg = segments.filter(s => s.start != null).sort((a, b) => a.start - b.start)[idx];
      if (!seg) return;
      const sevEl = document.getElementById("tooltip-severity");
-     const severity = (seg.severity || "medium").toLowerCase();
+     const severity = String(seg.severity || "medium").toLowerCase();
      sevEl.textContent = severity.toUpperCase();
      sevEl.className   = `tooltip-severity sev-${severity}`;
      document.getElementById("tooltip-type").textContent        = seg.bias_type   || "";
@@ -857,7 +857,7 @@
      segListEl.innerHTML = "";
      segments.forEach((seg) => {
        const card = document.createElement("div");
-       const severity = (seg.severity || "medium").toLowerCase();
+       const severity = String(seg.severity || "medium").toLowerCase();
        card.className = `segment-card sev-${severity}`;
        card.innerHTML = `
          <span class="seg-badge sev-${severity}">${severity}</span>
