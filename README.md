@@ -196,7 +196,8 @@ and resource sizing.
 
 
 
-Developed by the **AI Engineering** team at the [Vector Institute](https://vectorinstitute.ai).
+Developed by the **AI Engineering** team at the [Vector Institute](https://vectorinstitute.ai). UnBias-Plus is licensed under the Vector Institute License. See [LICENSE.md](./LICENSE.md) in the repository.
+
 
 For research collaborations, partnerships, or technical inquiries, please contact **Shaina Raza, PhD** at shaina.raza@vectorinstitute.ai.
 
@@ -206,6 +207,7 @@ For research collaborations, partnerships, or technical inquiries, please contac
 Resources used in preparing this research are provided, in part, by the Province of Ontario, the Government of Canada through CIFAR, and companies sponsoring the Vector Institute.
 
 This research is also supported by the European Union's Horizon Europe research and innovation programme under the AIXPERT project (Grant Agreement No. 101214389).
+
 
 
 
@@ -222,10 +224,9 @@ If you use UnBias-Plus in your research, please cite:
 }
 ```
 
-## License
 
-Licensed under the **Vector Institute License**. Use is restricted to Academic Entities, Sponsors, and Partners of the Vector Institute; by accessing or using the work, you agree to be bound by the license terms. See [LICENSE.md](./LICENSE.md) in the repository.
 
 ## Support
 
 * Open an issue on GitHub: [https://github.com/VectorInstitute/unbias-plus/issues](https://github.com/VectorInstitute/unbias-plus/issues)
+* For contribution, see Contribution.MD [https://github.com/VectorInstitute/unbias-plus/blob/main/CONTRIBUTING.md]
