@@ -183,4 +183,3 @@ uv run mkdocs build    # static build into site/
 ```
 
 The `docs` workflow builds on every PR and deploys to GitHub Pages from `main`.
-
