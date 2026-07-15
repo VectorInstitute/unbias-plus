@@ -31,8 +31,11 @@ from recipes.data import SOFT_DEBIAS_AUDIT_PATTERNS, load_jsonl
 from recipes.prompts import build_messages
 
 
+repair_json: Any
 try:
-    from json_repair import repair_json
+    from json_repair import repair_json as _repair_json
+
+    repair_json = _repair_json
 except ImportError:  # pragma: no cover - optional dependency
     repair_json = None
 
@@ -88,7 +91,7 @@ class Model:
                 pad_token_id=self.tokenizer.pad_token_id or self.tokenizer.eos_token_id,
             )
         new_tokens = output[0][inputs["input_ids"].shape[1] :]
-        return self.tokenizer.decode(new_tokens, skip_special_tokens=True)
+        return str(self.tokenizer.decode(new_tokens, skip_special_tokens=True))
 
 
 def parse_json(raw: str) -> dict[str, Any] | None:
@@ -98,7 +101,8 @@ def parse_json(raw: str) -> dict[str, Any] | None:
     if start > 0:
         text = text[start:]
     try:
-        return json.loads(text)
+        parsed = json.loads(text)
+        return parsed if isinstance(parsed, dict) else None
     except json.JSONDecodeError:
         pass
     if repair_json is not None:
@@ -219,9 +223,9 @@ def parse_args() -> argparse.Namespace:
 def resolve_jsonl_source(args: argparse.Namespace) -> str | None:
     """Return the JSONL path implied by ``--jsonl`` or a ``.jsonl`` ``--file``."""
     if args.jsonl:
-        return args.jsonl
+        return str(args.jsonl)
     if args.file and args.file.endswith(".jsonl"):
-        return args.file
+        return str(args.file)
     return None
 
 

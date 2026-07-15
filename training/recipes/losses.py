@@ -145,9 +145,9 @@ class WeightedLossTrainer(Trainer):
     def compute_loss(
         self,
         model: Any,
-        inputs: dict[str, torch.Tensor],
+        inputs: dict[str, Any],
         return_outputs: bool = False,
-        **kwargs: Any,
+        num_items_in_batch: Any = None,
     ) -> Any:
         """Compute token-weighted CE plus any configured unlikelihood terms."""
         labels = inputs.pop("labels")
