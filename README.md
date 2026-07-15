@@ -209,6 +209,19 @@ This research is also supported by the European Union's Horizon Europe research 
 
 
 
+## Citation
+
+If you use UnBias-Plus in your research, please cite:
+
+```bibtex
+@article{radwan2026unbias,
+  title={UnBias-Plus: Detect, Explain, and Rewrite Bias},
+  author={Radwan, Ahmed Y and ElKady, Ahmed and Chaduvula, Sindhuja and Hafez, Mohamed and Krishnan, Amrit and Raza, Shaina},
+  journal={arXiv preprint arXiv:2606.23412},
+  year={2026}
+}
+```
+
 ## License
 
 Licensed under the **Vector Institute License**. Use is restricted to Academic Entities, Sponsors, and Partners of the Vector Institute; by accessing or using the work, you agree to be bound by the license terms. See [LICENSE.md](./LICENSE.md) in the repository.
