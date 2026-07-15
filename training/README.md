@@ -3,6 +3,33 @@
 Standalone scripts for fine-tuning and evaluating the UnBias-Plus model.
 Not part of the installable `unbias_plus` package (`src/unbias_plus/`).
 
+This directory holds two things:
+
+1. **The original scripts** (below) — the flat scripts used to produce the
+   released models.
+2. **[`recipes/`](recipes/) — additional, self-contained content.** A single
+   configurable SFT pipeline that expresses several debiasing setups as
+   data-only YAML recipes and trains from the Hub `train_4` split. It is
+   independent of the scripts here; see [`recipes/README.md`](recipes/README.md).
+
+## Dataset splits
+
+All data lives on the Hub:
+[`vector-institute/unbias-plus-dataset`](https://huggingface.co/datasets/vector-institute/unbias-plus-dataset).
+The dataset ships several splits with different annotation schemas:
+
+| Split | Config | Notes |
+|-------|--------|-------|
+| `train_4` | `train_4` (default) | Newest, highest-quality split with the **expanded** schema. Used by [`recipes/`](recipes/). |
+| `train_1` | `other_splits` | Earlier split (regenerated from VLDBench). |
+| `train_2` | `other_splits` | Earlier split. |
+| `train_3` | `other_splits` | Earlier split. |
+| `test_set` | `other_splits` | Test split (BABE Golden 500). |
+
+`train_4` has extra fields not present in `train_1`–`train_3`, so it is kept as a
+separate config. The `recipes/` pipeline targets `train_4`; the original scripts
+below predate it and were run against the earlier splits.
+
 ## Scripts
 
 | File | Purpose |
@@ -13,6 +40,7 @@ Not part of the installable `unbias_plus` package (`src/unbias_plus/`).
 | `eval_judge.py` | Run the model on a test set + LLM-judge metrics |
 | `quick_test.py` | Fast local inference smoke test |
 | `smoke_test_inference.py` | Inference check via the merged model / adapter |
+| [`recipes/`](recipes/) | Configurable `train_4` SFT recipes (see its own README) |
 
 ## Environment
 
@@ -106,7 +134,7 @@ Create a `.env` file in the project root:
 HF_TOKEN=your_huggingface_token
 HF_USERNAME=your_hf_username
 WANDB_API_KEY=your_wandb_key
-VECTOR_API_KEY=your_vector_proxy_key
+VECTOR_API_KEY=your_vector_proxy_key or use any proxy with openAI compatible
 ```
 
 ## Data
