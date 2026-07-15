@@ -1,7 +1,7 @@
 /* ============================================================
    UnBias — Frontend Logic
    Handles: streaming API, highlighting, tooltip, breakdown cards,
-            example chips, file upload (.txt / .pdf)
+            example chips, file upload (.txt)
    ============================================================ */
    const inputEl       = document.getElementById("input-text");
    const charCountEl   = document.getElementById("char-count");
@@ -56,75 +56,56 @@
      if (len > MAX_CHARS * 0.9) charCountEl.classList.add("warn");
      if (len >= MAX_CHARS)      charCountEl.classList.add("error");
    });
-   // ============================================================
-   // FILE UPLOAD — .txt and text-based .pdf, fully client-side
-   // ============================================================
-   const uploadBtn      = document.getElementById("upload-btn");
-   const fileInput      = document.getElementById("file-input");
-   const uploadFilename = document.getElementById("upload-filename");
-   uploadBtn.addEventListener("click", () => fileInput.click());
-   fileInput.addEventListener("change", async () => {
-     const file = fileInput.files[0];
-     if (!file) return;
-     const ext = file.name.split(".").pop().toLowerCase();
-     let text = "";
-     try {
-       if (ext === "txt") {
-         text = await _readAsText(file);
-       } else if (ext === "pdf") {
-         text = await _extractPdfText(file);
-       } else {
-         showInlineError("Unsupported file type. Please upload a .txt or .pdf file.");
-         return;
-       }
-     } catch (err) {
-       showInlineError("Could not read file: " + err.message);
-       fileInput.value = "";
-       return;
-     }
-     text = text.trim();
-     if (!text) {
-       showInlineError("This PDF appears to be scanned or image-based. Please paste the text manually.");
-       fileInput.value = "";
-       return;
-     }
-     if (text.length > MAX_CHARS) {
-       text = text.slice(0, MAX_CHARS);
-       showInlineError(`File truncated to ${MAX_CHARS.toLocaleString()} characters.`);
-     }
-     inputEl.value = text;
-     inputEl.dispatchEvent(new Event("input"));
-     inputEl.focus();
-     uploadFilename.textContent = file.name;
-     uploadFilename.classList.remove("hidden");
-     fileInput.value = "";
-   });
-   function _readAsText(file) {
-     return new Promise((resolve, reject) => {
-       const reader = new FileReader();
-       reader.onload  = e => resolve(e.target.result);
-       reader.onerror = () => reject(new Error("Failed to read file"));
-       reader.readAsText(file, "utf-8");
-     });
-   }
-   async function _extractPdfText(file) {
-     if (typeof pdfjsLib === "undefined") {
-       throw new Error("PDF library not loaded. Please refresh and try again.");
-     }
-     pdfjsLib.GlobalWorkerOptions.workerSrc =
-       "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-     const arrayBuffer = await file.arrayBuffer();
-     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-     const pages = [];
-     for (let i = 1; i <= pdf.numPages; i++) {
-       const page    = await pdf.getPage(i);
-       const content = await page.getTextContent();
-       pages.push(content.items.map(item => item.str).join(" "));
-     }
-     return pages.join("\n\n");
-   }
-   // ============================================================
-   // ANALYZE — /analyze/stream (SSE)
+  // ============================================================
+  // FILE UPLOAD — .txt only, fully client-side
+  // ============================================================
+  const uploadBtn      = document.getElementById("upload-btn");
+  const fileInput      = document.getElementById("file-input");
+  const uploadFilename = document.getElementById("upload-filename");
+  uploadBtn.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    const ext = file.name.split(".").pop().toLowerCase();
+    let text = "";
+    if (ext !== "txt") {
+      showInlineError("Unsupported file type. Please upload a .txt file.");
+      fileInput.value = "";
+      return;
+    }
+    try {
+      text = await _readAsText(file);
+    } catch (err) {
+      showInlineError("Could not read file: " + err.message);
+      fileInput.value = "";
+      return;
+    }
+    text = text.trim();
+    if (!text) {
+      showInlineError("This file appears to be empty. Please upload a file with text.");
+      fileInput.value = "";
+      return;
+    }
+    // Load the full text just like a paste — the char counter and the
+    // over-limit check in runAnalysis handle length uniformly, so uploads and
+    // typed input behave the same (no silent truncation).
+    inputEl.value = text;
+    inputEl.dispatchEvent(new Event("input"));
+    inputEl.focus();
+    uploadFilename.textContent = file.name;
+    uploadFilename.classList.remove("hidden");
+    fileInput.value = "";
+  });
+  function _readAsText(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = e => resolve(e.target.result);
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      reader.readAsText(file, "utf-8");
+    });
+  }
+  // ============================================================
+  // ANALYZE — /analyze/stream (SSE)
    // ============================================================
    analyzeBtn.addEventListener("click", runAnalysis);
    inputEl.addEventListener("keydown", (e) => {
