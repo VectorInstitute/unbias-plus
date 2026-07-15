@@ -1,4 +1,3 @@
-# unbias-plus
 [![website](https://img.shields.io/badge/website-ff00ff)](https://vectorinstitute.github.io/unbias-plus/)
 [![arXiv](https://img.shields.io/badge/arXiv-2606.23412-b31b1b.svg)](https://arxiv.org/abs/2606.23412)
 [![code checks](https://github.com/VectorInstitute/unbias-plus/actions/workflows/code_checks.yml/badge.svg)](https://github.com/VectorInstitute/unbias-plus/actions/workflows/code_checks.yml)
@@ -8,6 +7,8 @@
 [![codecov](https://codecov.io/github/VectorInstitute/unbias-plus/graph/badge.svg?token=83MYFZ3UPA)](https://codecov.io/github/VectorInstitute/unbias-plus)
 [![License: Vector Institute](https://img.shields.io/badge/License-Vector%20Institute-003049.svg)](./LICENSE.md)
 [![Contact](https://img.shields.io/badge/Contact-shaina.raza%40vectorinstitute.ai-green)](mailto:shaina.raza@vectorinstitute.ai)
+
+# unbias-plus
 
 Bias detection and debiasing in text: identify biased segments, classify severity, get reasoning and neutral replacements per segment, and a full neutral rewrite. Structured output (binary label, severity, biased segments with offsets) via CLI, REST API, or Python.
 
@@ -71,6 +72,7 @@ source .venv/bin/activate
 ```
 
 **Optional: flash-attn (GPU only)**
+
 For training or faster inference with flash attention, install the `train` extra (requires CUDA/nvcc to build):
 ```bash
 uv sync --extra train
@@ -173,8 +175,8 @@ json_str = pipe.analyze_to_json("...")   # pretty-printed JSON string
 
 ## Training
 
-The Qwen3-8B checkpoint shipped with the demo was fine-tuned with SFT
-[vector-institute/Unbias-plus](https://huggingface.co/datasets/vector-institute/unbias-plus-dataset)
+The Qwen3-8B checkpoint shipped with the demo was fine-tuned with SFT on the
+[vector-institute/unbias-plus-dataset](https://huggingface.co/datasets/vector-institute/unbias-plus-dataset)
 dataset on HuggingFace.
 
 Standalone scripts that reproduce both stages live in [`training/`](training/),
@@ -191,25 +193,17 @@ and resource sizing.
 - **Linting / formatting**: `ruff` (format + lint), config in `pyproject.toml`.
 - **Type checking**: `mypy` with strict options, `mypy_path = ["src", "training"]`.
 
-
-## 👥 Team
-
-
+## Team
 
 Developed by the **AI Engineering** team at the [Vector Institute](https://vectorinstitute.ai). UnBias-Plus is licensed under the Vector Institute License. See [LICENSE.md](./LICENSE.md) in the repository.
 
-
 For research collaborations, partnerships, or technical inquiries, please contact **Shaina Raza, PhD** at shaina.raza@vectorinstitute.ai.
-
 
 ## Acknowledgement
 
 Resources used in preparing this research are provided, in part, by the Province of Ontario, the Government of Canada through CIFAR, and companies sponsoring the Vector Institute.
 
 This research is also supported by the European Union's Horizon Europe research and innovation programme under the AIXPERT project (Grant Agreement No. 101214389).
-
-
-
 
 ## Citation
 
@@ -224,9 +218,7 @@ If you use UnBias-Plus in your research, please cite:
 }
 ```
 
-
-
 ## Support
 
-* Open an issue on GitHub: [https://github.com/VectorInstitute/unbias-plus/issues](https://github.com/VectorInstitute/unbias-plus/issues)
-* For contribution, see Contribution.MD [https://github.com/VectorInstitute/unbias-plus/blob/main/CONTRIBUTING.md]
+- Open an issue on GitHub: [https://github.com/VectorInstitute/unbias-plus/issues](https://github.com/VectorInstitute/unbias-plus/issues)
+- For contribution guidelines, see [CONTRIBUTING.md](https://github.com/VectorInstitute/unbias-plus/blob/main/CONTRIBUTING.md)
