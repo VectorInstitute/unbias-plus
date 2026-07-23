@@ -85,3 +85,9 @@ jobs:
             PYSEC-2026-2257
             CVE-2026-5241
             PYSEC-2026-3447
+            # pyasn1 PYSEC-2026-3455/3456/3457: CPU/memory DoS via crafted
+            # BER/CER/DER input (long tags, large OIDs/exponents). Fix is 0.6.4;
+            # pyasn1 is a transitive dep here, not used to decode untrusted ASN.1.
+            PYSEC-2026-3455
+            PYSEC-2026-3456
+            PYSEC-2026-3457
