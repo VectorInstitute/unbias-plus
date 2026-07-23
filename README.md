@@ -6,7 +6,7 @@
 [![docs](https://github.com/VectorInstitute/unbias-plus/actions/workflows/docs.yml/badge.svg)](https://github.com/VectorInstitute/unbias-plus/actions/workflows/docs.yml)
 [![PyPI](https://img.shields.io/pypi/v/unbias-plus.svg)](https://pypi.org/project/unbias-plus/)
 [![codecov](https://codecov.io/github/VectorInstitute/unbias-plus/graph/badge.svg?token=83MYFZ3UPA)](https://codecov.io/github/VectorInstitute/unbias-plus)
-[![License: Vector Institute](https://img.shields.io/badge/License-Vector%20Institute-003049.svg)](./LICENSE.md)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-003049.svg)](./LICENSE.md)
 [![Contact](https://img.shields.io/badge/Contact-shaina.raza%40vectorinstitute.ai-green)](mailto:shaina.raza@vectorinstitute.ai)
 
 # unbias-plus
@@ -196,7 +196,7 @@ and resource sizing.
 
 ## Team
 
-Developed by the **AI Engineering** team at the [Vector Institute](https://vectorinstitute.ai). UnBias-Plus is licensed under the Vector Institute License. See [LICENSE.md](./LICENSE.md) in the repository.
+Developed by the **AI Engineering** team at the [Vector Institute](https://vectorinstitute.ai). UnBias-Plus is licensed under the Apache License 2.0. See [LICENSE.md](./LICENSE.md) in the repository.
 
 For research collaborations, partnerships, or technical inquiries, please contact **Shaina Raza, PhD** at shaina.raza@vectorinstitute.ai.
 

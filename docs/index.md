@@ -22,7 +22,7 @@ hide:
 </div>
 
 <div class="up-hero__badges" markdown>
-[![PyPI version](https://img.shields.io/pypi/v/unbias-plus.svg)](https://pypi.org/project/unbias-plus/) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1FlUSeFFXr3VeADiStOIzX7hOV6IlliC8?usp=sharing) [![Dataset](https://img.shields.io/badge/🤗%20Dataset-UnBias+-orange)](https://huggingface.co/datasets/vector-institute/unbias-plus-dataset) [![License: Vector Institute](https://img.shields.io/badge/License-Vector%20Institute-003049.svg)](https://github.com/VectorInstitute/unbias-plus/blob/main/LICENSE.md)
+[![PyPI version](https://img.shields.io/pypi/v/unbias-plus.svg)](https://pypi.org/project/unbias-plus/) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1FlUSeFFXr3VeADiStOIzX7hOV6IlliC8?usp=sharing) [![Dataset](https://img.shields.io/badge/🤗%20Dataset-UnBias+-orange)](https://huggingface.co/datasets/vector-institute/unbias-plus-dataset) [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-003049.svg)](https://github.com/VectorInstitute/unbias-plus/blob/main/LICENSE.md)
 </div>
 
 </div>
@@ -69,7 +69,7 @@ Tours of the demo UI you get when you run `unbias-plus --serve`:
 
 ## About
 
-Built by the AI Engineering team at the [Vector Institute](https://vectorinstitute.ai), led by [Shaina Raza, PhD](mailto:shaina.raza@vectorinstitute.ai). Released under the [Vector Institute License](https://github.com/VectorInstitute/unbias-plus/blob/main/LICENSE.md).
+Built by the AI Engineering team at the [Vector Institute](https://vectorinstitute.ai), led by [Shaina Raza, PhD](mailto:shaina.raza@vectorinstitute.ai). Released under the [Apache License 2.0](https://github.com/VectorInstitute/unbias-plus/blob/main/LICENSE.md).
 
 For collaboration or licensing inquiries, email Shaina. For bugs and feature requests, use [GitHub Issues](https://github.com/VectorInstitute/unbias-plus/issues).
 
