@@ -114,6 +114,11 @@ docs = [
     "jinja2>=3.1.6",
     "ipykernel>=6.29.5",
     "ipython>=8.31.0",
+    # CVE-2026-61632: pymdownx.b64 resolves <img src> against base_path with no
+    # containment check, so ../ or an absolute path reads any image-extension
+    # file. Fixed in 11.0.0. mkdocs-material only requires >=10.2, so it would
+    # otherwise resolve to a vulnerable 10.x.
+    "pymdown-extensions>=11.0.0",
     # Pinned: PYSEC-2026-89 advisory flags 3.10.x even though it documents
     # the fix as 3.8.1 — pin to the documented fix version until the
     # advisory's affected-range data is corrected upstream.
