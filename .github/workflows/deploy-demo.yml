@@ -311,6 +311,46 @@ jobs:
           echo "url=$URL" >> $GITHUB_OUTPUT
           echo "✓ vLLM deployed at $URL"
 
+      # A green `gcloud run deploy` is not proof the service works: when a new
+      # revision fails its startup probe Cloud Run keeps routing to the previous
+      # one, so the service still reports Ready.  Check the revision actually
+      # receiving traffic, then prove the GPU engine really came up.
+      - name: Verify vLLM is serving
+        run: |
+          set -euo pipefail
+          IMAGE="${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.VLLM_SERVICE }}:${{ github.sha }}"
+          URL="${{ steps.deploy.outputs.url }}"
+
+          SERVING_REV=$(gcloud run services describe ${{ env.VLLM_SERVICE }} \
+            --region=${{ env.REGION }} --project=${{ env.PROJECT_ID }} \
+            --format='value(status.traffic[0].revisionName)')
+
+          SERVING_IMAGE=$(gcloud run revisions describe "$SERVING_REV" \
+            --region=${{ env.REGION }} --project=${{ env.PROJECT_ID }} \
+            --format='value(spec.containers[0].image)')
+
+          if [ "$SERVING_IMAGE" != "$IMAGE" ]; then
+            echo "✗ Traffic is on ${SERVING_REV} (${SERVING_IMAGE}), not the image just built."
+            echo "  The new revision never became ready — Cloud Run kept the old one."
+            exit 1
+          fi
+
+          # /health only shows the HTTP server is listening.  /v1/models requires
+          # the engine core to have initialised and the weights to be on the GPU,
+          # which is what a driver mismatch or OOM actually breaks.
+          for endpoint in /health /v1/models; do
+            HTTP=$(curl -s -o /tmp/resp -w '%{http_code}' --max-time 30 "${URL}${endpoint}" || echo 000)
+            if [ "$HTTP" != "200" ]; then
+              echo "✗ ${endpoint} returned HTTP ${HTTP}"
+              head -c 2000 /tmp/resp || true
+              exit 1
+            fi
+            echo "✓ ${endpoint} → 200"
+          done
+
+          grep -q 'unbias-plus' /tmp/resp || { echo "✗ served model 'unbias-plus' missing"; cat /tmp/resp; exit 1; }
+          echo "✓ ${SERVING_REV} serving 'unbias-plus'"
+
       - name: Dump vLLM logs on deploy failure
         if: failure()
         run: |

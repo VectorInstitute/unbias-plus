@@ -14,12 +14,17 @@
 # includes native Qwen3ForCausalLM support (needed for Qwen3-8B-SFT).
 #
 # CUDA requirement: this image is built against CUDA 12.4 (PyTorch cu124).
-# Cloud Run L4 must have NVIDIA driver ≥ 550.xx (CUDA 12.4 capable).
-# On older drivers (e.g. CUDA 12.2 / driver 535.xx), the LD_LIBRARY_PATH line
-# below activates CUDA Forward Compatibility — the /usr/local/cuda/compat stubs
-# shipped in the nvcr CUDA devel base override cuDriverGetVersion() so PyTorch's
-# version check passes, and the compat layer mediates calls that require newer
-# driver features.  Minimum host driver for CUDA 12.x compat: 450.xx.
+# Cloud Run injects a host-matched libcuda.so at runtime; its L4 fleet driver is
+# well past 550.xx, so the CUDA 12.4 runtime here is satisfied directly.
+#
+# DO NOT put /usr/local/cuda/compat on LD_LIBRARY_PATH.  Those forward-compat
+# stubs are frozen at the base image's CUDA release and only work while they are
+# *newer* than the host kernel driver.  When Cloud Run upgraded its L4 driver on
+# 2026-07-20 the pinned stubs became older than the host kernel module, and every
+# cold start died with CUDA error 803 (cudaErrorSystemDriverMismatch) in
+# torch.cuda.set_device().  Letting the injected driver win is version-proof:
+# the host userspace driver always matches its own kernel module, and drivers
+# stay backward compatible with older CUDA runtimes.
 FROM vllm/vllm-openai:v0.8.5.post1
 
 ENV HF_HOME=/hf-cache
@@ -29,9 +34,6 @@ ENV HF_HOME=/hf-cache
 ENV VLLM_CACHE_ROOT=/hf-cache/vllm_cache
 ENV TOKENIZERS_PARALLELISM=false
 ENV VLLM_WORKER_MULTIPROC_METHOD=spawn
-# CUDA Forward Compatibility: override libcuda.so with the compat stubs so this
-# CUDA 12.4 image can start on host drivers that only support up to CUDA 12.2.
-ENV LD_LIBRARY_PATH=/usr/local/cuda/compat:${LD_LIBRARY_PATH}
 
 # Cloud Run injects $PORT (default 8080)
 ENV PORT=8080
