@@ -59,7 +59,7 @@ To support different communities and needs, we separate different user interface
 
 ![The web demo interface of UnBias-Plus allows users to input text, highlights biased segments with severity colour-coding, displays per-segment bias types and reasoning, and generates a full neutral rewrite.\label{fig:ui_demo}](UnBias.png)
 
-The toolkit supports training with any instruction-tuned model; however, the default configuration uses Qwen3-8B [@yang2025qwen3; @unbias-plus-8b], fine-tuned with low-rank adaptation (LoRA). The design prioritizes accessibility under limited computational resources by releasing a compact Qwen3.5-4B variant [@qwen35; @unbias-plus-4b]. Both variants support 4-bit quantization, reducing peak GPU memory usage and enabling deployment on consumer-grade hardware without requiring code changes. Additionally, users can substitute any Hugging Face–compatible checkpoint via a custom model path, allowing domain-specific adaptation without modifying the pipeline.
+The toolkit supports training with any instruction-tuned model; however, the default configuration uses Qwen3-8B [@@unbias-plus-8b], fine-tuned with low-rank adaptation (LoRA). The design prioritizes accessibility under limited computational resources by releasing a compact Qwen3.5-4B variant [@unbias-plus-4b]. Both variants support 4-bit quantization, reducing peak GPU memory usage and enabling deployment on consumer-grade hardware without requiring code changes. Additionally, users can substitute any Hugging Face–compatible checkpoint via a custom model path, allowing domain-specific adaptation without modifying the pipeline.
 
 ```python
 from unbias_plus import UnBiasPlus
@@ -92,7 +92,7 @@ At the societal level, UnBias-Plus can support more equitable information dissem
 
 ## Validation
 
-Usage examples for the command-line interface, Python API, REST API, and web interface are provided in the documentation. To validate the released models, we evaluated them on text outside the training distribution and assessed whether their outputs support the intended bias review workflow. We used an out-of-distribution test set from BABE [@spinde2021babe], a news media dataset, taking a stratified sample of 175 biased and 175 unbiased samples. GPT-4o-mini was used as a judge on a 0–5 scale, alongside automatic metrics including recall at biased words, ROUGE-L, length ratio, hallucination rate, and duplicate rate. The prompts for the judge metrics are given in our codebase.
+Usage examples for the command-line interface, Python API, REST API, and web interface are provided in the documentation. To validate the released models, we evaluated them on text outside the training distribution and assessed whether their outputs support the intended bias review workflow. We used an out-of-distribution test set from BABE [@spinde-etal-2021-neural-media], a news media dataset, taking a stratified sample of 175 biased and 175 unbiased samples. GPT-4o-mini was used as a judge on a 0–5 scale, alongside automatic metrics including recall at biased words, ROUGE-L, length ratio, hallucination rate, and duplicate rate. The prompts for the judge metrics are given in our codebase.
 
 : Out-of-distribution evaluation on BABE. $\uparrow$ = higher is better, $\downarrow$ = lower is better, $\approx 1$ = closest to 1.0 is best. Judge scores are on a 0–5 scale. \label{tab:ood-validation}
 
