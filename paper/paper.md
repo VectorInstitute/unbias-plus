@@ -33,19 +33,19 @@ bibliography: paper.bib
 
 # Summary
 
-Bias in natural language remains a persistent challenge in both human-written and artificial intelligence (AI) generated content, affecting domains such as journalism, education, and AI research, where Biased wording can shape how people and groups are represented, often through subtle word choices rather than overtly harmful content. Existing detection methods identify only whether bias is present, with limited support for granular detection, interpretable explanations, neutral rewriting, and openly available trained models. To address those limitations, UnBias-Plus is an open-source Python toolkit that unifies (1) segment-level multi-class bias classification, (2) biased span localization, (3) neutral text rewriting, and (4) reasoning for each decision. It is built on large language models (LLMs) fine-tuned on a curated, annotated bias dataset [@unbias-plus-dataset], and returns, for each biased phrase, what kind of bias it shows, why, and a neutral alternative.
+Bias in natural language remains a persistent challenge in both human-written and artificial intelligence (AI) generated content, affecting domains such as journalism, education, and AI research, where biased wording can shape how people and groups are represented, often through subtle word choices rather than overtly harmful content. Existing detection methods identify only whether bias is present, with limited support for granular detection, interpretable explanations, neutral rewriting, and openly available trained models. To address those limitations, UnBias-Plus is an open-source Python toolkit that unifies (1) segment-level multi-class bias classification, (2) biased span localization, (3) neutral text rewriting, and (4) reasoning for each decision. It is built on large language models (LLMs) fine-tuned on a curated, annotated bias dataset [@unbias-plus-dataset], and returns, for each biased phrase, what kind of bias it shows, why, and a neutral alternative.
 The toolkit is available through a Python API, a command-line interface (CLI), and a REST API for developers, and an interactive web interface for non-technical users. The source code, models, datasets, and documentation are publicly available, supporting reproducible fairness research and practitioner-facing bias review workflows.
 
 # Statement of Need
 
-Bias in natural language can influence how people and groups are represented, interpreted, and treated across human-written and AI-generated content [@gallegos2024bias]. Earlier text-bias research commonly framed the problem as binary or multi-class classification tasks, including sentence-level bias detection, span-level identification, and neutral rewriting from annotated examples [@gallegos2024bias]. Generative AI broadens this challenge because outputs are open-ended, context-dependent, and shaped by the prompt and intended use, while commercial moderation APIs [@openai_moderation_api] and LLM guardrails [@inan2023llama] can flag content against predefined safety policies or risk taxonomies, they are generally designed for broad safety enforcement rather than detailed bias analysis. Furthermore, many widely used moderation solutions are proprietary, while open alternatives often focus on safety classification rather than explaining and mitigating bias.
+Bias in natural language can influence how people and groups are represented, interpreted, and treated across human-written and AI-generated content [@gallegos2024bias]. Earlier text-bias research commonly framed the problem as binary or multi-class classification tasks, including sentence-level bias detection, span-level identification, and neutral rewriting from annotated examples [@gallegos2024bias]. Generative AI broadens this challenge because outputs are open-ended, context-dependent, and shaped by the prompt and intended use, and while commercial moderation APIs [@openai_moderation_api] and LLM guardrails [@inan2023llama] can flag content against predefined safety policies or risk taxonomies, they are generally designed for broad safety enforcement rather than detailed bias analysis. Furthermore, many widely used moderation solutions are proprietary, while open alternatives often focus on safety classification rather than explaining and mitigating bias.
 
 UnBias-Plus addresses this need as an open-source Python toolkit for fine-grained bias analysis and rewriting. It provides fine-tuned models trained on a purpose-built annotated dataset and supports reproducible end-to-end workflows for bias detection, explanation, and neutral rewriting. It supports both technical and non-technical users, enabling integration into research, development, and practitioner-facing review processes in domains such as journalism, education, and content moderation.
 
 # State of the field
 
 Several widely used fairness toolkits have emerged in this space, such as AI Fairness 360 (AIF360) [@bellamy2019aif360] which provides a comprehensive suite for detecting and mitigating disparities across preprocessing, in-processing, and post-processing stages, and Fairlearn [@weerts2023fairlearn] that focuses on practical fairness constraints for ML models, but both are mainly designed for traditional ML settings.
-Also, a number of open-source tools have been proposed for linguistic bias detection. For instance, Dbias [@raza2022dbias], NBias [@raza2024nbias], and Biaslyze [@biaslyze_api] identify biased expressions in text; however, these approaches largely rely on encoder-only architectures, often operate in an NLTK-style preprocessing pipeline, and do not natively leverage natural language inference or LLMs. NeuTral Rewriter [@vanmassenhove2021neutral] rewrites gendered English sentences into gender-neutral alternatives, but addresses a single bias dimension and does not detect or explain bias. Lastly, newer frameworks such as LangFair [@bouchard2025langfair] and FairLangPro [@manerba2025fairlangproc] adopt LLM-native, prompt-based strategies, but typically focus on individual tasks.
+Also, a number of open-source tools have been proposed for linguistic bias detection. For instance, Dbias [@raza2022dbias], NBias [@raza2024nbias], and Biaslyze [@biaslyze_api] identify biased expressions in text; however, these approaches largely rely on encoder-only architectures, often operate in an NLTK-style preprocessing pipeline, and do not natively leverage natural language inference or LLMs. NeuTral Rewriter [@vanmassenhove2021neutral] rewrites gendered English sentences into gender-neutral alternatives, but addresses a single bias dimension and does not detect or explain bias. Lastly, newer frameworks such as LangFair [@bouchard2025langfair] and FairLangProc [@manerba2025fairlangproc] adopt LLM-native, prompt-based strategies, but typically focus on individual tasks.
 Rather than extending these tools, UnBias-Plus was built as a unified pipeline because they offer limited support for granular detection, interpretable explanations, neutral rewriting, and openly available trained models together.
 
 
@@ -59,7 +59,7 @@ To support different communities and needs, we separate different user interface
 
 ![The web demo interface of UnBias-Plus allows users to input text, highlights biased segments with severity colour-coding, displays per-segment bias types and reasoning, and generates a full neutral rewrite.\label{fig:ui_demo}](UnBias.png)
 
-The toolkit supports training with any instruction-tuned model; however, the default configuration uses Qwen3-8B [@@unbias-plus-8b], fine-tuned with low-rank adaptation (LoRA). The design prioritizes accessibility under limited computational resources by releasing a compact Qwen3.5-4B variant [@unbias-plus-4b]. Both variants support 4-bit quantization, reducing peak GPU memory usage and enabling deployment on consumer-grade hardware without requiring code changes. Additionally, users can substitute any Hugging Face–compatible checkpoint via a custom model path, allowing domain-specific adaptation without modifying the pipeline.
+The toolkit supports training with any instruction-tuned model; however, the default configuration uses Qwen3-8B [@unbias-plus-8b], fine-tuned with low-rank adaptation (LoRA). The design prioritizes accessibility under limited computational resources by releasing a compact Qwen3.5-4B variant [@unbias-plus-4b]. Both variants support 4-bit quantization, reducing peak GPU memory usage and enabling deployment on consumer-grade hardware without requiring code changes. Additionally, users can substitute any Hugging Face–compatible checkpoint via a custom model path, allowing domain-specific adaptation without modifying the pipeline.
 
 ```python
 from unbias_plus import UnBiasPlus
@@ -73,10 +73,14 @@ result = pipe.analyze(
 print(result.binary_label)       # "biased"
 print(result.severity)           # 3
 
+print(result.severity)           # 3
+
 for seg in result.biased_segments:
     print(seg.original, seg.bias_type, seg.replacement, seg.start, seg.end)
-# "aggressive expansion strategy"      opinion_as_fact          "expansion strategy"       4  33
-# "championed by our male executives"  stereotypical_association "advocated by executives"  34 67
+# aggressive expansion strategy  opinion_as_fact
+#     -> expansion strategy  (4, 33)
+# championed by our male executives  stereotypical_association
+#     -> advocated by executives  (34, 67)
 
 print(result.unbiased_text)
 # "The expansion strategy advocated by executives has driven record profits."
@@ -94,30 +98,32 @@ At the societal level, UnBias-Plus can support more equitable information dissem
 
 Usage examples for the command-line interface, Python API, REST API, and web interface are provided in the documentation. To validate the released models, we evaluated them on text outside the training distribution and assessed whether their outputs support the intended bias review workflow. We used an out-of-distribution test set from BABE [@spinde-etal-2021-neural-media], a news media dataset, taking a stratified sample of 175 biased and 175 unbiased samples. GPT-4o-mini was used as a judge on a 0–5 scale, alongside automatic metrics including recall at biased words, ROUGE-L, length ratio, hallucination rate, and duplicate rate. The prompts for the judge metrics are given in our codebase.
 
-: Out-of-distribution evaluation on BABE. $\uparrow$ = higher is better, $\downarrow$ = lower is better, $\approx 1$ = closest to 1.0 is best. Judge scores are on a 0–5 scale. \label{tab:ood-validation}
+: Biased samples. $\uparrow$ = higher is better, $\approx 1$ = closest to 1.0 is best. Judge scores on a 0–5 scale. \label{tab:biased}
 
-| Sample set | Metric | Qwen3.5-4B UnBias+ | Qwen3-8B UnBias+ |
-|:-----------|:-------|-------------------:|-----------------:|
-| Biased     | Bias reduction (%) $\uparrow$                | 57.5     | **60.6** |
-|            | Bias reduction (mean) $\uparrow$             | 1.91     | **1.94** |
-|            | Semantic relevance $\uparrow$                | 4.09     | **4.18** |
-|            | Global rewrite quality $\uparrow$            | **3.15** | 3.08     |
-|            | ROUGE-L $\uparrow$                           | 0.71     | **0.72** |
-|            | Length ratio $\approx 1$                     | **1.00** | 0.99     |
-| Unbiased   | Correct identification (mean) $\uparrow$     | 3.44     | **4.16** |
-|            | Correct identification (median) $\uparrow$   | 2.0      | **5.0**  |
-|            | Avoids needless rewrites (mean) $\uparrow$   | 3.97     | **4.44** |
-|            | Avoids needless rewrites (median) $\uparrow$ | 3.0      | **5.0**  |
-| Segment    | Recall at biased words $\uparrow$            | **0.85** | 0.71     |
-|            | Segment edit quality $\uparrow$              | **3.88** | 3.58     |
-|            | Hallucination rate (%) $\downarrow$          | 5.3      | **3.6**  |
-|            | Duplicate rate (%) $\downarrow$              | **0.0**  | 0.7      |
+| Model | Bias red. (%) $\uparrow$ | Bias red. (mean) $\uparrow$ | Relevance $\uparrow$ | Global rewrite $\uparrow$ | ROUGE-L $\uparrow$ | Length ratio $\approx 1$ |
+|:----------------|-----:|-----:|-----:|-----:|-----:|-----:|
+| Qwen3.5-4B UnBias+ | **57.5** | **1.91** | **4.09** | **3.15** | 0.71 | **1.00** |
+| Qwen3-8B UnBias+ | 56.4 | 1.88 | 4.02 | 2.94 | **0.73** | 0.94 |
 
-Results in \autoref{tab:ood-validation} show a trade-off between bias detection and preservation on one side and segment-level editing precision on the other. The fine-tuned Qwen3-8B UnBias-Plus achieves stronger bias reduction, higher relevance, stronger preservation of unbiased samples, and a lower hallucination rate. The fine-tuned Qwen3.5-4B UnBias-Plus, however, improves rewrite and segment-level behaviour, with higher global rewrite quality, higher recall at biased words, stronger segment replacement quality, and a zero duplicate rate. These results support the design of UnBias-Plus as a configurable toolkit: users can select a model variant depending on whether their workflow prioritizes conservative bias review, unbiased-text preservation, or more aggressive segment-level localization.
+: Unbiased samples. Judge scores on a 0–5 scale. \label{tab:unbiased}
+
+| Model | Correct ID (mean) $\uparrow$ | Correct ID (median) $\uparrow$ | No needless rewrite (mean) $\uparrow$ | No needless rewrite (median) $\uparrow$ |
+|:----------------|-----:|-----:|-----:|-----:|
+| Qwen3.5-4B UnBias+ | **3.44** | 2.0 | **3.97** | 3.0 |
+| Qwen3-8B UnBias+ | 3.31 | 2.0 | 3.91 | 3.0 |
+
+: Segment level. $\downarrow$ = lower is better. \label{tab:segment}
+
+| Model | Recall at biased words $\uparrow$ | Segment edit quality $\uparrow$ | Hallucination (%) $\downarrow$ | Duplicate (%) $\downarrow$ |
+|:----------------|-----:|-----:|-----:|-----:|
+| Qwen3.5-4B UnBias+ | **0.85** | **3.88** | 5.3 | **0.0** |
+| Qwen3-8B UnBias+ | 0.84 | 3.77 | **4.5** | 0.2 |
+
+Results in \autoref{tab:biased}, \autoref{tab:unbiased}, and \autoref{tab:segment} show that the two variants perform closely. The compact Qwen3.5-4B UnBias-Plus is marginally stronger on most metrics, including bias reduction, relevance, global rewrite quality, recall at biased words, and segment edit quality, with a zero duplicate rate, while the default Qwen3-8B UnBias-Plus achieves higher lexical overlap with the reference rewrites and a lower hallucination rate. Both models score a median of 2.0 for correct identification of unbiased samples, indicating a tendency to flag unbiased text as biased; this motivates the human-in-the-loop review described in the limitations. These results support the design of UnBias-Plus as a configurable toolkit: users can select the smaller variant for limited hardware without a loss in quality, or the default 8B model where minimizing hallucinated content is the priority.
 
 # Focused Use Cases
 
-UnBias-Plus targets practitioners across several domains, starting with editorial teams, who can review drafts before publication: the toolkit highlights biased phrases, explains each issue, and suggests neutral rewrites, reducing the time required for manual bias review at scale. HR and policy teams can apply the same pipeline to job postings and internal documents before wider distribution, and NLP and fairness researchers can use the toolkit for dataset construction and benchmarking. Developers can integrate bias detection directly into existing pipelines using the same interface. Because bias is context-dependent, the toolkit is designed to support human-in-the-loop review, where model outputs can be inspected, contested, and revised before use in editorial, research, or decision-support workflows.
+UnBias-Plus targets practitioners across several domains, starting with editorial teams, who can review drafts before publication: the toolkit highlights biased phrases, explains each issue, and suggests neutral rewrites, reducing the time required for manual bias review at scale. HR and policy teams can apply the same pipeline to job postings and internal documents before wider distribution, and NLP and fairness researchers can use the toolkit for dataset construction and benchmarking. Developers can integrate bias detection directly into existing pipelines using the same interface.
 
 # Limitations and Future Development
 
