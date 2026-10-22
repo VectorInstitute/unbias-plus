@@ -2,65 +2,93 @@
 
 import json
 import os
+import threading
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, AsyncGenerator, Callable, Generator, cast
+from typing import Any, AsyncGenerator, Generator, cast
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from unbias_plus.cleaning import prepare_input
 from unbias_plus.model import DEFAULT_MODEL
 from unbias_plus.parser import parse_llm_output
-from unbias_plus.pipeline import UnBiasPlus
+from unbias_plus.pipeline import UnBiasPlus, finalize_result
 from unbias_plus.prompt import build_messages
-from unbias_plus.schema import BiasResult, compute_offsets
+from unbias_plus.schema import BiasResult
 
 
 DEMO_DIR = Path(__file__).parent / "demo"
 
 # When set, the demo app acts as a thin proxy to a remote vLLM endpoint
 # (OpenAI-compatible API). No local model is loaded.
-# Example: https://unbias-plus-vllm-xxxx.us-central1.run.app/v1
+# In production this points to proxy.vectorinstitute.ai/v1.
 VLLM_BASE_URL = os.environ.get("VLLM_BASE_URL")
 VLLM_MODEL_NAME = os.environ.get("VLLM_MODEL_NAME", "unbias-plus")
+# Service-level key for the Vector proxy gateway — never exposed to end users.
+VLLM_API_KEY = os.environ.get("VLLM_API_KEY", "EMPTY")
 MAX_INPUT_CHARS = int(os.environ.get("MAX_INPUT_CHARS", "5000"))
-# Tune via RATE_LIMIT env var, e.g. "20/minute", "100/hour"
-RATE_LIMIT = os.environ.get("RATE_LIMIT", "10/minute")
+# Must leave room for the prompt inside vLLM --max-model-len (default 8192).
+# 8096 + any prompt (>0) exceeds 8192 and returns HTTP 400.
+MAX_NEW_TOKENS = int(os.environ.get("MAX_NEW_TOKENS", "4096"))
+# Cloud project for BigQuery feedback storage (auto-set by Cloud Run).
+GCP_PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "unbias-toolkit")
+_BQ_DATASET = "unbias_plus"
+_BQ_TABLE = "feedback"
+
+_bq_lock = threading.Lock()
+_bq_cache: dict[str, Any] = {}
 
 
-def _get_client_ip(request: Request) -> str:
-    """Return the real client IP, respecting Cloud Run's X-Forwarded-For header."""
-    forwarded_for = request.headers.get("X-Forwarded-For")
-    if forwarded_for:
-        return forwarded_for.split(",")[0].strip()
-    return str(request.client.host) if request.client else "unknown"
+def _safe_error(e: Exception) -> str:
+    """Return str(e) with the proxy API key redacted."""
+    msg = str(e)
+    if VLLM_API_KEY and VLLM_API_KEY != "EMPTY":
+        msg = msg.replace(VLLM_API_KEY, "[REDACTED]")
+    return msg
 
 
-class _NoOpLimiter:
-    """No-op rate limiter for local mode (no slowapi dependency needed)."""
+def _get_bq_client() -> Any:
+    """Return a cached BigQuery client, creating the dataset/table on first call."""
+    if "client" not in _bq_cache:
+        with _bq_lock:
+            if "client" not in _bq_cache:
+                from google.cloud import bigquery  # noqa: PLC0415
 
-    def limit(self, *args: Any, **kwargs: Any) -> Callable[[Any], Any]:
-        """Return a pass-through decorator."""
-
-        def decorator(func: Any) -> Any:
-            return func
-
-        return decorator
-
-
-def _make_limiter() -> Any:
-    """Return a Limiter if in vLLM mode, else a no-op placeholder."""
-    if VLLM_BASE_URL:
-        from slowapi import Limiter  # noqa: PLC0415
-
-        return Limiter(key_func=_get_client_ip)
-    return _NoOpLimiter()
+                client = bigquery.Client(project=GCP_PROJECT)
+                _ensure_bq_table(client)
+                _bq_cache["client"] = client
+    return _bq_cache["client"]
 
 
-limiter: Any = _make_limiter()
+def _ensure_bq_table(client: Any) -> None:
+    """Create the BigQuery feedback dataset and table if they don't exist."""
+    from google.cloud import bigquery  # noqa: PLC0415
+
+    dataset_id = f"{GCP_PROJECT}.{_BQ_DATASET}"
+    try:
+        client.get_dataset(dataset_id)
+    except Exception:
+        client.create_dataset(dataset_id)
+
+    table_id = f"{GCP_PROJECT}.{_BQ_DATASET}.{_BQ_TABLE}"
+    try:
+        client.get_table(table_id)
+    except Exception:
+        schema = [
+            bigquery.SchemaField("timestamp", "TIMESTAMP"),
+            bigquery.SchemaField("reaction", "STRING"),
+            bigquery.SchemaField("message", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("input_text", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("rating", "INTEGER", mode="NULLABLE"),
+            bigquery.SchemaField("speed", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("accuracy", "STRING", mode="NULLABLE"),
+        ]
+        client.create_table(bigquery.Table(table_id, schema=schema))
 
 
 class FeedbackRequest(BaseModel):
@@ -115,12 +143,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     None
     """
     if VLLM_BASE_URL:
-        # Remote vLLM — no local model load needed.
         from openai import OpenAI  # noqa: PLC0415
 
-        app.state.vllm_client = OpenAI(base_url=VLLM_BASE_URL, api_key="EMPTY")
+        app.state.vllm_client = OpenAI(base_url=VLLM_BASE_URL, api_key=VLLM_API_KEY)
         app.state.pipe = None
-        print(f"Using remote vLLM at {VLLM_BASE_URL} (model: {VLLM_MODEL_NAME})")
+        print(f"Using remote vLLM via {VLLM_BASE_URL} (model: {VLLM_MODEL_NAME})")
     else:
         app.state.vllm_client = None
         model_path = getattr(app.state, "model_name_or_path", DEFAULT_MODEL)
@@ -129,14 +156,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             model_name_or_path=model_path,
             load_in_4bit=load_in_4bit,
         )
-        # Warmup: run a short dummy inference to compile CUDA kernels so the
-        # first real user request doesn't pay the JIT compilation penalty (~60s).
-        print("Warming up CUDA kernels...")
-        try:
-            app.state.pipe.analyze("Warmup.")
-            print("Warmup complete.")
-        except Exception:
-            pass  # warmup failure is non-fatal
+        pipe_ref = app.state.pipe
+
+        def _cuda_warmup() -> None:
+            print("Warming up CUDA kernels (background)...")
+            try:
+                pipe_ref.analyze("Warmup.")
+                print("Warmup complete.")
+            except Exception:
+                pass  # warmup failure is non-fatal
+
+        threading.Thread(target=_cuda_warmup, daemon=True).start()
 
     yield
     app.state.pipe = None
@@ -150,38 +180,38 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-if VLLM_BASE_URL:
-    from slowapi import _rate_limit_exceeded_handler  # noqa: PLC0415
-    from slowapi.errors import RateLimitExceeded  # noqa: PLC0415
-
-    app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
-
-# Serve demo static files if demo directory exists
 if (DEMO_DIR / "static").exists():
     app.mount("/static", StaticFiles(directory=DEMO_DIR / "static"), name="static")
 
+FAVICON_PATH = DEMO_DIR / "static" / "favicon-48x48.svg"
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon() -> FileResponse:
+    """Serve the demo favicon for browsers that request /favicon.ico by default."""
+    if not FAVICON_PATH.exists():
+        raise HTTPException(status_code=404, detail="Favicon not found.")
+    return FileResponse(FAVICON_PATH, media_type="image/svg+xml")
+
 
 @app.get("/", response_class=HTMLResponse, response_model=None)
-def index() -> str | RedirectResponse | HTMLResponse:
-    """Cloud: landing page (or /login if template missing). Local: serve index.html.
+def index() -> str:
+    """Serve the landing page in cloud mode, or the demo UI locally.
 
     Returns
     -------
-    str | RedirectResponse | HTMLResponse
-        Landing HTML or redirect in cloud mode; raw HTML in local mode.
+    str
+        HTML content.
 
     Raises
     ------
     HTTPException
-        404 if index.html is not found (local mode only).
+        404 if the template is not found.
     """
     if VLLM_BASE_URL:
         html_file = DEMO_DIR / "templates" / "landing.html"
-        if not html_file.exists():
-            return RedirectResponse(url="/login")
-        html = html_file.read_text()
-        return HTMLResponse(content=html)
+        if html_file.exists():
+            return html_file.read_text()
     html_file = DEMO_DIR / "templates" / "index.html"
     if not html_file.exists():
         raise HTTPException(status_code=404, detail="Demo UI not found.")
@@ -189,53 +219,23 @@ def index() -> str | RedirectResponse | HTMLResponse:
 
 
 @app.get("/demo", response_class=HTMLResponse, response_model=None)
-def demo_page() -> str | RedirectResponse:
-    """Serve the protected app page. Cloud only.
+def demo_page() -> str:
+    """Serve the demo UI.
 
     Returns
     -------
-    str | RedirectResponse
-        index.html with injected Supabase config in cloud mode;
-        redirect to / in local mode.
+    str
+        index.html content.
 
     Raises
     ------
     HTTPException
         404 if index.html is not found.
     """
-    if not VLLM_BASE_URL:
-        return RedirectResponse(url="/")
     html_file = DEMO_DIR / "templates" / "index.html"
     if not html_file.exists():
         raise HTTPException(status_code=404, detail="Demo UI not found.")
-    html = html_file.read_text()
-    config_script = f"""<script>
-window.__UNBIAS_CONFIG__ = {{
-  supabaseUrl: "{os.environ.get("SUPABASE_URL", "")}",
-  supabaseAnonKey: "{os.environ.get("SUPABASE_ANON_KEY", "")}"
-}};
-</script>"""
-    return html.replace("</head>", config_script + "\n</head>")
-
-
-@app.get("/login", response_class=HTMLResponse, response_model=None)
-def login_page() -> str | RedirectResponse:
-    """Serve the login/signup page. Cloud only."""
-    if not VLLM_BASE_URL:
-        from fastapi.responses import RedirectResponse  # noqa: PLC0415
-
-        return RedirectResponse(url="/")
-    html_file = DEMO_DIR / "templates" / "login.html"
-    if not html_file.exists():
-        raise HTTPException(status_code=404, detail="Login page not found.")
-    html = html_file.read_text()
-    config_script = f"""<script>
-window.__UNBIAS_CONFIG__ = {{
-  supabaseUrl: "{os.environ.get("SUPABASE_URL", "")}",
-  supabaseAnonKey: "{os.environ.get("SUPABASE_ANON_KEY", "")}"
-}};
-</script>"""
-    return html.replace("</head>", config_script + "\n</head>")
+    return html_file.read_text()
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -259,7 +259,6 @@ def health(request: Request) -> HealthResponse:
 
 
 @app.post("/analyze", response_model=BiasResult)
-@limiter.limit(RATE_LIMIT)
 def analyze(request: Request, body: AnalyzeRequest) -> BiasResult:
     """Analyze input text for bias.
 
@@ -287,53 +286,118 @@ def analyze(request: Request, body: AnalyzeRequest) -> BiasResult:
     pipe = getattr(request.app.state, "pipe", None)
     if vllm_client is None and pipe is None:
         raise HTTPException(status_code=500, detail="Model not loaded.")
-    if len(body.text) > MAX_INPUT_CHARS:
+    text = prepare_input(body.text)
+    if len(text) > MAX_INPUT_CHARS:
         raise HTTPException(
             status_code=422,
-            detail=f"Input too long: {len(body.text)} chars (max {MAX_INPUT_CHARS}).",
+            detail=f"Input too long: {len(text)} chars (max {MAX_INPUT_CHARS}).",
         )
     try:
         if vllm_client is not None:
             completion = vllm_client.chat.completions.create(
                 model=VLLM_MODEL_NAME,
-                messages=build_messages(body.text),
-                max_tokens=4096,
+                messages=build_messages(text),
+                max_tokens=MAX_NEW_TOKENS,
                 temperature=0,
-                extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+                stop=["<|im_end|>", "<|endoftext|>"],
+                extra_body={
+                    "chat_template_kwargs": {"enable_thinking": False},
+                    "stop_token_ids": [151645, 151643],
+                },
             )
             raw = completion.choices[0].message.content or ""
             result = parse_llm_output(raw)
-            segments = compute_offsets(body.text, result.biased_segments)
-            return result.model_copy(
-                update={"biased_segments": segments, "original_text": body.text}
-            )
+            return finalize_result(text, result)
         assert pipe is not None
-        return cast(BiasResult, pipe.analyze(body.text))
+        return cast(BiasResult, pipe.analyze(text))
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e)) from e
+        raise HTTPException(status_code=422, detail=_safe_error(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=_safe_error(e)) from e
+
+
+def _json_root_is_complete(text: str) -> bool:
+    """Return True if *text* is a single balanced JSON object (brace-depth 0)."""
+    start = text.find("{")
+    if start == -1:
+        return False
+    depth = 0
+    in_string = False
+    escape_next = False
+    for ch in text[start:]:
+        if escape_next:
+            escape_next = False
+            continue
+        if ch == "\\" and in_string:
+            escape_next = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return True
+            if depth < 0:
+                return False
+    return False
+
+
+def _sse_json_candidate(raw_output: str) -> str | None:
+    """Return a closed top-level JSON object from streamed output, or None."""
+    if not raw_output.rstrip().endswith("}"):
+        return None
+
+    text = raw_output.strip()
+    # Strip markdown fences if the model added them.
+    if text.startswith("```"):
+        text = text.split("```", 2)[1] if text.count("```") >= 2 else text
+        text = text.lstrip("json").strip()
+
+    start = text.find("{")
+    end = text.rfind("}")
+    if start == -1 or end <= start:
+        return None
+    candidate = text[start : end + 1]
+    if not _json_root_is_complete(candidate):
+        return None
+    return candidate
 
 
 def _sse_result_line_or_none(raw_output: str, original_text: str) -> str | None:
     """Return the final SSE ``data: {"result":...}`` line if *raw_output* is complete.
 
-    Cheap guard first (trailing ``}``), then :func:`parse_llm_output`. Used to stop
-    streaming as soon as the model has finished the JSON instead of consuming tokens
-    until ``max_tokens``.
+    Only accepts a fully closed JSON object that already includes
+    ``unbiased_text``. Truncation repair is intentionally NOT used here —
+    otherwise a mid-stream ``}`` closing a segment object can be "repaired"
+    into a fake complete result and the stream stops silently.
     """
-    if not raw_output.rstrip().endswith("}"):
+    candidate = _sse_json_candidate(raw_output)
+    if candidate is None:
         return None
+
     try:
-        result = parse_llm_output(raw_output)
+        data = json.loads(candidate)
+    except json.JSONDecodeError:
+        return None
+    required = {"unbiased_text", "severity", "biased_segments"}
+    if not isinstance(data, dict) or not required.issubset(data):
+        return None
+
+    try:
+        result = parse_llm_output(candidate)
     except ValueError:
         return None
-    segments_with_offsets = compute_offsets(original_text, result.biased_segments)
-    final = result.model_copy(
-        update={
-            "biased_segments": segments_with_offsets,
-            "original_text": original_text,
-        }
+    final = finalize_result(original_text, result)
+    print(
+        f"[stream] complete JSON received "
+        f"(severity={final.severity}, segments={len(final.biased_segments)}, "
+        f"chars_out={len(candidate)})",
+        flush=True,
     )
     return (
         "data: " + json.dumps({"result": json.loads(final.model_dump_json())}) + "\n\n"
@@ -341,7 +405,6 @@ def _sse_result_line_or_none(raw_output: str, original_text: str) -> str | None:
 
 
 @app.post("/analyze/stream")
-@limiter.limit(RATE_LIMIT)
 def analyze_stream(request: Request, body: AnalyzeRequest) -> StreamingResponse:
     """Stream bias analysis tokens via SSE, then emit the final parsed result.
 
@@ -368,13 +431,12 @@ def analyze_stream(request: Request, body: AnalyzeRequest) -> StreamingResponse:
     pipe = getattr(request.app.state, "pipe", None)
     if vllm_client is None and pipe is None:
         raise HTTPException(status_code=500, detail="Model not loaded.")
-    if len(body.text) > MAX_INPUT_CHARS:
+    text = prepare_input(body.text)
+    if len(text) > MAX_INPUT_CHARS:
         raise HTTPException(
             status_code=422,
-            detail=f"Input too long: {len(body.text)} chars (max {MAX_INPUT_CHARS}).",
+            detail=f"Input too long: {len(text)} chars (max {MAX_INPUT_CHARS}).",
         )
-
-    text = body.text
 
     def event_stream() -> Generator[str, None, None]:
         try:
@@ -382,30 +444,31 @@ def analyze_stream(request: Request, body: AnalyzeRequest) -> StreamingResponse:
             raw_output = ""
 
             if vllm_client is not None:
-                # Stream via vLLM's OpenAI-compatible SSE endpoint.
                 stream = vllm_client.chat.completions.create(
                     model=VLLM_MODEL_NAME,
                     messages=messages,
-                    max_tokens=4096,
+                    max_tokens=MAX_NEW_TOKENS,
                     temperature=0,
                     stream=True,
                     stop=["<|im_end|>", "<|endoftext|>"],
                     extra_body={
                         "chat_template_kwargs": {"enable_thinking": False},
-                        "stop_token_ids": [151645, 151643],  # token ID fallback
+                        "stop_token_ids": [151645, 151643],
                     },
                 )
-                for chunk in stream:
-                    token = chunk.choices[0].delta.content or ""
-                    if token:
-                        raw_output += token
-                        yield "data: " + json.dumps({"t": token}) + "\n\n"
-                    early = _sse_result_line_or_none(raw_output, text)
-                    if early is not None:
-                        yield early
-                        return
+                try:
+                    for chunk in stream:
+                        token = chunk.choices[0].delta.content or ""
+                        if token:
+                            raw_output += token
+                            yield "data: " + json.dumps({"t": token}) + "\n\n"
+                        early = _sse_result_line_or_none(raw_output, text)
+                        if early is not None:
+                            yield early
+                            return
+                finally:
+                    stream.close()
             else:
-                # Local model streaming via HuggingFace TextIteratorStreamer.
                 assert pipe is not None
                 for token in pipe._model.generate_stream(messages):
                     raw_output += token
@@ -416,22 +479,18 @@ def analyze_stream(request: Request, body: AnalyzeRequest) -> StreamingResponse:
                         return
 
             result = parse_llm_output(raw_output)
-            segments_with_offsets = compute_offsets(text, result.biased_segments)
-            final = result.model_copy(
-                update={
-                    "biased_segments": segments_with_offsets,
-                    "original_text": text,
-                }
-            )
+            final = finalize_result(text, result)
             yield (
                 "data: "
                 + json.dumps({"result": json.loads(final.model_dump_json())})
                 + "\n\n"
             )
         except ValueError as e:
-            yield "data: " + json.dumps({"error": str(e)}) + "\n\n"
+            print(f"[stream] parse error: {_safe_error(e)}", flush=True)
+            yield "data: " + json.dumps({"error": _safe_error(e)}) + "\n\n"
         except Exception as e:
-            yield "data: " + json.dumps({"error": str(e)}) + "\n\n"
+            print(f"[stream] error: {_safe_error(e)}", flush=True)
+            yield "data: " + json.dumps({"error": _safe_error(e)}) + "\n\n"
 
     return StreamingResponse(
         event_stream(),
@@ -444,33 +503,23 @@ def analyze_stream(request: Request, body: AnalyzeRequest) -> StreamingResponse:
 
 
 @app.post("/feedback")
-def submit_feedback(request: Request, body: FeedbackRequest) -> dict:
-    """Save user feedback (reaction + optional message) to Supabase.
+def submit_feedback(body: FeedbackRequest) -> dict[str, Any]:
+    """Save user feedback to BigQuery.
 
-    Cloud only — protected by JWT auth.
+    Returns
+    -------
+    dict
+        ``{"ok": True}`` on success.
+
+    Raises
+    ------
+    HTTPException
+        404 in local mode (no VLLM_BASE_URL).
+        422 if reaction value is invalid.
+        500 if the BigQuery write fails.
     """
     if not VLLM_BASE_URL:
         raise HTTPException(status_code=404, detail="Not available in local mode.")
-
-    from unbias_plus.supabase_client import get_supabase  # noqa: PLC0415
-
-    auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    token = auth_header.replace("Bearer ", "")
-
-    try:
-        supabase = get_supabase()
-        user_response = supabase.auth.get_user(token)
-        if user_response is None or user_response.user is None:
-            raise HTTPException(status_code=401, detail="Invalid or expired token.")
-        user_id = str(user_response.user.id)
-        email = user_response.user.email
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=401, detail="Invalid or expired token.") from e
 
     if body.reaction not in ("like", "dislike"):
         raise HTTPException(
@@ -478,10 +527,11 @@ def submit_feedback(request: Request, body: FeedbackRequest) -> dict:
         )
 
     try:
-        supabase.table("feedback").insert(
+        bq = _get_bq_client()
+        table_id = f"{GCP_PROJECT}.{_BQ_DATASET}.{_BQ_TABLE}"
+        rows = [
             {
-                "user_id": user_id,
-                "email": email,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "reaction": body.reaction,
                 "message": body.message or None,
                 "input_text": body.input_text[:500] if body.input_text else None,
@@ -489,7 +539,10 @@ def submit_feedback(request: Request, body: FeedbackRequest) -> dict:
                 "speed": body.speed or None,
                 "accuracy": body.accuracy or None,
             }
-        ).execute()
+        ]
+        errors = bq.insert_rows_json(table_id, rows)
+        if errors:
+            raise RuntimeError(f"BigQuery insert errors: {errors}")
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to save feedback: {e}"

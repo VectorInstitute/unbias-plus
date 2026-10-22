@@ -1,18 +1,21 @@
-# unbias-plus
 [![website](https://img.shields.io/badge/website-ff00ff)](https://vectorinstitute.github.io/unbias-plus/)
+[![arXiv](https://img.shields.io/badge/arXiv-2606.23412-b31b1b.svg)](https://arxiv.org/abs/2606.23412)
 [![code checks](https://github.com/VectorInstitute/unbias-plus/actions/workflows/code_checks.yml/badge.svg)](https://github.com/VectorInstitute/unbias-plus/actions/workflows/code_checks.yml)
 [![unit tests](https://github.com/VectorInstitute/unbias-plus/actions/workflows/unit_tests.yml/badge.svg)](https://github.com/VectorInstitute/unbias-plus/actions/workflows/unit_tests.yml)
 [![integration tests](https://github.com/VectorInstitute/unbias-plus/actions/workflows/integration_tests.yml/badge.svg)](https://github.com/VectorInstitute/unbias-plus/actions/workflows/integration_tests.yml)
 [![docs](https://github.com/VectorInstitute/unbias-plus/actions/workflows/docs.yml/badge.svg)](https://github.com/VectorInstitute/unbias-plus/actions/workflows/docs.yml)
+[![PyPI](https://img.shields.io/pypi/v/unbias-plus.svg)](https://pypi.org/project/unbias-plus/)
 [![codecov](https://codecov.io/github/VectorInstitute/unbias-plus/graph/badge.svg?token=83MYFZ3UPA)](https://codecov.io/github/VectorInstitute/unbias-plus)
-[![License](https://img.shields.io/github/license/VectorInstitute/unbias-plus)](https://github.com/VectorInstitute/unbias-plus/blob/main/LICENSE.md)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-003049.svg)](./LICENSE.md)
 [![Contact](https://img.shields.io/badge/Contact-shaina.raza%40vectorinstitute.ai-green)](mailto:shaina.raza@vectorinstitute.ai)
+
+# unbias-plus
 
 Bias detection and debiasing in text: identify biased segments, classify severity, get reasoning and neutral replacements per segment, and a full neutral rewrite. Structured output (binary label, severity, biased segments with offsets) via CLI, REST API, or Python.
 
 ## Overview
 
-Input text → analysis → validated `BiasResult`: binary label (biased/unbiased), overall severity (1–5), `biased_segments` (original phrase, replacement, severity, bias type, reasoning, character offsets), and full `unbiased_text`. Entry points: CLI (`unbias-plus`), REST API (FastAPI + demo UI), or Python (`UnBiasPlus`).
+Input text → analysis → validated `BiasResult`: binary label (biased/unbiased), overall severity (0–10), `biased_segments` (original phrase, replacement, severity, bias type, reasoning, character offsets), and full `unbiased_text`. Entry points: CLI (`unbias-plus`), REST API (FastAPI + demo UI), or Python (`UnBiasPlus`).
 
 **Project structure:**
 ```
@@ -40,10 +43,10 @@ unbias-plus/
 ## Features
 
 - **Bias detection**: Identifies biased phrases in text and returns them as segments with character-level offsets for highlighting.
-- **Classification**: Binary label (biased/unbiased), per-segment severity (low/medium/high), and bias type (e.g. loaded language, framing).
+- **Classification**: Binary label (biased/unbiased), per-segment severity (low/medium/high), and bias type (e.g. `loaded_language`, `stereotypical_association`).
 - **Reasoning**: Each segment includes an explanation of why it is considered biased.
 - **Debiasing**: Per-segment neutral replacements and a full rewritten `unbiased_text`.
-- **Structured output**: Pydantic-validated `BiasResult` with `binary_label`, `severity` (1–5), `biased_segments`, and `unbiased_text`.
+- **Structured output**: Pydantic-validated `BiasResult` with `binary_label`, `severity` (0–10), `biased_segments`, and `unbiased_text`.
 - **Demo UI**: `--serve` launches a FastAPI server that also serves a visual web interface at `http://localhost:8000`.
 - **CLI**: Analyze from command line with `--text`, `--file`, or start the API + UI with `--serve`. Optional 4-bit quantization and JSON output.
 - **REST API**: FastAPI server with `/health` and `/analyze` (POST JSON `{"text": "..."}`). Model loaded at startup via lifespan.
@@ -70,6 +73,7 @@ source .venv/bin/activate
 ```
 
 **Optional: flash-attn (GPU only)**
+
 For training or faster inference with flash attention, install the `train` extra (requires CUDA/nvcc to build):
 ```bash
 uv sync --extra train
@@ -155,7 +159,7 @@ pipe = UnBiasPlus("your-hf-model-id", load_in_4bit=False)
 result = pipe.analyze("Women are too emotional to lead.")
 
 print(result.binary_label)   # "biased" | "unbiased"
-print(result.severity)       # 1–5
+print(result.severity)       # 0–10
 print(result.bias_found)     # bool
 
 for seg in result.biased_segments:
@@ -170,19 +174,31 @@ d        = pipe.analyze_to_dict("...")   # plain dict
 json_str = pipe.analyze_to_json("...")   # pretty-printed JSON string
 ```
 
+## Training
+
+The Qwen3-8B checkpoint shipped with the demo was fine-tuned with SFT on the
+[vector-institute/unbias-plus-dataset](https://huggingface.co/datasets/vector-institute/unbias-plus-dataset)
+dataset on HuggingFace.
+
+Standalone scripts that reproduce both stages live in [`training/`](training/),
+along with a sanity-check inference runner. They depend on the `[train]`
+optional extra (`peft`, `trl`, `unsloth`, `flash-attn`) and require an A100
+or comparable GPU.
+
+See [`training/README.md`](training/README.md) for details, CLI invocations,
+and resource sizing.
+
 ## Development
 
 - **Tests**: `pytest` (see `pyproject.toml` for markers). Run from repo root: `uv run pytest tests/`.
 - **Linting / formatting**: `ruff` (format + lint), config in `pyproject.toml`.
-- **Type checking**: `mypy` with strict options, `mypy_path = "src"`.
+- **Type checking**: `mypy` with strict options, `mypy_path = ["src", "training"]`.
 
+## Team
 
-## 👥 Team
+Developed by the **AI Engineering** team at the [Vector Institute](https://vectorinstitute.ai). UnBias-Plus is licensed under the Apache License 2.0. See [LICENSE.md](./LICENSE.md) in the repository.
 
-Developed by the **AI Engineering** team at the [Vector Institute](https://vectorinstitute.ai).
-
-Ahmed Y. Radwan · Amrit Krishnan · Shaina Raza, PhD
-
+For research collaborations, partnerships, or technical inquiries, please contact **Shaina Raza, PhD** at shaina.raza@vectorinstitute.ai.
 
 ## Acknowledgement
 
@@ -190,12 +206,20 @@ Resources used in preparing this research are provided, in part, by the Province
 
 This research is also supported by the European Union's Horizon Europe research and innovation programme under the AIXPERT project (Grant Agreement No. 101214389).
 
+## Citation
 
+If you use UnBias-Plus in your research, please cite:
 
-## License
-
-Licensed under the **Vector Institute Custom License**. Use is restricted to Academic Entities, Sponsors, and Partners of the Vector Institute; by accessing or using the work, you agree to be bound by the license terms. See [LICENSE](https://github.com/VectorInstitute/unbias-plus/blob/main/LICENSE.md) in the repository.
+```bibtex
+@article{radwan2026unbias,
+  title={UnBias-Plus: Detect, Explain, and Rewrite Bias},
+  author={Radwan, Ahmed Y and ElKady, Ahmed and Chaduvula, Sindhuja and Hafez, Mohamed and Krishnan, Amrit and Raza, Shaina},
+  journal={arXiv preprint arXiv:2606.23412},
+  year={2026}
+}
+```
 
 ## Support
 
-* Open an issue on GitHub: [https://github.com/VectorInstitute/unbias-plus/issues](https://github.com/VectorInstitute/unbias-plus/issues)
+- Open an issue on GitHub: [https://github.com/VectorInstitute/unbias-plus/issues](https://github.com/VectorInstitute/unbias-plus/issues)
+- For contribution guidelines, see [CONTRIBUTING.md](https://github.com/VectorInstitute/unbias-plus/blob/main/CONTRIBUTING.md)

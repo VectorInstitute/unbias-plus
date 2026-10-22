@@ -2,11 +2,17 @@
 
 from pathlib import Path
 
+from unbias_plus.cleaning import prepare_input
 from unbias_plus.formatter import format_cli, format_dict, format_json
 from unbias_plus.model import DEFAULT_MODEL, UnBiasModel
 from unbias_plus.parser import parse_llm_output
 from unbias_plus.prompt import build_messages
-from unbias_plus.schema import BiasResult, compute_offsets
+from unbias_plus.schema import (
+    BiasResult,
+    compute_offsets,
+    compute_replacement_offsets,
+    drop_unchanged_segments,
+)
 
 
 class UnBiasPlus:
@@ -20,13 +26,14 @@ class UnBiasPlus:
     ----------
     model_name_or_path : str | Path
         HuggingFace model ID or local path to the fine-tuned
-        model. Defaults to 'vector-institute/Qwen3-4B-UnBias-Plus-SFT'.
+        model. Defaults to ``DEFAULT_MODEL``
+        (``vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-V2``).
     device : str | None, optional
         Device to run on ('cuda' or 'cpu'). Auto-detected if None.
     load_in_4bit : bool, optional
         Load model in 4-bit quantization. Default is False.
     max_new_tokens : int, optional
-        Maximum tokens to generate. Default is 4096.
+        Maximum tokens to generate. Default is 8096.
 
     Examples
     --------
@@ -43,7 +50,7 @@ class UnBiasPlus:
         model_name_or_path: str | Path = DEFAULT_MODEL,
         device: str | None = None,
         load_in_4bit: bool = False,
-        max_new_tokens: int = 4096,
+        max_new_tokens: int = 8096,
     ) -> None:
         self._model = UnBiasModel(
             model_name_or_path=model_name_or_path,
@@ -82,19 +89,11 @@ class UnBiasPlus:
         True
 
         """
+        text = prepare_input(text)
         messages = build_messages(text)
         raw_output = self._model.generate(messages)
         result = parse_llm_output(raw_output)
-
-        # Compute character-level offsets for frontend highlighting
-        segments_with_offsets = compute_offsets(text, result.biased_segments)
-
-        return result.model_copy(
-            update={
-                "biased_segments": segments_with_offsets,
-                "original_text": text,
-            }
-        )
+        return finalize_result(text, result)
 
     def analyze_to_cli(self, text: str) -> str:
         """Analyze text and return a formatted CLI string.
@@ -143,3 +142,35 @@ class UnBiasPlus:
 
         """
         return format_json(self.analyze(text))
+
+
+def finalize_result(text: str, result: BiasResult) -> BiasResult:
+    """Attach original text and character offsets for each biased segment.
+
+    Segments whose replacement equals the original are dropped as no-ops. If no
+    segments survive, the result is reconciled to a clean unbiased state
+    (severity 0, no bias, rewrite == original) since, per the model contract,
+    an empty ``biased_segments`` means there is no bias to report or rewrite.
+    """
+    segments = drop_unchanged_segments(result.biased_segments)
+    segments = compute_offsets(text, segments)
+    segments = compute_replacement_offsets(text, result.unbiased_text, segments)
+
+    if not segments:
+        return result.model_copy(
+            update={
+                "biased_segments": [],
+                "binary_label": "unbiased",
+                "bias_found": False,
+                "severity": 0,
+                "unbiased_text": text,
+                "original_text": text,
+            }
+        )
+
+    return result.model_copy(
+        update={
+            "biased_segments": segments,
+            "original_text": text,
+        }
+    )

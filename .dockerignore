@@ -33,6 +33,7 @@ docs/
 mkdocs.yml
 *.md
 !README.md
+!LICENSE.md
 
 # CI/CD
 .github/

@@ -16,11 +16,11 @@ def sample_segment() -> BiasedSegment:
 
     """
     return BiasedSegment(
-        original="Sharia-obsessed fanatics",
-        replacement="extremist groups",
-        severity="high",
-        bias_type="dehumanizing framing",
-        reasoning="Uses inflammatory religious language to dehumanize.",
+        original="flood of migrants",
+        replacement="arrival of migrants",
+        severity="High",
+        bias_type="dehumanizing_language",
+        reasoning="Treats people as a threatening mass.",
     )
 
 
@@ -41,16 +41,16 @@ def sample_result(sample_segment: BiasedSegment) -> BiasResult:
     """
     return BiasResult(
         binary_label="biased",
-        severity=3,
+        severity=6,
         bias_found=True,
         biased_segments=[sample_segment],
-        unbiased_text="They are surrounded by extremist groups.",
+        unbiased_text="They are surrounded by arrival of migrants.",
     )
 
 
 @pytest.fixture
 def sample_json() -> str:
-    """Return a sample valid JSON string matching BiasResult schema.
+    """Return a sample valid JSON string matching the model output schema.
 
     Returns
     -------
@@ -60,19 +60,17 @@ def sample_json() -> str:
     """
     return """
     {
-        "binary_label": "biased",
-        "severity": 3,
-        "bias_found": true,
+        "severity": 6,
         "biased_segments": [
             {
-                "original": "Sharia-obsessed fanatics",
-                "replacement": "extremist groups",
-                "severity": "high",
-                "bias_type": "dehumanizing framing",
-                "reasoning": "Uses inflammatory language."
+                "original": "flood of migrants",
+                "replacement": "arrival of migrants",
+                "severity": "High",
+                "bias_type": "dehumanizing_language",
+                "reasoning": "Treats people as a threatening mass."
             }
         ],
-        "unbiased_text": "They are surrounded by extremist groups."
+        "unbiased_text": "They are surrounded by arrival of migrants."
     }
     """
 

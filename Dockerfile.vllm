@@ -1,7 +1,7 @@
 # ============================================================
 # UnBias Plus vLLM Inference Server — GPU Cloud Run Service
 # Base: vllm/vllm-openai (OpenAI-compatible API server)
-# Model: vector-institute/Qwen3-8B-UnBias-Plus-SFT
+# Model: vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-V2
 # GPU: NVIDIA L4 (23 GB VRAM — fits Qwen3-8B in BF16 ~18 GB)
 #
 # Exposes an OpenAI-compatible API at /v1 (chat/completions,
@@ -9,7 +9,23 @@
 # vLLM provides continuous batching + PagedAttention for high
 # throughput under concurrent load.
 # ============================================================
-FROM vllm/vllm-openai:latest
+# Pin to a specific release so CI is reproducible and a surprise `latest` bump
+# doesn't silently change CUDA requirements.  v0.8.5.post1 is the minimum that
+# includes native Qwen3ForCausalLM support (needed for Qwen3-8B-SFT).
+#
+# CUDA requirement: this image is built against CUDA 12.4 (PyTorch cu124).
+# Cloud Run injects a host-matched libcuda.so at runtime; its L4 fleet driver is
+# well past 550.xx, so the CUDA 12.4 runtime here is satisfied directly.
+#
+# DO NOT put /usr/local/cuda/compat on LD_LIBRARY_PATH.  Those forward-compat
+# stubs are frozen at the base image's CUDA release and only work while they are
+# *newer* than the host kernel driver.  When Cloud Run upgraded its L4 driver on
+# 2026-07-20 the pinned stubs became older than the host kernel module, and every
+# cold start died with CUDA error 803 (cudaErrorSystemDriverMismatch) in
+# torch.cuda.set_device().  Letting the injected driver win is version-proof:
+# the host userspace driver always matches its own kernel module, and drivers
+# stay backward compatible with older CUDA runtimes.
+FROM vllm/vllm-openai:v0.8.5.post1
 
 ENV HF_HOME=/hf-cache
 # Redirect the entire vLLM cache root (torch.compile cache, etc.) to the
@@ -23,8 +39,8 @@ ENV VLLM_WORKER_MULTIPROC_METHOD=spawn
 ENV PORT=8080
 EXPOSE 8080
 
-# vllm/vllm-openai ENTRYPOINT is: vllm serve
-# Model is the first positional argument; remaining are flags.
+# vllm/vllm-openai ENTRYPOINT is: python -m vllm.entrypoints.openai.api_server
+# v0.8.x dropped the positional model arg — model must be --model flag.
 # Port hardcoded to 8080 (Cloud Run standard — ENV PORT=8080 set above).
 #
 # Key flags:
@@ -33,7 +49,7 @@ EXPOSE 8080
 #   --dtype bfloat16              native Qwen3 dtype; faster than fp16 on L4
 #   --enable-chunked-prefill      improves throughput for long prompts
 CMD [ \
-    "vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct", \
+    "--model", "vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct-V2", \
     "--served-model-name", "unbias-plus", \
     "--port", "8080", \
     "--host", "0.0.0.0", \

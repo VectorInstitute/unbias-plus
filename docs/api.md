@@ -8,6 +8,7 @@ Reference for the `unbias_plus` package: pipeline, model, schema, FastAPI server
     options:
       show_root_heading: true
       show_root_full_path: true
+      show_submodules: false
 
 ## Pipeline
 

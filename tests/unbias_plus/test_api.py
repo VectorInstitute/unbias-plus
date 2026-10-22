@@ -21,14 +21,14 @@ def sample_bias_result() -> BiasResult:
     """
     return BiasResult(
         binary_label="biased",
-        severity=3,
+        severity=6,
         bias_found=True,
         biased_segments=[
             BiasedSegment(
                 original="desperate for clicks",
                 replacement="seeking audience engagement",
-                severity="medium",
-                bias_type="loaded language",
+                severity="Medium",
+                bias_type="loaded_language",
                 reasoning="Pejorative motive attributed without evidence.",
             )
         ],

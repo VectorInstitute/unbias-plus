@@ -1,0 +1,99 @@
+# Phrase-unlikelihood SFT: the strongest, cleanest anti-laundering recipe.
+# Replaces the broad token penalty with a phrase-level penalty on exact
+# laundering continuations ("Some people believe", "women may", "commonly
+# associated", ...). Adds curated hard-neutral exemplars, filters soft-debias
+# target rows, x3 hard-case upsampling, and a larger LoRA adapter (r=32).
+name: phrase_unlikelihood
+description: >-
+  Concise hard-neutralization prompt + phrase-level anti-laundering unlikelihood
+  + curated exemplars + soft-debias target filtering + x3 upsampling, r=32 LoRA.
+prompt: concise_hard
+
+base_model: unsloth/Qwen3-8B
+max_seq_length: 8192
+train_samples: 5000
+seed: 42
+heldout_size: 250
+eval_size: 250
+
+lora:
+  r: 32
+  alpha: 64
+  dropout: 0.0
+
+optim:
+  learning_rate: 5.0e-5
+  epochs: 4
+  per_device_batch: 1
+  grad_accum: 16
+  warmup_ratio: 0.05
+  weight_decay: 0.01
+  lr_scheduler: cosine
+  max_grad_norm: 1.0
+
+weights:
+  base_completion: 0.7
+  original: 0.20
+  replacement: 8.5
+  reasoning: 4.0
+  unbiased_text: 3.5
+
+phrase_unlikelihood:
+  lambda_weight: 0.16
+  max_ids_per_pos: 8
+  phrases:
+    - "Some people believe"
+    - "some people believe"
+    - "Some people think"
+    - "some people think"
+    - "Some people claim"
+    - "some people claim"
+    - "critics say"
+    - "Critics say"
+    - "observers say"
+    - "Observers say"
+    - "some women may"
+    - "Some women may"
+    - "women may"
+    - "Women may"
+    - "some men may"
+    - "Some men may"
+    - "men may"
+    - "Men may"
+    - "some team members may"
+    - "Some team members may"
+    - "some employees may"
+    - "Some employees may"
+    - "some candidates may"
+    - "Some candidates may"
+    - "men are commonly associated"
+    - "women are commonly associated"
+    - "are commonly associated"
+    - "commonly associated with"
+    - "associated with"
+    - "seen as"
+    - "perceived as"
+    - "concerns about whether"
+    - "have concerns about whether"
+    - "some companies may"
+    - "Some companies may"
+    - "some companies assign"
+    - "Some companies assign"
+    - "companies may assign"
+    - "may assign"
+    - "companies may prefer"
+    - "may prefer"
+
+data:
+  hard_upsample_multiplier: 3
+  filter_soft_debias_targets: true
+  curated_hard_case_repeat: 20
+  augment_reasoning_cue: true
+  soft_debias_bias_types:
+    - stereotypical_association
+    - unsupported_generalization
+
+wandb:
+  enabled: true
+  project: unbias-sft-phrase-unlikelihood
+  run_name: qwen3-8b-sft-phrase-unlikelihood

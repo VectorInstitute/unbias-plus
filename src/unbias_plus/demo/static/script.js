@@ -1,7 +1,7 @@
 /* ============================================================
    UnBias — Frontend Logic
    Handles: streaming API, highlighting, tooltip, breakdown cards,
-            example chips, file upload (.txt / .pdf)
+            example chips, file upload (.txt)
    ============================================================ */
    const inputEl       = document.getElementById("input-text");
    const charCountEl   = document.getElementById("char-count");
@@ -11,6 +11,7 @@
    const highlightEl   = document.getElementById("highlighted-text");
    const unbiasedEl    = document.getElementById("unbiased-text");
    const segCountEl    = document.getElementById("segment-count");
+   const globalSevEl   = document.getElementById("global-severity");
    const pillsEl       = document.getElementById("severity-pills");
    const segListEl     = document.getElementById("segment-list");
    const noBiasEl      = document.getElementById("no-bias");
@@ -18,9 +19,13 @@
    const tooltip       = document.getElementById("tooltip");
    const errorBannerEl = document.getElementById("error-banner");
    const MAX_CHARS = 5000;
+   const PYPI_SLOW_SECONDS = 8;
    const MAX_COLD_START_RETRIES = 10; // 10 × 5 s = 50 s window for uvicorn to start
    let coldStartRetries = 0;
    let _activeAnalysisController = null; // AbortController for the in-flight stream
+   // Preserved across stream → final render so a bad server parse does not wipe highlights.
+   let _lastStreamingSegments = [];
+   let _lastStreamedUnbiased = "";
    // ============================================================
    // INLINE ERROR BANNER
    // ============================================================
@@ -30,6 +35,7 @@
      errorBannerEl.classList.remove("hidden");
      setTimeout(() => errorBannerEl.classList.add("hidden"), 8000);
    }
+
    // ============================================================
    // EXAMPLE CHIPS
    // ============================================================
@@ -50,75 +56,56 @@
      if (len > MAX_CHARS * 0.9) charCountEl.classList.add("warn");
      if (len >= MAX_CHARS)      charCountEl.classList.add("error");
    });
-   // ============================================================
-   // FILE UPLOAD — .txt and text-based .pdf, fully client-side
-   // ============================================================
-   const uploadBtn      = document.getElementById("upload-btn");
-   const fileInput      = document.getElementById("file-input");
-   const uploadFilename = document.getElementById("upload-filename");
-   uploadBtn.addEventListener("click", () => fileInput.click());
-   fileInput.addEventListener("change", async () => {
-     const file = fileInput.files[0];
-     if (!file) return;
-     const ext = file.name.split(".").pop().toLowerCase();
-     let text = "";
-     try {
-       if (ext === "txt") {
-         text = await _readAsText(file);
-       } else if (ext === "pdf") {
-         text = await _extractPdfText(file);
-       } else {
-         showInlineError("Unsupported file type. Please upload a .txt or .pdf file.");
-         return;
-       }
-     } catch (err) {
-       showInlineError("Could not read file: " + err.message);
-       fileInput.value = "";
-       return;
-     }
-     text = text.trim();
-     if (!text) {
-       showInlineError("This PDF appears to be scanned or image-based. Please paste the text manually.");
-       fileInput.value = "";
-       return;
-     }
-     if (text.length > MAX_CHARS) {
-       text = text.slice(0, MAX_CHARS);
-       showInlineError(`File truncated to ${MAX_CHARS.toLocaleString()} characters.`);
-     }
-     inputEl.value = text;
-     inputEl.dispatchEvent(new Event("input"));
-     inputEl.focus();
-     uploadFilename.textContent = file.name;
-     uploadFilename.classList.remove("hidden");
-     fileInput.value = "";
-   });
-   function _readAsText(file) {
-     return new Promise((resolve, reject) => {
-       const reader = new FileReader();
-       reader.onload  = e => resolve(e.target.result);
-       reader.onerror = () => reject(new Error("Failed to read file"));
-       reader.readAsText(file, "utf-8");
-     });
-   }
-   async function _extractPdfText(file) {
-     if (typeof pdfjsLib === "undefined") {
-       throw new Error("PDF library not loaded. Please refresh and try again.");
-     }
-     pdfjsLib.GlobalWorkerOptions.workerSrc =
-       "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-     const arrayBuffer = await file.arrayBuffer();
-     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-     const pages = [];
-     for (let i = 1; i <= pdf.numPages; i++) {
-       const page    = await pdf.getPage(i);
-       const content = await page.getTextContent();
-       pages.push(content.items.map(item => item.str).join(" "));
-     }
-     return pages.join("\n\n");
-   }
-   // ============================================================
-   // ANALYZE — /analyze/stream (SSE)
+  // ============================================================
+  // FILE UPLOAD — .txt only, fully client-side
+  // ============================================================
+  const uploadBtn      = document.getElementById("upload-btn");
+  const fileInput      = document.getElementById("file-input");
+  const uploadFilename = document.getElementById("upload-filename");
+  uploadBtn.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    const ext = file.name.split(".").pop().toLowerCase();
+    let text = "";
+    if (ext !== "txt") {
+      showInlineError("Unsupported file type. Please upload a .txt file.");
+      fileInput.value = "";
+      return;
+    }
+    try {
+      text = await _readAsText(file);
+    } catch (err) {
+      showInlineError("Could not read file: " + err.message);
+      fileInput.value = "";
+      return;
+    }
+    text = text.trim();
+    if (!text) {
+      showInlineError("This file appears to be empty. Please upload a file with text.");
+      fileInput.value = "";
+      return;
+    }
+    // Load the full text just like a paste — the char counter and the
+    // over-limit check in runAnalysis handle length uniformly, so uploads and
+    // typed input behave the same (no silent truncation).
+    inputEl.value = text;
+    inputEl.dispatchEvent(new Event("input"));
+    inputEl.focus();
+    uploadFilename.textContent = file.name;
+    uploadFilename.classList.remove("hidden");
+    fileInput.value = "";
+  });
+  function _readAsText(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = e => resolve(e.target.result);
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      reader.readAsText(file, "utf-8");
+    });
+  }
+  // ============================================================
+  // ANALYZE — /analyze/stream (SSE)
    // ============================================================
    analyzeBtn.addEventListener("click", runAnalysis);
    inputEl.addEventListener("keydown", (e) => {
@@ -137,39 +124,56 @@
      }
      _activeAnalysisController = new AbortController();
      const signal = _activeAnalysisController.signal;
+    //  analyzeBtn.disabled = true;
+    //  resultsEl.classList.add("hidden");
+    //  loadingEl.classList.remove("hidden");
      analyzeBtn.disabled = true;
      resultsEl.classList.add("hidden");
      loadingEl.classList.remove("hidden");
+     // Clear all previous results so a new run never shows stale highlights/cards.
+     unbiasedEl.innerHTML  = "";
+     highlightEl.innerHTML = "";
+     segListEl.innerHTML   = "";
+     pillsEl.innerHTML     = "";
+     segCountEl.textContent = "0 segments";
+     if (globalSevEl) {
+       globalSevEl.textContent = "";
+       globalSevEl.className = "global-severity hidden";
+     }
+     noBiasEl.classList.add("hidden");
      unbiasedEl.innerHTML = "";
      const labelEl = document.querySelector(".loading-label");
      let tokenCount = 0;
      let firstTokenReceived = false;
+     let serverConnected = false; // true once HTTP 200 received — model is up, may just be busy
      let accumulated = "";
      let streamingSegments = [];
+     _lastStreamingSegments = [];
+     _lastStreamedUnbiased = "";
      let lastStreamedUnbiased = "";
      let resultRendered = false;
      let streamLoadingDismissed = false;
      // Elapsed timer — updates label every second until first token arrives.
-     // After 8 s of silence, shows a cold-start warning with a live counter.
+     // Cold-start warning only fires before HTTP 200 arrives; once connected,
+     // slow tokens mean the GPU is under load, not that the model is loading.
      const startTime = Date.now();
      const timerInterval = setInterval(() => {
        if (firstTokenReceived) return;
        const elapsed = Math.floor((Date.now() - startTime) / 1000);
        if (!labelEl) return;
-       if (elapsed < 8) {
+       if (serverConnected || elapsed < PYPI_SLOW_SECONDS) {
          labelEl.textContent = "Analyzing bias patterns...";
        } else {
          labelEl.innerHTML =
-           "Cold start: loading model from GCS\u00a0\u00a0"
+           "Loading model from GCS\u00a0\u00a0"
            + "<span style='font-variant-numeric:tabular-nums;'>" + elapsed + "s</span>"
-           + "<br><span style='font-size:0.85em;opacity:0.6;'>First request after idle takes ~7 min. Hang tight.</span>";
+           + "<br><span style='font-size:0.85em;opacity:0.6;'>New GPU instance is warming up (~7 min). Hang tight.</span>";
        }
      }, 1000);
      try {
-      const authHeaders = typeof getAuthHeaders === "function" ? await getAuthHeaders() : {};
       const res = await fetch("/analyze/stream", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
         signal,
       });
@@ -180,6 +184,7 @@
          httpErr.status = res.status;
          throw httpErr;
        }
+       serverConnected = true; // model is loaded; remaining wait is GPU queue time
        const reader  = res.body.getReader();
        const decoder = new TextDecoder();
        let buffer = "";
@@ -198,30 +203,44 @@
              firstTokenReceived = true;
              clearInterval(timerInterval);
            }
+
            tokenCount++;
            accumulated += payload.t;
            if (labelEl) labelEl.textContent = `Analyzing... (${tokenCount} tokens)`;
-           const newSegs = parseNewSegments(accumulated, streamingSegments.length, text);
+
+           // Strip <think> block before parsing — vLLM may emit it even with enable_thinking:false
+           let cleanAccumulated = accumulated;
+           if (cleanAccumulated.includes("</think>")) {
+             cleanAccumulated = cleanAccumulated.split("</think>").pop().trim();
+           } else if (cleanAccumulated.includes("<think>")) {
+             cleanAccumulated = ""; // still inside think block, nothing to parse yet
+           }
+
+           const newSegs = parseNewSegments(cleanAccumulated, streamingSegments.length, text);
+
            if (newSegs.length > 0) {
              streamingSegments = streamingSegments.concat(newSegs);
+             _lastStreamingSegments = streamingSegments;
              renderStreamingPartial(text, streamingSegments);
            }
            // unbiased_text is last in the schema; the server only sends {"result":...}
            // after the full stream ends — extract the string from partial JSON so the
            // UnBiased panel fills as it streams instead of staying empty until max_tokens.
-           const ub = parseUnbiasedTextField(accumulated);
+           const ub = parseUnbiasedTextField(cleanAccumulated);
            const unbiasedGrew = ub && ub.text.length > 0 && ub.text !== lastStreamedUnbiased;
            const segmentsJustAdded = newSegs.length > 0;
            if (ub && ub.text.length > 0 && (unbiasedGrew || segmentsJustAdded)) {
              lastStreamedUnbiased = ub.text;
+             _lastStreamedUnbiased = ub.text;
              resultsEl.classList.remove("hidden");
              document.querySelector(".panels")?.classList.remove("hidden");
              // Same green replacement marks as final renderResults — not plain escapeHtml,
              // or highlights would only appear after the stream ends.
-             unbiasedEl.innerHTML =
-               streamingSegments.length > 0
-                 ? buildUnbiasedHTML(text, ub.text, streamingSegments)
-                 : escapeHtml(ub.text);
+            const displaySegs = withoutNoOpSegments(streamingSegments);
+            unbiasedEl.innerHTML =
+              displaySegs.length > 0
+                ? buildUnbiasedHTML(text, ub.text, displaySegs)
+                : escapeHtml(ub.text);
            }
           // Neutral rewrite JSON string is closed — hide spinner and re-enable
           // the button immediately. The stream may still drain the final
@@ -312,13 +331,13 @@
          return; // keep button disabled, retry automatically
        }
        // GPU cold start: long wait with no tokens received.
-       const isGpuColdStart = elapsed > 8 && !firstTokenReceived;
+       const isGpuColdStart = elapsed > 8 && !firstTokenReceived && !serverConnected;
        analyzeBtn.disabled = false;
        coldStartRetries = 0;
        if (isGpuColdStart) {
          if (labelEl) labelEl.innerHTML =
-           "Connection dropped after " + elapsed + "s — model is still loading.<br>"
-           + "<span style='font-size:0.85em;opacity:0.6;'>GPU is warming up (~7 min total). Click Analyze again to reconnect.</span>";
+           "No response after " + elapsed + "s — service may be starting up or temporarily unavailable.<br>"
+           + "<span style='font-size:0.85em;opacity:0.6;'>If a new GPU instance is loading, it takes ~7 min. Click Analyze again to retry.</span>";
        } else {
          loadingEl.classList.add("hidden");
          if (labelEl) labelEl.textContent = "Analyzing bias patterns...";
@@ -393,7 +412,254 @@
    // objects from the biased_segments array using brace counting,
    // skips already-rendered ones, computes offsets client-side.
    // ============================================================
-   function parseNewSegments(raw, alreadyParsed, inputText) {
+   function findNextSpan(inputText, phrase, cursor) {
+     if (!phrase) return null;
+     const lower = inputText.toLowerCase();
+     const needle = phrase.toLowerCase();
+     const start = lower.indexOf(needle, cursor);
+     if (start === -1) return null;
+     return { start, end: start + phrase.length };
+   }
+   /** Match phrase in haystack from cursor (mirrors server offset logic). */
+   function findNextSpanFlexible(haystack, phrase, cursor) {
+     if (!phrase) return null;
+     const candidates = [];
+     const seen = new Set();
+     for (const cand of [phrase.trim(), phrase]) {
+       if (cand && !seen.has(cand)) {
+         seen.add(cand);
+         candidates.push(cand);
+       }
+     }
+     for (const cand of candidates) {
+       const span = findNextSpan(haystack, cand, cursor);
+       if (span) return span;
+     }
+     const tokens = phrase.trim().split(/\s+/).filter(Boolean);
+     if (tokens.length > 0) {
+       const pattern = new RegExp(
+         tokens.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+"),
+         "i"
+       );
+       const m = haystack.slice(cursor).match(pattern);
+       if (m && m.index !== undefined) {
+         const start = cursor + m.index;
+         return { start, end: start + m[0].length };
+       }
+     }
+     return null;
+   }
+   /** Map original indices onto the rewrite (mirrors server boundary alignment). */
+   function wordStart(text, pos) {
+     pos = Math.min(Math.max(pos, 0), text.length);
+     while (pos > 0 && !/\s/.test(text[pos - 1])) pos--;
+     return pos;
+   }
+   function wordEnd(text, pos) {
+     pos = Math.min(Math.max(pos, 0), text.length);
+     while (pos < text.length && !/\s/.test(text[pos])) pos++;
+     return pos;
+   }
+   function buildOrigToUnbMap(original, unbiased) {
+     const opcodes = getDiffOpcodes(original, unbiased);
+     const n = original.length;
+     const map = new Array(n + 1).fill(0);
+     map[n] = unbiased.length;
+     for (const [tag, i1, i2, j1, j2] of opcodes) {
+       if (tag === "equal") {
+         for (let k = 0; k < i2 - i1; k++) map[i1 + k] = j1 + k;
+         if (i2 <= n) map[i2] = j2;
+       } else if (tag === "replace") {
+         const olen = i2 - i1;
+         const ulen = j2 - j1;
+         for (let k = 0; k < olen; k++) map[i1 + k] = j1 + (olen ? Math.floor((k * ulen) / olen) : 0);
+         if (i2 <= n) map[i2] = j2;
+       } else if (tag === "delete") {
+         for (let k = i1; k < i2; k++) map[k] = j1;
+         if (i2 <= n) map[i2] = j1;
+       } else if (tag === "insert") {
+         if (i1 <= n) map[i1] = j1;
+       }
+     }
+     return map;
+   }
+   function findReplacementSpanInUnbiased(unbiased, replacement, cursor) {
+     if (!replacement) return null;
+     let span = findNextSpanFlexible(unbiased, replacement, cursor);
+     if (span) return [span.start, span.end];
+     const tokens = replacement.trim().split(/\s+/);
+     const drop = new Set(["were", "was", "is", "are", "a", "an", "the"]);
+     for (let idx = 0; idx < tokens.length; idx++) {
+       const reduced = tokens.slice(idx).join(" ");
+       span = findNextSpanFlexible(unbiased, reduced, cursor);
+       if (span) return [span.start, span.end];
+     }
+     const reduced = tokens.filter(t => !drop.has(t.toLowerCase())).join(" ");
+     if (reduced) {
+       span = findNextSpanFlexible(unbiased, reduced, cursor);
+       if (span) return [span.start, span.end];
+     }
+     return null;
+   }
+   function boundaryReplacementSpan(original, unbiased, segStart, segEnd, origToUnb, replacement) {
+     const uStart = wordStart(unbiased, origToUnb[segStart]);
+     const uEnd = wordEnd(unbiased, origToUnb[segEnd]);
+     if (uEnd <= uStart) return null;
+     const origLen = segEnd - segStart;
+     const unbLen = uEnd - uStart;
+     // Reject wildly expanded spans (JS diff can leave map holes → start at 0).
+     if (origLen > 0 && unbLen > origLen * 3 + 40) return null;
+     if (replacement) {
+       const slice = unbiased.slice(uStart, uEnd).toLowerCase();
+       const needle = replacement.trim().toLowerCase();
+       if (needle && !slice.includes(needle) && !needle.includes(slice.trim())) {
+         return null;
+       }
+       // Ghost span from doc start: mapped start far before the real replacement.
+       const found = unbiased.toLowerCase().indexOf(needle);
+       if (found !== -1 && uStart < found - 2) return null;
+     }
+     return [uStart, uEnd];
+   }
+   /** Assign replacement_start/end (mirrors server boundary + fallback search). */
+   function attachReplacementOffsets(original, unbiased, segments) {
+     if (!original || !unbiased || original === unbiased) return segments;
+     const origToUnb = buildOrigToUnbMap(original, unbiased);
+     const used = [];
+     return segments.map(seg => {
+       // Prefer server offsets when present (Python SequenceMatcher is reliable).
+       if (
+         seg.replacement_start != null &&
+         seg.replacement_end != null &&
+         seg.replacement_end > seg.replacement_start
+       ) {
+         const span = [seg.replacement_start, seg.replacement_end];
+         used.push(span);
+         return seg;
+       }
+       let span = null;
+       if (seg.start != null && seg.end != null) {
+         span = boundaryReplacementSpan(
+           original, unbiased, seg.start, seg.end, origToUnb, seg.replacement
+         );
+       }
+       if (!span && seg.replacement) {
+         const cursor = seg.start != null ? origToUnb[seg.start] : 0;
+         span = findReplacementSpanInUnbiased(unbiased, seg.replacement, cursor);
+       }
+       if (!span) return seg;
+       // Clip to avoid overlapping marks (keep the non-overlapping tail).
+       for (const [s, e] of used) {
+         if (!(span[1] <= s || span[0] >= e) && span[0] < e) {
+           span = [e, span[1]];
+         }
+       }
+       if (span[1] <= span[0]) return seg;
+       used.push(span);
+       return {
+         ...seg,
+         replacement_start: span[0],
+         replacement_end: span[1],
+       };
+     });
+   }
+   function findLongestMatch(a, aLow, aHigh, b, bLow, bHigh) {
+     let bestSize = 0;
+     let bestA = aLow;
+     let bestB = bLow;
+     let j2len = new Map();
+     for (let i = aLow; i < aHigh; i++) {
+       const newJ2len = new Map();
+       for (let j = bLow; j < bHigh; j++) {
+         if (a[i] === b[j]) {
+           const k = (j2len.get(j - 1) || 0) + 1;
+           newJ2len.set(j, k);
+           if (k > bestSize) {
+             bestSize = k;
+             bestA = i - k + 1;
+             bestB = j - k + 1;
+           }
+         }
+       }
+       j2len = newJ2len;
+     }
+     return { aStart: bestA, bStart: bestB, size: bestSize };
+   }
+   function getDiffOpcodes(a, b) {
+     if (a === b) return [["equal", 0, a.length, 0, b.length]];
+     const opcodes = [];
+     function diff(aOff, aEnd, bOff, bEnd) {
+       while (aOff < aEnd && bOff < bEnd && a[aOff] === b[bOff]) {
+         aOff++;
+         bOff++;
+       }
+       while (aOff < aEnd && bOff < bEnd && a[aEnd - 1] === b[bEnd - 1]) {
+         aEnd--;
+         bEnd--;
+       }
+       if (aOff >= aEnd || bOff >= bEnd) {
+         if (aOff < aEnd) opcodes.push(["delete", aOff, aEnd, bOff, bOff]);
+         else if (bOff < bEnd) opcodes.push(["insert", aOff, aOff, bOff, bEnd]);
+         return;
+       }
+       const match = findLongestMatch(a, aOff, aEnd, b, bOff, bEnd);
+       if (match.size === 0) {
+         opcodes.push(["replace", aOff, aEnd, bOff, bEnd]);
+         return;
+       }
+       diff(aOff, match.aStart, bOff, match.bStart);
+       opcodes.push([
+         "equal",
+         match.aStart,
+         match.aStart + match.size,
+         match.bStart,
+         match.bStart + match.size,
+       ]);
+       diff(match.aStart + match.size, aEnd, match.bStart + match.size, bEnd);
+     }
+     diff(0, a.length, 0, b.length);
+     return opcodes;
+   }
+   // Normalise a phrase for original-vs-replacement comparison. Mirrors
+  // schema._normalize_for_equality: fold curly quotes/dashes to ASCII,
+  // collapse whitespace, and lowercase.
+  function normalizeForEquality(s) {
+    return (s || "")
+      .replace(/[\u201c\u201d]/g, '"')
+      .replace(/[\u2018\u2019]/g, "'")
+      .replace(/[\u2013\u2014]/g, "-")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+  }
+  // A segment is a no-op when its replacement equals the original — there is
+  // nothing to change, so it is not shown. An empty replacement means "delete
+  // the phrase" (a real edit) and is kept. Mirrors the server-side
+  // schema.drop_unchanged_segments so the demo matches the API.
+  function isNoOpSegment(seg) {
+    const replacement = (seg.replacement || "").trim();
+    if (!replacement) return false;
+    return normalizeForEquality(seg.original) === normalizeForEquality(replacement);
+  }
+  function withoutNoOpSegments(segments) {
+    return (segments || []).filter(s => !isNoOpSegment(s));
+  }
+  // Normalise a segment's severity to low/medium/high. Mirrors the server-side
+  // BiasedSegment.severity validator so a raw integer streamed from vLLM (e.g.
+  // "severity": 5) is bucketed live instead of crashing .toLowerCase().
+  function bucketSegmentSeverity(v) {
+    const allowed = new Set(["low", "medium", "high"]);
+    if (typeof v === "string") {
+      const n = v.trim().toLowerCase();
+      if (allowed.has(n)) return n;
+    } else if (typeof v === "number" && Number.isFinite(v)) {
+      if (v >= 6) return "high";
+      if (v >= 3) return "medium";
+      return "low";
+    }
+    return "medium";
+  }
+  function parseNewSegments(raw, alreadyParsed, inputText) {
      const marker = '"biased_segments"';
      const markerIdx = raw.indexOf(marker);
      if (markerIdx === -1) return [];
@@ -402,6 +668,7 @@
      const segments = [];
      let i = arrStart + 1;
      let segsParsed = 0;
+     let offsetCursor = 0;
      while (i < raw.length) {
        // Skip whitespace
        while (i < raw.length && /\s/.test(raw[i])) i++;
@@ -418,14 +685,15 @@
        if (depth !== 0) break; // incomplete object, wait for more tokens
        const objStr = raw.slice(i, j + 1);
        try {
-         const seg = JSON.parse(objStr);
-         if (segsParsed >= alreadyParsed) {
-           // Compute client-side offsets
-           const start = inputText.indexOf(seg.original);
-           seg.start = start >= 0 ? start : null;
-           seg.end   = start >= 0 ? start + seg.original.length : null;
-           segments.push(seg);
-         }
+        const seg = JSON.parse(objStr);
+        seg.severity = bucketSegmentSeverity(seg.severity);
+        const span = findNextSpan(inputText, seg.original, offsetCursor);
+        if (span) offsetCursor = span.end;
+        if (segsParsed >= alreadyParsed) {
+          seg.start = span ? span.start : null;
+          seg.end   = span ? span.end : null;
+          segments.push(seg);
+        }
          segsParsed++;
        } catch { /* incomplete JSON, stop */ break; }
        i = j + 1;
@@ -437,25 +705,64 @@
    // ============================================================
    // PARTIAL RENDER (called as each streaming segment arrives)
    // ============================================================
-   function renderStreamingPartial(inputText, segments) {
-     resultsEl.classList.remove("hidden");
-     document.querySelector(".summary-bar").classList.remove("hidden");
-     document.querySelector(".panels").classList.remove("hidden");
-     document.querySelector(".breakdown-section").classList.remove("hidden");
-     noBiasEl.classList.add("hidden");
-     renderSummary(segments);
-     highlightEl.innerHTML = buildHighlightedHTML(inputText, segments);
-     attachMarkTooltips(segments);
-     renderSegmentCards(segments);
+  function renderStreamingPartial(inputText, segments) {
+    const display = withoutNoOpSegments(segments);
+    if (display.length === 0) return;
+    resultsEl.classList.remove("hidden");
+    document.querySelector(".summary-bar").classList.remove("hidden");
+    document.querySelector(".panels").classList.remove("hidden");
+    document.querySelector(".breakdown-section").classList.remove("hidden");
+    noBiasEl.classList.add("hidden");
+    renderSummary(display);
+    highlightEl.innerHTML = buildHighlightedHTML(inputText, display);
+    attachMarkTooltips(display);
+    renderSegmentCards(display);
+  }
+   function countHighlightedSegments(segments) {
+     return segments.filter(s => s.start != null && s.end != null).length;
+   }
+   /** Fill missing original offsets from the streaming pass only (never override server). */
+   function mergeMissingOriginalOffsets(serverSegs, streamSegs) {
+     if (!streamSegs?.length) return serverSegs;
+     const byOriginal = new Map();
+     streamSegs.forEach(s => {
+       if (s.original) byOriginal.set(s.original, s);
+     });
+     return serverSegs.map(seg => {
+       if (seg.start != null && seg.end != null) return seg;
+       const st = byOriginal.get(seg.original);
+       if (!st) return seg;
+       return { ...seg, start: st.start, end: st.end };
+     });
    }
    // ============================================================
    // RENDER RESULTS (final — called on result event)
    // ============================================================
-   function renderResults(data) {
-     const { original_text, unbiased_text, bias_found, biased_segments } = data;
-     resultsEl.classList.remove("hidden");
+  function renderResults(data) {
+    const original_text = data.original_text;
+    // Offsets are computed against the server parse — never swap in stream text.
+    const unbiased_text = data.unbiased_text || _lastStreamedUnbiased || "";
+    const serverSegments = withoutNoOpSegments(
+      mergeMissingOriginalOffsets(data.biased_segments || [], _lastStreamingSegments)
+    );
+    const severity = Number(data.severity ?? 0);
+    // The server is authoritative about whether bias exists. Only fall back to
+    // streamed segments when the server reports bias but lost the list (parser
+    // glitch) — never to resurrect no-op segments the server intentionally
+    // dropped (which would otherwise reappear when the server returns none).
+    const serverSaysBiased =
+      data.bias_found === true ||
+      data.binary_label === "biased" ||
+      severity > 0 ||
+      serverSegments.length > 0;
+    const finalSegments =
+      serverSegments.length > 0
+        ? serverSegments
+        : (serverSaysBiased ? withoutNoOpSegments(_lastStreamingSegments || []) : []);
+    const biasFound = serverSaysBiased && finalSegments.length > 0;
+    resultsEl.classList.remove("hidden");
      resultsEl.scrollIntoView({ behavior: "smooth", block: "start" });
-     if (!bias_found || biased_segments.length === 0) {
+     if (!biasFound || finalSegments.length === 0) {
        document.querySelector(".summary-bar").classList.add("hidden");
        document.querySelector(".panels").classList.add("hidden");
        document.querySelector(".breakdown-section").classList.add("hidden");
@@ -466,24 +773,34 @@
      document.querySelector(".panels").classList.remove("hidden");
      document.querySelector(".breakdown-section").classList.remove("hidden");
      noBiasEl.classList.add("hidden");
-    renderSummary(biased_segments);
-    highlightEl.innerHTML = buildHighlightedHTML(original_text, biased_segments);
-    attachMarkTooltips(biased_segments);
-    unbiasedEl.innerHTML  = buildUnbiasedHTML(original_text, unbiased_text, biased_segments);
-    renderSegmentCards(biased_segments);
-
-    // Trigger feedback popup 2.5s after results appear (cloud only)
-    if (typeof IS_CLOUD !== "undefined" && IS_CLOUD) {
-      setTimeout(() => openFeedbackPopup(original_text), 2500);
-    }
+    renderSummary(finalSegments, severity);
+    highlightEl.innerHTML = buildHighlightedHTML(original_text, finalSegments);
+    attachMarkTooltips(finalSegments);
+    unbiasedEl.innerHTML  = buildUnbiasedHTML(original_text, unbiased_text, finalSegments);
+    renderSegmentCards(finalSegments);
   }
    // ============================================================
    // SUMMARY BAR
    // ============================================================
-   function renderSummary(segments) {
+   function renderSummary(segments, globalSeverity) {
      segCountEl.textContent = `${segments.length} segment${segments.length !== 1 ? "s" : ""}`;
+     if (globalSevEl) {
+       const score = Number(globalSeverity);
+       if (Number.isFinite(score) && score > 0) {
+         globalSevEl.textContent = `Severity ${score}/10`;
+         globalSevEl.className = "global-severity " + (
+           score >= 6 ? "sev-strong" : score >= 3 ? "sev-moderate" : "sev-limited"
+         );
+       } else {
+         globalSevEl.textContent = "";
+         globalSevEl.className = "global-severity hidden";
+       }
+     }
      const counts = { high: 0, medium: 0, low: 0 };
-     segments.forEach(s => { if (counts[s.severity] !== undefined) counts[s.severity]++; });
+     segments.forEach(s => {
+       const sev = String(s.severity || "").toLowerCase();
+       if (counts[sev] !== undefined) counts[sev]++;
+     });
      pillsEl.innerHTML = "";
      ["high", "medium", "low"].forEach(sev => {
        if (counts[sev] > 0) {
@@ -504,7 +821,8 @@
      let html   = "";
      let cursor = 0;
      sorted.forEach((seg, idx) => {
-       const { start, end, severity } = seg;
+       const { start, end } = seg;
+       const severity = String(seg.severity || "medium").toLowerCase();
        if (start < cursor) return;
        if (start > cursor) html += escapeHtml(text.slice(cursor, start));
        html += `<mark class="severity-${severity}" data-seg-idx="${idx}" tabindex="0">${escapeHtml(text.slice(start, end))}</mark>`;
@@ -539,8 +857,9 @@
      const seg = segments.filter(s => s.start != null).sort((a, b) => a.start - b.start)[idx];
      if (!seg) return;
      const sevEl = document.getElementById("tooltip-severity");
-     sevEl.textContent = seg.severity.toUpperCase();
-     sevEl.className   = `tooltip-severity sev-${seg.severity}`;
+     const severity = String(seg.severity || "medium").toLowerCase();
+     sevEl.textContent = severity.toUpperCase();
+     sevEl.className   = `tooltip-severity sev-${severity}`;
      document.getElementById("tooltip-type").textContent        = seg.bias_type   || "";
      document.getElementById("tooltip-reasoning").textContent   = seg.reasoning   || "";
      document.getElementById("tooltip-replacement").textContent = seg.replacement || "";
@@ -567,9 +886,10 @@
      segListEl.innerHTML = "";
      segments.forEach((seg) => {
        const card = document.createElement("div");
-       card.className = `segment-card sev-${seg.severity}`;
+       const severity = String(seg.severity || "medium").toLowerCase();
+       card.className = `segment-card sev-${severity}`;
        card.innerHTML = `
-         <span class="seg-badge sev-${seg.severity}">${seg.severity}</span>
+         <span class="seg-badge sev-${severity}">${severity}</span>
          <div class="seg-content">
            <span class="seg-original">"${escapeHtmlText(seg.original)}"</span>
            <span class="seg-type">${escapeHtmlText(seg.bias_type || "")}</span>
@@ -606,182 +926,22 @@
    // UNBIASED HTML BUILDER
    // ============================================================
   function buildUnbiasedHTML(original, unbiased, segments) {
-    const replacements = segments.map(s => s.replacement).filter(Boolean);
-    let html = escapeHtmlText(unbiased);
-    replacements.forEach((rep) => {
-      if (!rep) return;
-      const escaped = escapeHtmlText(rep);
-      html = html.replace(escaped, `<mark class="replaced-green">${escaped}</mark>`);
+    const withOffsets = attachReplacementOffsets(original, unbiased, segments);
+    const sorted = withOffsets
+      .filter(s => s.replacement_start != null && s.replacement_end != null)
+      .sort((a, b) => a.replacement_start - b.replacement_start);
+    if (sorted.length === 0) {
+      return escapeHtmlText(unbiased);
+    }
+    let html = "";
+    let cursor = 0;
+    sorted.forEach((seg) => {
+      const { replacement_start: start, replacement_end: end } = seg;
+      if (start < cursor) return;
+      if (start > cursor) html += escapeHtmlText(unbiased.slice(cursor, start));
+      html += `<mark class="replaced-green">${escapeHtmlText(unbiased.slice(start, end))}</mark>`;
+      cursor = end;
     });
+    if (cursor < unbiased.length) html += escapeHtmlText(unbiased.slice(cursor));
     return html;
   }
-
-/* ============================================================
-   FEEDBACK POPUP
-   ============================================================ */
-
-let _lastAnalyzedText = "";
-let _selectedRating   = null;  // 1–5
-let _selectedSpeed    = null;  // "too_slow" | "acceptable" | "fast"
-let _selectedAccuracy = null;  // "not_accurate" | "somewhat" | "very_accurate"
-let _popupClosing     = false; // guard against double-close
-
-// ── Open ──────────────────────────────────────────────────────
-
-function openFeedbackPopup(inputText) {
-  if (typeof IS_CLOUD === "undefined" || !IS_CLOUD) return;
-  _lastAnalyzedText = inputText || "";
-
-  const overlay = document.getElementById("feedback-overlay");
-  const popup   = document.getElementById("feedback-popup");
-  if (!overlay || !popup) return;
-
-  // Reset form state
-  document.querySelectorAll(".reaction-btn").forEach(b => b.classList.remove("selected"));
-  document.querySelectorAll(".star-btn").forEach(b => _setStarFill(b, false));
-  document.querySelectorAll(".feedback-pill").forEach(b => b.classList.remove("selected"));
-  document.getElementById("feedback-message").value = "";
-  document.getElementById("feedback-char-count").textContent = "0 / 1000";
-  document.getElementById("feedback-submit-btn").disabled = true;
-  document.getElementById("feedback-ack").classList.add("hidden");
-  _selectedRating   = null;
-  _selectedSpeed    = null;
-  _selectedAccuracy = null;
-  _popupClosing     = false;
-
-  // Show elements (opacity: 0 via CSS), then animate in next frame so
-  // browser paints the initial invisible state before the transition fires.
-  overlay.classList.remove("hidden");
-  popup.classList.remove("hidden");
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      popup.classList.add("popup-enter");
-      overlay.classList.add("visible");
-    });
-  });
-}
-
-// ── Close ─────────────────────────────────────────────────────
-
-function closeFeedbackPopup() {
-  const overlay = document.getElementById("feedback-overlay");
-  const popup   = document.getElementById("feedback-popup");
-  if (!overlay || !popup || _popupClosing) return;
-  _popupClosing = true;
-
-  // Trigger CSS transitions (opacity/transform back to initial values)
-  popup.classList.remove("popup-enter");
-  overlay.classList.remove("visible");
-
-  // After transitions complete, fully remove from layout
-  setTimeout(() => {
-    overlay.classList.add("hidden");
-    popup.classList.add("hidden");
-    _popupClosing = false;
-  }, 240);
-}
-
-// ── Star rating ───────────────────────────────────────────────
-
-function _setStarFill(btn, filled) {
-  const svg = btn.querySelector("svg path");
-  if (!svg) return;
-  svg.setAttribute("fill", filled ? "#EB088A" : "none");
-  svg.setAttribute("stroke", filled ? "#EB088A" : "currentColor");
-}
-
-function _updateStars(rating) {
-  document.querySelectorAll(".star-btn").forEach(btn => {
-    const n = parseInt(btn.dataset.star, 10);
-    _setStarFill(btn, n <= rating);
-    btn.classList.toggle("selected", n <= rating);
-  });
-}
-
-document.querySelectorAll(".star-btn").forEach(btn => {
-  btn.addEventListener("mouseenter", () => {
-    const n = parseInt(btn.dataset.star, 10);
-    document.querySelectorAll(".star-btn").forEach(b => {
-      _setStarFill(b, parseInt(b.dataset.star, 10) <= n);
-    });
-  });
-  btn.addEventListener("mouseleave", () => {
-    _updateStars(_selectedRating || 0);
-  });
-  btn.addEventListener("click", () => {
-    _selectedRating = parseInt(btn.dataset.star, 10);
-    _updateStars(_selectedRating);
-  });
-});
-
-// ── Speed & Accuracy pills ────────────────────────────────────
-
-document.querySelectorAll(".feedback-pill").forEach(btn => {
-  btn.addEventListener("click", () => {
-    const group = btn.dataset.group;
-    document.querySelectorAll(`.feedback-pill[data-group="${group}"]`)
-      .forEach(b => b.classList.remove("selected"));
-    btn.classList.add("selected");
-    if (group === "speed")    _selectedSpeed    = btn.dataset.value;
-    if (group === "accuracy") _selectedAccuracy = btn.dataset.value;
-  });
-});
-
-// ── Reaction (required — enables Submit) ─────────────────────
-
-document.querySelectorAll(".reaction-btn").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".reaction-btn").forEach(b => b.classList.remove("selected"));
-    btn.classList.add("selected");
-    document.getElementById("feedback-submit-btn").disabled = false;
-  });
-});
-
-// ── Char counter ──────────────────────────────────────────────
-
-document.getElementById("feedback-message")?.addEventListener("input", (e) => {
-  document.getElementById("feedback-char-count").textContent = `${e.target.value.length} / 1000`;
-});
-
-// ── Close handlers ────────────────────────────────────────────
-
-document.getElementById("feedback-close")?.addEventListener("click", closeFeedbackPopup);
-document.getElementById("feedback-overlay")?.addEventListener("click", closeFeedbackPopup);
-
-// ── Manual trigger from header button ────────────────────────
-
-document.getElementById("feedback-trigger-btn")?.addEventListener("click", () => {
-  openFeedbackPopup(_lastAnalyzedText);
-});
-
-// ── Submit ────────────────────────────────────────────────────
-
-document.getElementById("feedback-submit-btn")?.addEventListener("click", async () => {
-  const selected = document.querySelector(".reaction-btn.selected");
-  if (!selected) return;
-
-  const reaction  = selected.dataset.reaction;
-  const message   = document.getElementById("feedback-message").value.trim();
-  const submitBtn = document.getElementById("feedback-submit-btn");
-
-  submitBtn.disabled = true;
-  submitBtn.querySelector(".btn-text").textContent = "Sending...";
-
-  const result = await submitFeedback({
-    reaction,
-    message,
-    inputText: _lastAnalyzedText,
-    rating:    _selectedRating,
-    speed:     _selectedSpeed,
-    accuracy:  _selectedAccuracy,
-  });
-
-  if (result.ok) {
-    document.getElementById("feedback-ack").classList.remove("hidden");
-    setTimeout(closeFeedbackPopup, 1800);
-  } else {
-    submitBtn.disabled = false;
-    submitBtn.querySelector(".btn-text").textContent = "Submit";
-    showInlineError("Could not save feedback. Please try again.");
-  }
-});

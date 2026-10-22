@@ -1,0 +1,110 @@
+# Token-unlikelihood SFT: field-weighted loss plus a token-level unlikelihood
+# penalty that discourages soft/laundered debiasing words (some, may, often,
+# believe, associated, ...) inside replacement/rewrite spans of hard cases.
+# Hard cases (stereotype / unsupported generalization) are upsampled x2.
+name: token_unlikelihood
+description: >-
+  Field-weighted SFT + token-level anti-laundering unlikelihood + x2 hard-case
+  upsampling. Hard-neutralization prompt with explicit bad-vs-good examples.
+prompt: hard_neutralization
+
+base_model: unsloth/Qwen3-8B
+max_seq_length: 8192
+train_samples: 5000
+seed: 42
+heldout_size: 250
+eval_size: 250
+
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.0
+
+optim:
+  learning_rate: 7.0e-5
+  epochs: 5
+  per_device_batch: 1
+  grad_accum: 16
+  warmup_ratio: 0.05
+  weight_decay: 0.01
+  lr_scheduler: cosine
+  max_grad_norm: 1.0
+
+weights:
+  base_completion: 0.8
+  original: 0.25
+  replacement: 3.5
+  reasoning: 2.0
+  unbiased_text: 2.0
+
+token_unlikelihood:
+  lambda_weight: 0.08
+  forbidden_strings:
+    - "some"
+    - "Some"
+    - " some"
+    - " Some"
+    - "may"
+    - "May"
+    - " may"
+    - " May"
+    - "might"
+    - "Might"
+    - " might"
+    - " Might"
+    - "often"
+    - "Often"
+    - " often"
+    - " Often"
+    - "tend"
+    - "Tend"
+    - " tend"
+    - " Tend"
+    - "tends"
+    - "Tends"
+    - " tends"
+    - " Tends"
+    - "believe"
+    - "believes"
+    - "believed"
+    - "believing"
+    - " believe"
+    - " believes"
+    - " believed"
+    - " believing"
+    - "claim"
+    - "claims"
+    - "claimed"
+    - "argue"
+    - "argues"
+    - "argued"
+    - " claim"
+    - " claims"
+    - " claimed"
+    - " argue"
+    - " argues"
+    - " argued"
+    - "associated"
+    - " association"
+    - " commonly"
+    - "common"
+    - "seen"
+    - " perceived"
+    - "viewed"
+    - "concern"
+    - "concerns"
+    - " concerned"
+    - "prefer"
+    - "prefers"
+    - "preferred"
+
+data:
+  hard_upsample_multiplier: 2
+  soft_debias_bias_types:
+    - stereotypical_association
+    - unsupported_generalization
+
+wandb:
+  enabled: true
+  project: unbias-sft-token-unlikelihood
+  run_name: qwen3-8b-sft-token-unlikelihood

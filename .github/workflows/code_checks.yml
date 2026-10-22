@@ -8,24 +8,10 @@ on:
     branches:
       - main
       - unbias-pretrained
-    paths:
-      - .pre-commit-config.yaml
-      - .github/workflows/code_checks.yml
-      - '**.py'
-      - uv.lock
-      - pyproject.toml
-      - '**.ipynb'
   pull_request:
     branches:
       - main
       - unbias-pretrained
-    paths:
-      - .pre-commit-config.yaml
-      - .github/workflows/code_checks.yml
-      - '**.py'
-      - uv.lock
-      - pyproject.toml
-      - '**.ipynb'
 
 jobs:
   run-code-check:
@@ -34,7 +20,7 @@ jobs:
       - uses: actions/checkout@v6.0.2
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7.5.0
+        uses: astral-sh/setup-uv@v8.1.0
         with:
           # Install a specific version of uv.
           version: "0.10.12"
@@ -45,7 +31,7 @@ jobs:
         with:
           python-version-file: ".python-version"
       - name: Cache pre-commit environments
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/pre-commit
           key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
@@ -66,3 +52,42 @@ jobs:
             GHSA-4xh5-x5gv-qwph
             PYSEC-2024-161
             CVE-2026-1839
+            CVE-2026-3219
+            CVE-2026-6357
+            # markdown PYSEC-2026-89: advisory documents 3.8.1 as the fix, but
+            # OSV affected-range data still flags 3.8.1+. We're pinned to 3.8.1.
+            PYSEC-2026-89
+            # transformers PYSEC-2025-211..218: checkpoint-conversion / model-load
+            # RCEs. No fix version published in OSV — flagged on every release.
+            # Exploitation requires loading attacker-controlled checkpoints; we
+            # don't ingest untrusted checkpoints in the API or demo paths.
+            PYSEC-2025-211
+            PYSEC-2025-212
+            PYSEC-2025-213
+            PYSEC-2025-214
+            PYSEC-2025-215
+            PYSEC-2025-216
+            PYSEC-2025-217
+            PYSEC-2025-218
+            # pip PYSEC-2026-196: entry-point install path; CI-audit only, low risk.
+            PYSEC-2026-196
+            # msgpack GHSA-6v7p-g79w-8964: DoS via reused Unpacker after error. Fix is 1.2.1;
+            # upgrade blocked by <upstream dep>. Low exploitability in our usage.
+            GHSA-6v7p-g79w-8964
+            # pydantic-settings GHSA-4xgf-cpjx-pc3j: symlink path traversal in
+            # NestedSecretsSettingsSource. We don't use secrets_nested_subdir=True.
+            GHSA-4xgf-cpjx-pc3j
+            PYSEC-2026-2132
+            PYSEC-2026-2253
+            PYSEC-2026-2254
+            PYSEC-2026-2255
+            PYSEC-2026-2256
+            PYSEC-2026-2257
+            CVE-2026-5241
+            PYSEC-2026-3447
+            # pyasn1 PYSEC-2026-3455/3456/3457: CPU/memory DoS via crafted
+            # BER/CER/DER input (long tags, large OIDs/exponents). Fix is 0.6.4;
+            # pyasn1 is a transitive dep here, not used to decode untrusted ASN.1.
+            PYSEC-2026-3455
+            PYSEC-2026-3456
+            PYSEC-2026-3457

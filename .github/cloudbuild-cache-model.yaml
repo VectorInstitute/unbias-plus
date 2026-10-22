@@ -8,6 +8,13 @@
 # Required substitutions:
 #   _MODEL  — HuggingFace model ID (e.g. vector-institute/Qwen3-8B-UnBias-Plus-SFT-Instruct)
 #   _BUCKET — GCS bucket name (e.g. unbias-plus-model-cache)
+#
+# No auth: authenticated downloads were found to hang indefinitely inside
+# Cloud Build's network specifically (reproduced 3x; the same token worked
+# fine locally every time), so this deliberately stays anonymous. The
+# original failure mode this guarded against was a transient CDN error on
+# one shard a few hours after the model was pushed to HF — snapshot_download
+# resumes from cache_dir, so retrying a few times clears that without auth.
 
 steps:
 - name: 'python:3.11-slim'
@@ -15,18 +22,28 @@ steps:
   entrypoint: bash
   env:
   - '_MODEL=${_MODEL}'
-  - 'HF_HUB_DISABLE_XET=1'
+  - 'HF_HUB_ETAG_TIMEOUT=30'
+  - 'HF_HUB_DOWNLOAD_TIMEOUT=30'
+  timeout: '900s'
   args:
   - -c
   - |
+    set -x
     pip install -q "huggingface_hub>=0.23"
-    python3 -c "
+    ok=0
+    for attempt in 1 2 3 4 5; do
+      python3 -c "
+    import socket; socket.setdefaulttimeout(30)
     from huggingface_hub import snapshot_download; import os
     model = os.environ['_MODEL']
-    print(f'Downloading {model} ...')
+    print(f'Downloading {model} (attempt ${attempt}) ...')
     snapshot_download(model, cache_dir='/workspace/hf-cache')
     print('Download complete.')
-    "
+    " && { ok=1; break; }
+      echo "attempt ${attempt} failed, retrying in 15s..."
+      sleep 15
+    done
+    [ "$ok" -eq 1 ]
 
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
   id: 'upload'

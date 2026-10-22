@@ -7,12 +7,15 @@ from unbias_plus.schema import BiasResult
 
 
 def test_parse_llm_output_valid(sample_json: str) -> None:
-    """Test parse_llm_output returns BiasResult for valid JSON."""
+    """Test parse_llm_output returns BiasResult for valid model JSON."""
     result = parse_llm_output(sample_json)
     assert isinstance(result, BiasResult)
     assert result.binary_label == "biased"
-    assert result.severity == 3
+    assert result.bias_found is True
+    assert result.severity == 6
     assert len(result.biased_segments) == 1
+    assert result.biased_segments[0].severity == "high"
+    assert result.biased_segments[0].bias_type == "dehumanizing_language"
 
 
 def test_parse_llm_output_fenced_json(sample_json: str) -> None:
@@ -60,12 +63,10 @@ def test_extract_json_buried() -> None:
 
 
 def test_parse_llm_output_unbiased() -> None:
-    """Test parse_llm_output handles unbiased result correctly."""
+    """Test parse_llm_output derives unbiased labels from severity 0."""
     json_str = """
     {
-        "binary_label": "unbiased",
-        "severity": 1,
-        "bias_found": false,
+        "severity": 0,
         "biased_segments": [],
         "unbiased_text": "This is a neutral text."
     }
@@ -73,4 +74,28 @@ def test_parse_llm_output_unbiased() -> None:
     result = parse_llm_output(json_str)
     assert result.binary_label == "unbiased"
     assert result.bias_found is False
+    assert result.severity == 0
     assert result.biased_segments == []
+
+
+def test_parse_llm_output_derives_labels_from_severity() -> None:
+    """Severity > 0 without labels still yields biased."""
+    json_str = """
+    {
+        "severity": 4,
+        "biased_segments": [
+            {
+                "original": "thugs",
+                "replacement": "people",
+                "severity": "Medium",
+                "bias_type": "loaded_language",
+                "reasoning": "Charged wording."
+            }
+        ],
+        "unbiased_text": "people"
+    }
+    """
+    result = parse_llm_output(json_str)
+    assert result.binary_label == "biased"
+    assert result.bias_found is True
+    assert result.severity == 4

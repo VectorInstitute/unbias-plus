@@ -3,8 +3,6 @@ extra_css:
 extra:
   generator: false
   social:
-    - icon: fontawesome/brands/discord
-      link: 404.html
     - icon: fontawesome/brands/github
       link: https://github.com/VectorInstitute/unbias-plus
 markdown_extensions:
@@ -22,19 +20,32 @@ markdown_extensions:
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.tabbed:
+      alternate_style: true
   - toc:
       permalink: true
 nav:
   - Home: index.md
-  - User Guide: user_guide.md
-  - API Reference: api.md
-  - Team: team.md
-  - License: license.md
+  - Start here:
+      - What it does: overview.md
+      - Quickstart: quickstart.md
+  - How it works: how_it_works.md
+  - Guides:
+      - Installation: guides/install.md
+      - Command line: guides/cli.md
+      - REST API: guides/rest.md
+      - Python API: guides/python.md
+  - Reference:
+      - API Reference: api.md
+      - Development: reference/dev.md
+  - FAQ: faq.md
 plugins:
   - search
   - mkdocstrings:
       handlers:
         python:
+          # Website-only: no sibling checkout. Install `unbias-plus` into this venv so
+          # `import unbias_plus` works (see requirements-docs.txt).
           options:
             docstring_style: numpy
             members_order: source
@@ -47,11 +58,15 @@ plugins:
             show_symbol_type_heading: true
             show_symbol_type_toc: true
 repo_url: https://github.com/VectorInstitute/unbias-plus
+edit_uri: edit/main/docs/
 repo_name: VectorInstitute/unbias-plus
 site_name: unbias-plus
+site_url: https://vectorinstitute.github.io/unbias-plus/
 theme:
   custom_dir: docs/overrides
   favicon: assets/favicon-48x48.svg
+  font:
+    text: Open Sans
   features:
     - content.code.annotate
     - content.code.copy
@@ -60,12 +75,13 @@ theme:
     - navigation.instant
     - navigation.tabs
     - navigation.top
+    - navigation.sections
     - search.suggest
     - search.highlight
     - toc.follow
   icon:
     repo: fontawesome/brands/github
-  logo: assets/vector-logo.svg
+  logo: assets/vector-logo-black.svg
   logo_footer: assets/vector-logo.svg
   name: material
   palette:
