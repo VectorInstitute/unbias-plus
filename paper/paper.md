@@ -26,9 +26,8 @@ authors:
     affiliation: 1
 affiliations:
   - name: Vector Institute for Artificial Intelligence, Toronto, Ontario, Canada
-    ror: 02e5yfp61
     index: 1
-date: 19 October 2026
+date: 22 October 2026
 bibliography: paper.bib
 ---
 
@@ -46,9 +45,7 @@ UnBias-Plus addresses this need as an open-source Python toolkit for fine-graine
 # State of the field
 
 Several widely used fairness toolkits have emerged in this space, such as AI Fairness 360 (AIF360) [@bellamy2019aif360] which provides a comprehensive suite for detecting and mitigating disparities across preprocessing, in-processing, and post-processing stages, and Fairlearn [@weerts2023fairlearn] that focuses on practical fairness constraints for ML models, but both are mainly designed for traditional ML settings.
-
 Also, a number of open-source tools have been proposed for linguistic bias detection. For instance, Dbias [@raza2022dbias], NBias [@raza2024nbias], and Biaslyze [@biaslyze_api] identify biased expressions in text; however, these approaches largely rely on encoder-only architectures, often operate in an NLTK-style preprocessing pipeline, and do not natively leverage natural language inference or LLMs. NeuTral Rewriter [@vanmassenhove2021neutral] rewrites gendered English sentences into gender-neutral alternatives, but addresses a single bias dimension and does not detect or explain bias. Lastly, newer frameworks such as LangFair [@bouchard2025langfair] and FairLangPro [@manerba2025fairlangproc] adopt LLM-native, prompt-based strategies, but typically focus on individual tasks.
-
 Rather than extending these tools, UnBias-Plus was built as a unified pipeline because they offer limited support for granular detection, interpretable explanations, neutral rewriting, and openly available trained models together.
 
 
@@ -90,9 +87,7 @@ The `start` and `end` offsets in the listing are computed deterministically afte
 # Research Impact Statement
 
 The research impact of UnBias-Plus spans research, industry, and societal dimensions. From a research perspective, it contributes a unified framework for bias detection, classification, explanation, and debiasing, together with released models, code, datasets, and training recipes that support reproducible development of fairness-aware language systems.
-
 In industry, UnBias-Plus can be applied across domains such as journalism, content moderation, and decision-support systems, where editorial and review teams can use it to screen biased or non-neutral language and improve transparency. In high-stakes domains such as hiring and insurance, it can help flag potentially biased language before documents are published or decisions are communicated.
-
 At the societal level, UnBias-Plus can support more equitable information dissemination by reducing the propagation of biased language in public-facing systems, and can be used in educational settings to help students identify and refine biased expressions in their writing.
 
 ## Validation
